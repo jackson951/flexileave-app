@@ -118,8 +118,6 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      
-
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-4 sm:p-6">
         <div className="w-full max-w-md">
           {/* Login Card */}
