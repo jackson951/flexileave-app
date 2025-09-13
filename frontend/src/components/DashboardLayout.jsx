@@ -55,8 +55,8 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
       show: userType === "admin",
     },
     {
-      name: "Settings",
-      href: "/dashboard/settings",
+      name: "Profile Settings",
+      href: "/dashboard/profile",
       icon: Cog6ToothIcon,
       show: true,
     },

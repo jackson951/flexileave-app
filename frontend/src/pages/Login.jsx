@@ -20,6 +20,20 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
 
+  const [user, setUser] = useState({
+    id: 2,
+    name: "Jane Smith",
+    email: formData?.email,
+    password: formData.password,
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
+    role: "admin",
+    department: "Marketing",
+    position: "Marketing Manager",
+    leaveBalance: 22,
+    joinDate: "2021-08-10",
+  });
+
   // Auto-focus on email field when component mounts
   useEffect(() => {
     const emailInput = document.getElementById("email");
@@ -94,6 +108,7 @@ const LoginPage = () => {
         localStorage.removeItem("digititan_rememberMe");
       }
 
+      localStorage.setItem("user", user);
       // Store login timestamp
       localStorage.setItem("digititan_lastLogin", new Date().toISOString());
 
@@ -127,9 +142,7 @@ const LoginPage = () => {
                 <h2 className="text-3xl font-bold text-gray-900 mb-2">
                   Welcome Back
                 </h2>
-                <p className="text-gray-600">
-                  Sign in to access your dashboard
-                </p>
+                <p className="text-gray-600">Sign in to access your account</p>
               </div>
 
               {/* Error Alert */}
@@ -343,7 +356,7 @@ const LoginPage = () => {
                         Signing in...
                       </>
                     ) : (
-                      "Sign In to Dashboard"
+                      "Sign In"
                     )}
                   </button>
                 </div>

@@ -147,7 +147,7 @@ const AppRoutes = () => {
 
         {/* Settings (both see same placeholder for now) */}
         <Route
-          path="settings"
+          path="profile"
           element={<div className="p-6">⚙️ Settings coming soon</div>}
         />
       </Route>
