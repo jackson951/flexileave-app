@@ -12,10 +12,9 @@ import {
   ArrowLeftIcon,
   ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
-
-// Import LeaveHistory component (assuming it's in the same parent directory)
 import LeaveHistory from "../leave/LeaveHistory";
 import { useAuth } from "../../contexts/AuthContext";
+
 const LeaveApprovals = () => {
   const [currentView, setCurrentView] = useState("approvals"); // "approvals" or "history"
   const [leaves, setLeaves] = useState([]);
@@ -27,6 +26,7 @@ const LeaveApprovals = () => {
   const [error, setError] = useState(null);
 
   const { user } = useAuth();
+
   // Fetch all leave requests from API (excluding admin's own leaves)
   useEffect(() => {
     if (currentView !== "approvals") return;
@@ -55,17 +55,16 @@ const LeaveApprovals = () => {
 
         const data = await response.json();
 
-        if (user.ok) {
-          const currentUser = await user.json();
-          const filteredData = data.filter(
-            (leave) => leave.userId !== currentUser.id
-          );
-          setLeaves(filteredData);
-          setFilteredLeaves(filteredData);
-        } else {
-          setLeaves(data);
-          setFilteredLeaves(data);
-        }
+        // Get current user ID from auth context
+        const currentUserId = user?.id;
+
+        // Filter out the current user's leaves to prevent self-approval
+        const filteredData = data.filter(
+          (leave) => leave.userId !== currentUserId
+        );
+
+        setLeaves(filteredData);
+        setFilteredLeaves(filteredData);
       } catch (err) {
         console.error("Error fetching leaves:", err);
         setError(err.message);
@@ -75,7 +74,7 @@ const LeaveApprovals = () => {
     };
 
     fetchLeaves();
-  }, [currentView]);
+  }, [currentView, user]);
 
   // Filter leaves based on search term and status
   useEffect(() => {
