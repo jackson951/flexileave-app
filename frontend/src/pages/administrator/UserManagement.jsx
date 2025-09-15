@@ -13,16 +13,27 @@ import {
   CalendarIcon,
   FunnelIcon,
   ChevronUpDownIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from "@heroicons/react/24/outline";
+
+const API_BASE_URL = "http://localhost:5000/api";
 
 const UserManagement = () => {
   const { user } = useAuth();
+  const [token, setToken] = useState(
+    localStorage.getItem("authToken") || sessionStorage.getItem("authToken")
+  );
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -33,6 +44,8 @@ const UserManagement = () => {
     leaveBalance: "",
     role: "employee",
     avatar: "",
+    password: "",
+    confirmPassword: "",
   });
 
   // Departments for filtering and selection
@@ -47,92 +60,45 @@ const UserManagement = () => {
     "Customer Support",
   ];
 
-  // Generate dummy employees on component mount
-  useEffect(() => {
-    const dummyEmployees = [
-      {
-        id: 1,
-        name: "John Doe",
-        email: "john.doe@digititan.com",
-        phone: "+1 (555) 123-4567",
-        department: "Engineering",
-        position: "Senior Developer",
-        joinDate: "2022-03-15",
-        leaveBalance: 18,
-        role: "employee",
-        avatar:
-          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
-      },
-      {
-        id: 2,
-        name: "Jane Smith",
-        email: "jane.smith@digititan.com",
-        phone: "+1 (555) 234-5678",
-        department: "Marketing",
-        position: "Marketing Manager",
-        joinDate: "2021-08-10",
-        leaveBalance: 22,
-        role: "admin",
-        avatar:
-          "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
-      },
-      {
-        id: 3,
-        name: "Robert Johnson",
-        email: "robert.johnson@digititan.com",
-        phone: "+1 (555) 345-6789",
-        department: "Sales",
-        position: "Sales Executive",
-        joinDate: "2023-01-20",
-        leaveBalance: 15,
-        role: "employee",
-        avatar:
-          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
-      },
-      {
-        id: 4,
-        name: "Sarah Wilson",
-        email: "sarah.wilson@digititan.com",
-        phone: "+1 (555) 456-7890",
-        department: "HR",
-        position: "HR Specialist",
-        joinDate: "2020-11-05",
-        leaveBalance: 20,
-        role: "employee",
-        avatar:
-          "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
-      },
-      {
-        id: 5,
-        name: "Michael Brown",
-        email: "michael.brown@digititan.com",
-        phone: "+1 (555) 567-8901",
-        department: "Finance",
-        position: "Financial Analyst",
-        joinDate: "2019-05-12",
-        leaveBalance: 25,
-        role: "employee",
-        avatar:
-          "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
-      },
-      {
-        id: 6,
-        name: "Emily Davis",
-        email: "emily.davis@digititan.com",
-        phone: "+1 (555) 678-9012",
-        department: "Operations",
-        position: "Operations Manager",
-        joinDate: "2022-09-30",
-        leaveBalance: 16,
-        role: "manager",
-        avatar:
-          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
-      },
-    ];
+  // Fetch employees from backend
+  const fetchEmployees = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/users`, {
+        method: "GET",
+        credentials: "include", // Important for cookies/sessions
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    setEmployees(dummyEmployees);
-    setFilteredEmployees(dummyEmployees);
-  }, []);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch employees");
+      }
+
+      const data = await response.json();
+      setEmployees(data);
+      setFilteredEmployees(data);
+    } catch (err) {
+      setError(err.message || "Failed to fetch employees");
+      console.error("Error fetching employees:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load employees on component mount
+  useEffect(() => {
+    console.log("Current token:", token); // Check if token exists
+    if (token) {
+      fetchEmployees();
+    } else {
+      setError("Authentication required. Please log in.");
+    }
+  }, [token]);
 
   // Filter employees based on search term and department
   useEffect(() => {
@@ -142,10 +108,10 @@ const UserManagement = () => {
       const term = searchTerm.toLowerCase();
       result = result.filter(
         (employee) =>
-          employee.name.toLowerCase().includes(term) ||
-          employee.email.toLowerCase().includes(term) ||
-          employee.position.toLowerCase().includes(term) ||
-          employee.department.toLowerCase().includes(term)
+          employee.name?.toLowerCase().includes(term) ||
+          employee.email?.toLowerCase().includes(term) ||
+          employee.position?.toLowerCase().includes(term) ||
+          employee.department?.toLowerCase().includes(term)
       );
     }
 
@@ -168,31 +134,89 @@ const UserManagement = () => {
   };
 
   // Handle form submission for create/update
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError(null);
 
-    if (editingEmployee) {
-      // Update existing employee
-      setEmployees(
-        employees.map((emp) =>
-          emp.id === editingEmployee.id ? { ...formData, id: emp.id } : emp
-        )
-      );
-    } else {
-      // Create new employee
-      const newEmployee = {
-        ...formData,
-        id:
-          employees.length > 0
-            ? Math.max(...employees.map((e) => e.id)) + 1
-            : 1,
+    try {
+      // Only validate passwords when creating a new user
+      if (!editingEmployee && formData.password !== formData.confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
+
+      if (!editingEmployee && !formData.password) {
+        throw new Error("Password is required");
+      }
+
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        department: formData.department,
+        position: formData.position,
+        joinDate: formData.joinDate || new Date().toISOString().split("T")[0],
+        leaveBalance: parseInt(formData.leaveBalance),
+        role: formData.role,
+        avatar:
+          formData?.avatar ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+            FormData.name || "User"
+          )}&background=random&size=128`,
+        // Only include password if it's being set/changed
+        ...(!editingEmployee && { password: formData.password }),
       };
-      setEmployees([...employees, newEmployee]);
-    }
 
-    setIsModalOpen(false);
-    setEditingEmployee(null);
-    resetForm();
+      let response;
+
+      if (editingEmployee) {
+        // Update existing employee
+        response = await fetch(`${API_BASE_URL}/users/${editingEmployee.id}`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // Create new employee
+        response = await fetch(`${API_BASE_URL}/users`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Operation failed");
+      }
+
+      const savedEmployee = await response.json();
+
+      if (editingEmployee) {
+        setEmployees(
+          employees.map((emp) =>
+            emp.id === editingEmployee.id ? savedEmployee : emp
+          )
+        );
+      } else {
+        setEmployees([...employees, savedEmployee]);
+      }
+
+      setIsModalOpen(false);
+      setEditingEmployee(null);
+      resetForm();
+    } catch (err) {
+      setError(err.message);
+      console.error("Error saving employee:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Reset form data
@@ -207,20 +231,58 @@ const UserManagement = () => {
       leaveBalance: "",
       role: "employee",
       avatar: "",
+      password: "",
+      confirmPassword: "",
     });
+    setError(null);
   };
 
   // Edit employee
   const handleEdit = (employee) => {
     setEditingEmployee(employee);
-    setFormData(employee);
+    setFormData({
+      name: employee.name,
+      email: employee.email,
+      phone: employee.phone,
+      department: employee.department,
+      position: employee.position,
+      joinDate: employee.joinDate
+        ? new Date(employee.joinDate).toISOString().split("T")[0]
+        : "",
+      leaveBalance: employee.leaveBalance?.toString() || "",
+      role: employee.role || "employee",
+      avatar: employee.avatar || "",
+      password: "", // Don't pre-fill password fields
+      confirmPassword: "",
+    });
     setIsModalOpen(true);
   };
 
   // Delete employee
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this employee?")) {
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this employee?"))
+      return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) throw new Error("Failed to delete employee");
+
       setEmployees(employees.filter((employee) => employee.id !== id));
+    } catch (err) {
+      setError(err.message);
+      console.error("Error deleting employee:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -230,6 +292,42 @@ const UserManagement = () => {
     setEditingEmployee(null);
     resetForm();
   };
+
+  // Loading skeleton
+  const renderSkeleton = () => (
+    <tr>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="flex items-center">
+          <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
+          <div className="ml-4">
+            <div className="h-4 bg-gray-200 rounded animate-pulse w-24"></div>
+            <div className="h-3 bg-gray-200 rounded animate-pulse w-32 mt-2"></div>
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-4 bg-gray-200 rounded animate-pulse w-24"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-6 bg-gray-200 rounded-full animate-pulse w-16"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="h-6 bg-gray-200 rounded-full animate-pulse w-20"></div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-right">
+        <div className="flex justify-end space-x-2">
+          <div className="h-5 w-5 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-5 w-5 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+      </td>
+    </tr>
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -246,13 +344,35 @@ const UserManagement = () => {
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            disabled={isLoading}
+            className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <PlusIcon className="h-5 w-5 mr-2" />
             Add Employee
           </button>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-lg flex items-start">
+          <svg
+            className="h-5 w-5 mr-2 mt-0.5"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <div>
+            <p className="font-medium">Error</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
@@ -267,6 +387,7 @@ const UserManagement = () => {
               placeholder="Search employees..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={isLoading}
             />
           </div>
           <div className="flex gap-2">
@@ -275,6 +396,7 @@ const UserManagement = () => {
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
                 className="h-full rounded-md border-0 bg-transparent py-0 pl-8 pr-8 text-gray-700 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
+                disabled={isLoading}
               >
                 <option value="all">All Departments</option>
                 {departments.map((dept) => (
@@ -350,7 +472,13 @@ const UserManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEmployees.length > 0 ? (
+              {isLoading && !employees.length ? (
+                <>
+                  {renderSkeleton()}
+                  {renderSkeleton()}
+                  {renderSkeleton()}
+                </>
+              ) : filteredEmployees.length > 0 ? (
                 filteredEmployees.map((employee) => (
                   <tr key={employee.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -358,8 +486,15 @@ const UserManagement = () => {
                         <div className="flex-shrink-0 h-10 w-10">
                           <img
                             className="h-10 w-10 rounded-full object-cover"
-                            src={employee.avatar}
+                            src={
+                              employee.avatar ||
+                              "https://via.placeholder.com/150?text=User"
+                            }
                             alt={employee.name}
+                            onError={(e) => {
+                              e.target.src =
+                                "https://via.placeholder.com/150?text=User";
+                            }}
                           />
                         </div>
                         <div className="ml-4">
@@ -412,13 +547,15 @@ const UserManagement = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         onClick={() => handleEdit(employee)}
-                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        disabled={isLoading}
+                        className="text-indigo-600 hover:text-indigo-900 mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <PencilIcon className="h-5 w-5" />
                       </button>
                       <button
                         onClick={() => handleDelete(employee.id)}
-                        className="text-red-600 hover:text-red-900"
+                        disabled={isLoading}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <TrashIcon className="h-5 w-5" />
                       </button>
@@ -431,7 +568,9 @@ const UserManagement = () => {
                     colSpan="7"
                     className="px-6 py-4 text-center text-sm text-gray-500"
                   >
-                    No employees found. Try adjusting your search criteria.
+                    {isLoading
+                      ? "Loading employees..."
+                      : "No employees found. Try adjusting your search criteria."}
                   </td>
                 </tr>
               )}
@@ -442,13 +581,26 @@ const UserManagement = () => {
 
       {/* Add/Edit Employee Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
           <div className="relative p-8 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="absolute top-4 right-4">
+              <button
+                onClick={handleCloseModal}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
             <div className="text-center">
-              <h3 className="text-2xl font-semibold text-gray-900">
+              <h3 className="text-2xl font-semibold text-gray-900 mb-6">
                 {editingEmployee ? "Edit Employee" : "Add New Employee"}
               </h3>
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                {error && (
+                  <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                    {error}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label
@@ -465,6 +617,7 @@ const UserManagement = () => {
                       value={formData.name}
                       onChange={handleInputChange}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      disabled={isLoading}
                     />
                   </div>
                   <div>
@@ -482,6 +635,7 @@ const UserManagement = () => {
                       value={formData.email}
                       onChange={handleInputChange}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      disabled={isLoading}
                     />
                   </div>
                   <div>
@@ -498,6 +652,7 @@ const UserManagement = () => {
                       value={formData.phone}
                       onChange={handleInputChange}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      disabled={isLoading}
                     />
                   </div>
                   <div>
@@ -514,6 +669,7 @@ const UserManagement = () => {
                       value={formData.department}
                       onChange={handleInputChange}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      disabled={isLoading}
                     >
                       <option value="">Select Department</option>
                       {departments.map((dept) => (
@@ -538,6 +694,7 @@ const UserManagement = () => {
                       value={formData.position}
                       onChange={handleInputChange}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      disabled={isLoading}
                     />
                   </div>
                   <div>
@@ -555,6 +712,7 @@ const UserManagement = () => {
                       value={formData.joinDate}
                       onChange={handleInputChange}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      disabled={isLoading}
                     />
                   </div>
                   <div>
@@ -573,6 +731,7 @@ const UserManagement = () => {
                       value={formData.leaveBalance}
                       onChange={handleInputChange}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      disabled={isLoading}
                     />
                   </div>
                   <div>
@@ -589,12 +748,82 @@ const UserManagement = () => {
                       value={formData.role}
                       onChange={handleInputChange}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      disabled={isLoading}
                     >
                       <option value="employee">Employee</option>
                       <option value="manager">Manager</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>
+                  {/* Password fields - only show when creating new user */}
+                  {!editingEmployee && (
+                    <>
+                      <div className="sm:col-span-2">
+                        <label
+                          htmlFor="password"
+                          className="block text-sm font-medium text-gray-700 text-left"
+                        >
+                          Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            name="password"
+                            id="password"
+                            required
+                            value={formData.password}
+                            onChange={handleInputChange}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border pr-10"
+                            disabled={isLoading}
+                          />
+                          <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                            ) : (
+                              <EyeIcon className="h-5 w-5 text-gray-400" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label
+                          htmlFor="confirmPassword"
+                          className="block text-sm font-medium text-gray-700 text-left"
+                        >
+                          Confirm Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            name="confirmPassword"
+                            id="confirmPassword"
+                            required
+                            value={formData.confirmPassword}
+                            onChange={handleInputChange}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border pr-10"
+                            disabled={isLoading}
+                          />
+                          <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            onClick={() =>
+                              setShowConfirmPassword(!showConfirmPassword)
+                            }
+                          >
+                            {showConfirmPassword ? (
+                              <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                            ) : (
+                              <EyeIcon className="h-5 w-5 text-gray-400" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <div className="sm:col-span-2">
                     <label
                       htmlFor="avatar"
@@ -610,6 +839,7 @@ const UserManagement = () => {
                       onChange={handleInputChange}
                       placeholder="https://example.com/avatar.jpg"
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -617,15 +847,45 @@ const UserManagement = () => {
                   <button
                     type="button"
                     onClick={handleCloseModal}
-                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >
-                    {editingEmployee ? "Update Employee" : "Add Employee"}
+                    {isLoading ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        {editingEmployee ? "Updating..." : "Saving..."}
+                      </>
+                    ) : editingEmployee ? (
+                      "Update Employee"
+                    ) : (
+                      "Add Employee"
+                    )}
                   </button>
                 </div>
               </form>

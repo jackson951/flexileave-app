@@ -36,6 +36,7 @@ const NewLeaveRequest = () => {
   const [fileUploadError, setFileUploadError] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const leaveTypes = [
     "Annual Leave",
@@ -62,7 +63,7 @@ const NewLeaveRequest = () => {
     setDateRange([ranges.selection]);
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length + formData.supportingDocs.length > 5) {
       setFileUploadError("You can upload a maximum of 5 files");
@@ -72,29 +73,68 @@ const NewLeaveRequest = () => {
     setFileUploading(true);
     setFileUploadError("");
 
-    // Simulate file upload
-    setTimeout(() => {
-      const newFiles = files.map((file) => ({
-        id: Math.random().toString(36).substr(2, 9),
-        name: file.name,
-        size: (file.size / 1024 / 1024).toFixed(2) + " MB",
-        type: file.type.split("/")[1] || file.type,
-        uploadedAt: new Date().toISOString(),
+    try {
+      const token = localStorage.getItem("authToken");
+      const formData = new FormData();
+
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      const response = await fetch("http://localhost:5000/api/leaves/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to upload files");
+      }
+
+      const uploadedFiles = await response.json();
+      setFormData((prev) => ({
+        ...prev,
+        supportingDocs: [...prev.supportingDocs, ...uploadedFiles],
       }));
+    } catch (err) {
+      console.error("Error uploading files:", err);
+      setFileUploadError(err.message);
+    } finally {
+      setFileUploading(false);
+    }
+  };
+
+  const removeFile = async (fileId) => {
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(
+        `http://localhost:5000/api/leaves/files/${fileId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete file");
+      }
 
       setFormData((prev) => ({
         ...prev,
-        supportingDocs: [...prev.supportingDocs, ...newFiles],
+        supportingDocs: prev.supportingDocs.filter(
+          (file) => file.id !== fileId
+        ),
       }));
-      setFileUploading(false);
-    }, 1500);
-  };
-
-  const removeFile = (id) => {
-    setFormData((prev) => ({
-      ...prev,
-      supportingDocs: prev.supportingDocs.filter((file) => file.id !== id),
-    }));
+    } catch (err) {
+      console.error("Error deleting file:", err);
+      setFileUploadError(err.message);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -112,12 +152,46 @@ const NewLeaveRequest = () => {
 
     if (step === 3) {
       setIsSubmitting(true);
+      setSubmitError("");
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      try {
+        const token = localStorage.getItem("authToken");
 
-      setIsSubmitted(true);
-      setIsSubmitting(false);
+        const leaveData = {
+          leaveType: formData.leaveType,
+          reason: formData.reason,
+          startDate: dateRange[0].startDate.toISOString(),
+          endDate: dateRange[0].endDate.toISOString(),
+          days: calculateDays(),
+          emergencyContact: formData.emergencyContact,
+          emergencyPhone: formData.emergencyPhone,
+          // ✅ CORRECT: Send array of file IDs
+          fileIds: formData.supportingDocs.map((doc) => doc.id),
+        };
+
+        const response = await fetch("http://localhost:5000/api/leaves", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(leaveData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || "Failed to submit leave request"
+          );
+        }
+
+        setIsSubmitted(true);
+      } catch (err) {
+        console.error("Error submitting leave request:", err);
+        setSubmitError(err.message);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -209,6 +283,19 @@ const NewLeaveRequest = () => {
           </ol>
         </nav>
       </div>
+
+      {submitError && (
+        <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <XMarkIcon className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{submitError}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Step 1: Basic Information */}
@@ -335,6 +422,7 @@ const NewLeaveRequest = () => {
                         multiple
                         className="sr-only"
                         onChange={handleFileChange}
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                         disabled={fileUploading}
                       />
                     </label>
@@ -369,7 +457,7 @@ const NewLeaveRequest = () => {
                             {file.name}
                           </span>
                           <span className="ml-2 text-xs text-gray-500">
-                            {file.size}
+                            {file.size} KB
                           </span>
                         </div>
                         <button
@@ -460,7 +548,7 @@ const NewLeaveRequest = () => {
                                   {file.name}
                                 </span>
                                 <span className="ml-2 text-xs text-gray-500">
-                                  {file.size}
+                                  {file.size} KB
                                 </span>
                               </div>
                             </li>

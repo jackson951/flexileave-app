@@ -10,90 +10,24 @@ import {
   ChevronUpDownIcon,
   ChevronUpIcon,
   ChevronDownIcon,
-  TrashIcon,
-  EyeIcon,
-  ExclamationTriangleIcon,
-  FunnelIcon,
-  BarsArrowDownIcon,
-  BarsArrowUpIcon,
-  DocumentTextIcon,
   ArrowDownTrayIcon,
+  FunnelIcon,
+  DocumentTextIcon,
+  EyeIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../contexts/AuthContext";
 import { format, subDays, parseISO } from "date-fns";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import Papa from "papaparse";
-// Import SheetJS for Excel export
 import * as XLSX from "xlsx";
-
-// Mock data generator for leave reports
-const generateMockLeaveReports = () => {
-  const departments = ["Engineering", "Marketing", "HR", "Operations"];
-  const leaveTypes = [
-    "Annual Leave",
-    "Sick Leave",
-    "Maternity/Paternity",
-    "Emergency Leave",
-    "Unpaid Leave",
-  ];
-  const statuses = ["Pending", "Approved", "Rejected"];
-  const employees = [
-    { id: 1, name: "John Doe", department: "Engineering" },
-    { id: 2, name: "Jane Smith", department: "Marketing" },
-    { id: 3, name: "Mike Johnson", department: "HR" },
-    { id: 4, name: "Sarah Wilson", department: "Operations" },
-  ];
-  const reports = [];
-  const startDate = subDays(new Date(), 90);
-  for (let i = 0; i < 50; i++) {
-    const randomDays = Math.floor(Math.random() * 10) + 1;
-    const start = new Date(
-      startDate.getTime() +
-        Math.random() * (new Date().getTime() - startDate.getTime())
-    );
-    const end = new Date(start.getTime());
-    end.setDate(start.getDate() + randomDays);
-
-    const employee = employees[Math.floor(Math.random() * employees.length)];
-    reports.push({
-      id: `LV-${1000 + i}`,
-      type: leaveTypes[Math.floor(Math.random() * leaveTypes.length)],
-      employeeId: employee.id,
-      employeeName: employee.name,
-      department: employee.department,
-      startDate: format(start, "yyyy-MM-dd"),
-      endDate: format(end, "yyyy-MM-dd"),
-      days: randomDays,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      reason: [
-        "Family vacation",
-        "Medical appointment",
-        "Personal reasons",
-        "Family emergency",
-        "Mental health day",
-      ][Math.floor(Math.random() * 5)],
-      submittedAt: format(start, "yyyy-MM-dd HH:mm"),
-      approvedBy: ["HR Manager", "Team Lead", "Department Head"][
-        Math.floor(Math.random() * 3)
-      ],
-      notes: [
-        "Approved as per policy",
-        "Requires doctor's note",
-        "Pending team coverage",
-        "Approved with reduced days",
-        "Rejected - insufficient notice",
-      ][Math.floor(Math.random() * 5)],
-    });
-  }
-  return reports;
-};
 
 const LeaveReportsPage = () => {
   const { user } = useAuth();
   const [reports, setReports] = useState([]);
   const [filteredReports, setFilteredReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -115,14 +49,11 @@ const LeaveReportsPage = () => {
     "reason",
   ]);
 
-  // Initialize mock data
-  useEffect(() => {
-    const mockReports = generateMockLeaveReports();
-    setReports(mockReports);
-    setFilteredReports(mockReports);
-    setLoading(false);
-  }, []);
-    // Filters state
+  // View Detail Modal State
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+
+  // Filters state
   const [filters, setFilters] = useState({
     type: "all",
     department: "all",
@@ -130,6 +61,59 @@ const LeaveReportsPage = () => {
     dateFrom: "",
     dateTo: "",
   });
+
+  // Fetch leave reports from API
+  useEffect(() => {
+    const fetchLeaveReports = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+          throw new Error("Authentication token not found");
+        }
+
+        const response = await fetch("http://localhost:5000/api/leaves", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to fetch leave reports");
+        }
+
+        const data = await response.json();
+
+        // Map backend data to match frontend expectations
+        const mappedReports = data.map((report) => ({
+          id: report.id,
+          employeeName: report.user?.name || "Unknown",
+          department: report.user?.department || "Unknown",
+          type: report.leaveType,
+          startDate: report.startDate,
+          endDate: report.endDate,
+          days: report.days,
+          status: report.status.toLowerCase(), // Backend sends "Approved", we need "approved"
+          reason: report.reason || "",
+          submittedAt: report.submittedAt,
+          approvedBy: report.approvedBy || "System",
+          notes: report.notes || "",
+        }));
+
+        setReports(mappedReports);
+        setFilteredReports(mappedReports);
+      } catch (err) {
+        console.error("Error fetching leave reports:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaveReports();
+  }, []);
 
   // Filter and sort reports
   useEffect(() => {
@@ -171,11 +155,11 @@ const LeaveReportsPage = () => {
 
     // Apply tab filtering
     if (activeTab === "pending") {
-      result = result.filter((report) => report.status === "Pending");
+      result = result.filter((report) => report.status === "pending");
     } else if (activeTab === "approved") {
-      result = result.filter((report) => report.status === "Approved");
+      result = result.filter((report) => report.status === "approved");
     } else if (activeTab === "rejected") {
-      result = result.filter((report) => report.status === "Rejected");
+      result = result.filter((report) => report.status === "rejected");
     }
 
     // Apply sorting
@@ -221,6 +205,18 @@ const LeaveReportsPage = () => {
     ) : (
       <ChevronDownIcon className="h-4 w-4 text-indigo-600 ml-1" />
     );
+  };
+
+  // Handle view details
+  const handleViewReport = (report) => {
+    setSelectedReport(report);
+    setIsViewModalOpen(true);
+  };
+
+  // Close view modal
+  const handleCloseViewModal = () => {
+    setIsViewModalOpen(false);
+    setSelectedReport(null);
   };
 
   // Export to PDF
@@ -274,6 +270,9 @@ const LeaveReportsPage = () => {
       return visibleColumnKeys.map((key) => {
         if (key === "reason") {
           return report[key].substring(0, 30); // Truncate reason for readability
+        }
+        if (key === "status") {
+          return report[key].charAt(0).toUpperCase() + report[key].slice(1);
         }
         return report[key];
       });
@@ -353,7 +352,12 @@ const LeaveReportsPage = () => {
     });
 
     const data = filteredReports.map((report) => {
-      return visibleColumnKeys.map((key) => report[key]);
+      return visibleColumnKeys.map((key) => {
+        if (key === "status") {
+          return report[key].charAt(0).toUpperCase() + report[key].slice(1);
+        }
+        return report[key];
+      });
     });
 
     const csvContent = Papa.unparse([visibleHeaders, ...data], {
@@ -420,7 +424,12 @@ const LeaveReportsPage = () => {
     // Create worksheet data
     const worksheetData = [visibleHeaders];
     filteredReports.forEach((report) => {
-      const row = visibleColumnKeys.map((key) => report[key]);
+      const row = visibleColumnKeys.map((key) => {
+        if (key === "status") {
+          return report[key].charAt(0).toUpperCase() + report[key].slice(1);
+        }
+        return report[key];
+      });
       worksheetData.push(row);
     });
 
@@ -454,15 +463,15 @@ const LeaveReportsPage = () => {
   // Status badge component
   const StatusBadge = ({ status }) => {
     const colors = {
-      Approved: "bg-green-100 text-green-800",
-      Pending: "bg-yellow-100 text-yellow-800",
-      Rejected: "bg-red-100 text-red-800",
+      approved: "bg-green-100 text-green-800",
+      pending: "bg-yellow-100 text-yellow-800",
+      rejected: "bg-red-100 text-red-800",
     };
     return (
       <span
         className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status]}`}
       >
-        {status}
+        {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
   };
@@ -482,7 +491,22 @@ const LeaveReportsPage = () => {
     );
   }
 
-
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <XMarkIcon className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -491,7 +515,7 @@ const LeaveReportsPage = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Leave Reports</h1>
           <p className="mt-2 text-gray-600">
-            Manage and track employee leave requests
+            View and export comprehensive leave request reports
           </p>
         </div>
         <div className="flex space-x-3">
@@ -522,7 +546,7 @@ const LeaveReportsPage = () => {
               <span className="ml-1 bg-gray-200 text-gray-800 text-xs rounded-full px-2 py-0.5">
                 {
                   filteredReports.filter((r) =>
-                    tab === "all" ? true : r.status.toLowerCase() === tab
+                    tab === "all" ? true : r.status === tab
                   ).length
                 }
               </span>
@@ -546,7 +570,7 @@ const LeaveReportsPage = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Search leave requests..."
+                  placeholder="Search by employee, ID, or reason..."
                 />
               </div>
             </div>
@@ -615,7 +639,7 @@ const LeaveReportsPage = () => {
                   <option value="all">All Statuses</option>
                   {uniqueStatuses.map((status) => (
                     <option key={status} value={status}>
-                      {status}
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
                     </option>
                   ))}
                 </select>
@@ -761,11 +785,7 @@ const LeaveReportsPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
                       <button
-                        onClick={() => {
-                          // Since admin can't view details, this could be removed or kept for future use
-                          // For now, we'll just log it
-                          console.log("View details for:", report.id);
-                        }}
+                        onClick={() => handleViewReport(report)}
                         className="text-indigo-600 hover:text-indigo-900"
                         title="View details"
                       >
@@ -875,9 +895,135 @@ const LeaveReportsPage = () => {
         )}
       </div>
 
+      {/* View Details Modal */}
+      {isViewModalOpen && selectedReport && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-3xl w-full shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">
+                  Leave Request Details
+                </h3>
+                <button
+                  onClick={handleCloseViewModal}
+                  className="text-gray-400 hover:text-gray-500"
+                  aria-label="Close modal"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Leave ID
+                  </label>
+                  <p className="text-gray-900 font-medium">
+                    {selectedReport.id}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Employee
+                  </label>
+                  <p className="text-gray-900 font-medium">
+                    {selectedReport.employeeName}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Department
+                  </label>
+                  <p className="text-gray-900">{selectedReport.department}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Leave Type
+                  </label>
+                  <p className="text-gray-900">{selectedReport.type}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Date
+                  </label>
+                  <p className="text-gray-900">
+                    {format(new Date(selectedReport.startDate), "MMM d, yyyy")}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date
+                  </label>
+                  <p className="text-gray-900">
+                    {format(new Date(selectedReport.endDate), "MMM d, yyyy")}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Duration
+                  </label>
+                  <p className="text-gray-900">
+                    {selectedReport.days} day
+                    {selectedReport.days !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <StatusBadge status={selectedReport.status} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reason
+                  </label>
+                  <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
+                    {selectedReport.reason || "No reason provided"}
+                  </p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Submitted At
+                  </label>
+                  <p className="text-gray-900">
+                    {format(
+                      new Date(selectedReport.submittedAt),
+                      "MMM d, yyyy hh:mm a"
+                    )}
+                  </p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Approved By
+                  </label>
+                  <p className="text-gray-900">{selectedReport.approvedBy}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
+                    {selectedReport.notes || "No notes provided"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-gray-200">
+                <button
+                  onClick={handleCloseViewModal}
+                  className="px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Export Modal */}
       {showExportModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-lg w-full shadow-xl">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">

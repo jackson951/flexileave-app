@@ -7,8 +7,12 @@ import AdminDashboard from "../pages/administrator/Dashboard";
 import NewLeaveRequest from "../pages/leave/NewLeaveRequest";
 import LeaveHistory from "../pages/leave/LeaveHistory";
 import LeaveApprovals from "../pages/administrator/LeaveApproval";
-import UserManagement from "../pages/administrator/UserManagement"; // Import the UserManagement component
+import UserManagement from "../pages/administrator/UserManagement";
 import ReportsPage from "../pages/administrator/ExportReports";
+import ProfilePage from "../pages/profilePage";
+import NotFoundPage from "../pages/NotFoundPage";
+import TeamCalender from "../pages/administrator/TeamCalender";
+import ForgotPasswordPage from "../pages/ForgotPassword";
 
 // Role-based protected route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -67,6 +71,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* Redirect root to dashboard */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -95,6 +100,16 @@ const AppRoutes = () => {
             />
           }
         />
+
+        <Route
+          path="calendar"
+          element={
+            <AdminRoute>
+              <TeamCalender />
+            </AdminRoute>
+          }
+        />
+
         {/* Reports - Admin only */}
         <Route
           path="reports"
@@ -105,7 +120,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Leave requests */}
+        {/* Leave requests - accessible to both users and admins */}
         <Route
           path="leave/new"
           element={
@@ -139,21 +154,15 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Calendar (both see same placeholder for now) */}
-        <Route
-          path="calendar"
-          element={<div className="p-6">📅 Calendar coming soon</div>}
-        />
+        {/* Profile Page - accessible to all authenticated users */}
+        <Route path="profile" element={<ProfilePage user={user} />} />
 
-        {/* Settings (both see same placeholder for now) */}
-        <Route
-          path="profile"
-          element={<div className="p-6">⚙️ Settings coming soon</div>}
-        />
+        {/* Catch-all 404 Not Found inside dashboard */}
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Catch-all 404 Not Found for all other unknown routes */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 };

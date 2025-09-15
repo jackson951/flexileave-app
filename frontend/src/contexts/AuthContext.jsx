@@ -1,51 +1,52 @@
-// src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from "react";
-import LeaveApprovals from "../pages/administrator/LeaveApproval";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
-// Create context
 const AuthContext = createContext();
 
-// Custom hook for easier access
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
 
-// Provider
 export const AuthProvider = ({ children }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
-  const [user, setUser] = useState({
-    id: 2,
-    name: "Jane Smith",
-    email: "jane.smith@digititan.com",
-    password: "password123",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
-    role: "admin",
-    department: "Marketing",
-    position: "Marketing Manager",
-    leaveBalance: 22,
-    joinDate: "2021-08-10",
-  });
-  const [authToken, setAuthToken] = useState(null);
-  const [loading, setLoading] = useState(true); // Loading while checking local storage / session
+  const safeParseUser = (value) => {
+    try {
+      if (!value || value === "undefined" || value === "null") return null;
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  };
 
-  // On mount, check localStorage for token/session
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authToken, setAuthToken] = useState(null);
+  const [user, setUser] = useState(safeParseUser(localStorage.getItem("user")));
+  const [loading, setLoading] = useState(true);
+
+  // Load auth state from localStorage/sessionStorage on mount
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    const userData = user;
+    const token =
+      localStorage.getItem("authToken") || sessionStorage.getItem("authToken");
+    const storedUser = safeParseUser(localStorage.getItem("user"));
 
     if (token) {
       setAuthToken(token);
       setIsLoggedIn(true);
     }
 
-    if (userData) {
-      setUser(userData);
+    if (storedUser) {
+      setUser(storedUser);
     }
 
     setLoading(false);
   }, []);
 
-  // Login function
-  const login = ({ token, userData, rememberMe = false }) => {
+  // Login handler
+  const login = async ({ token, userData, rememberMe = false }) => {
     setAuthToken(token);
     setUser(userData);
     setIsLoggedIn(true);
@@ -55,30 +56,59 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("user", JSON.stringify(userData));
     } else {
       sessionStorage.setItem("authToken", token);
-      sessionStorage.setItem("user", JSON.stringify(userData));
+      // still store user in localStorage for persistence
+      localStorage.setItem("user", JSON.stringify(userData));
     }
   };
 
-  // Logout function
+  // Logout handler
   const logout = () => {
     setAuthToken(null);
     setUser(null);
     setIsLoggedIn(false);
+
     localStorage.removeItem("authToken");
     localStorage.removeItem("user");
     sessionStorage.removeItem("authToken");
-    sessionStorage.removeItem("user");
   };
 
-  // Context value
+  // ✅ Update user profile
+  const updateUserProfile = async (id, updatedData) => {
+    if (!authToken) throw new Error("No auth token found");
+
+    const response = await axios.put(
+      `http://localhost:5000/api/users/${id}`,
+      updatedData,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const updatedUser = response.data;
+
+    // update state + storage so UI reflects immediately
+    setUser(updatedUser);
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+
+    return updatedUser;
+  };
+
   const value = {
     isLoggedIn,
-    user,
     authToken,
+    user,
     loading,
     login,
     logout,
+    updateUserProfile, // ✅ exposed here
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 };

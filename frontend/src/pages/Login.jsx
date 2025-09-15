@@ -6,10 +6,12 @@ import {
   EyeIcon,
   EyeSlashIcon,
 } from "@heroicons/react/24/outline";
-import Header from "../components/header";
+import { useAuth } from "../contexts/AuthContext";
+import axios from "axios";
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -20,28 +22,10 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
 
-  const [user, setUser] = useState({
-    id: 2,
-    name: "Jane Smith",
-    email: formData?.email,
-    password: formData.password,
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
-    role: "admin",
-    department: "Marketing",
-    position: "Marketing Manager",
-    leaveBalance: 22,
-    joinDate: "2021-08-10",
-  });
-
-  // Auto-focus on email field when component mounts
   useEffect(() => {
     const emailInput = document.getElementById("email");
-    if (emailInput) {
-      emailInput.focus();
-    }
+    if (emailInput) emailInput.focus();
 
-    // Check for saved credentials
     const savedEmail = localStorage.getItem("digititan_email");
     const savedRememberMe =
       localStorage.getItem("digititan_rememberMe") === "true";
@@ -56,14 +40,12 @@ const LoginPage = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address";
     }
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 8) {
+    if (!formData.password) newErrors.password = "Password is required";
+    else if (formData.password.length < 8) {
       newErrors.password = "Password must be at least 8 characters";
     }
     setErrors(newErrors);
@@ -76,18 +58,7 @@ const LoginPage = () => {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-    // Clear error when user types
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: null }));
-    }
-  };
-
-  const handleFocus = (fieldName) => {
-    setFocusedField(fieldName);
-  };
-
-  const handleBlur = () => {
-    setFocusedField(null);
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
   };
 
   const handleSubmit = async (e) => {
@@ -96,10 +67,17 @@ const LoginPage = () => {
 
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await axios.post(
+        "http://localhost:5000/api/auth/login",
+        {
+          email: formData.email,
+          password: formData.password,
+        }
+      );
 
-      // Save credentials if remember me is checked
+      const userData = response.data.user;
+
+      // Store credentials if remember me is checked
       if (formData.rememberMe) {
         localStorage.setItem("digititan_email", formData.email);
         localStorage.setItem("digititan_rememberMe", "true");
@@ -108,26 +86,16 @@ const LoginPage = () => {
         localStorage.removeItem("digititan_rememberMe");
       }
 
-      localStorage.setItem("user", user);
-      // Store login timestamp
-      localStorage.setItem("digititan_lastLogin", new Date().toISOString());
-
-      // On successful login
-      navigate("/dashboard", { replace: true });
-    } catch (error) {
-      setErrors({
-        submit:
-          error.message ||
-          "Login failed. Please check your credentials and try again.",
+      await login({
+        token: response.data.token,
+        userData,
+        rememberMe: formData.rememberMe,
       });
+      navigate("/dashboard");
+    } catch (error) {
+      setErrors({ submit: error.response?.data?.message || "Login failed" });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !isLoading) {
-      handleSubmit(e);
     }
   };
 
@@ -135,7 +103,6 @@ const LoginPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-4 sm:p-6">
         <div className="w-full max-w-md">
-          {/* Login Card */}
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-2xl">
             <div className="px-8 pt-8 pb-6">
               <div className="text-center mb-8">
@@ -145,9 +112,8 @@ const LoginPage = () => {
                 <p className="text-gray-600">Sign in to access your account</p>
               </div>
 
-              {/* Error Alert */}
               {errors.submit && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start animate-fade-in">
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start">
                   <svg
                     className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0"
                     fill="currentColor"
@@ -163,11 +129,7 @@ const LoginPage = () => {
                 </div>
               )}
 
-              <form
-                onSubmit={handleSubmit}
-                onKeyPress={handleKeyPress}
-                className="space-y-6"
-              >
+              <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Email Field */}
                 <div className="space-y-2">
                   <label
@@ -179,7 +141,7 @@ const LoginPage = () => {
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <EnvelopeIcon
-                        className={`h-5 w-5 transition-colors duration-200 ${
+                        className={`h-5 w-5 ${
                           focusedField === "email"
                             ? "text-indigo-500"
                             : "text-gray-400"
@@ -193,14 +155,12 @@ const LoginPage = () => {
                       autoComplete="email"
                       value={formData.email}
                       onChange={handleChange}
-                      onFocus={() => handleFocus("email")}
-                      onBlur={handleBlur}
-                      className={`block w-full pl-10 pr-3 py-3.5 rounded-xl border transition-all duration-300 ${
+                      onFocus={() => setFocusedField("email")}
+                      onBlur={() => setFocusedField(null)}
+                      className={`block w-full pl-10 pr-3 py-3.5 rounded-xl border ${
                         errors.email
                           ? "border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50"
-                          : focusedField === "email"
-                          ? "border-indigo-500 focus:ring-indigo-500 focus:border-indigo-500 bg-indigo-50/30 shadow-md"
-                          : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 hover:bg-white"
+                          : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
                       } focus:outline-none text-sm font-medium`}
                       placeholder="employee@digititan.com"
                     />
@@ -234,7 +194,7 @@ const LoginPage = () => {
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <LockClosedIcon
-                        className={`h-5 w-5 transition-colors duration-200 ${
+                        className={`h-5 w-5 ${
                           focusedField === "password"
                             ? "text-indigo-500"
                             : "text-gray-400"
@@ -248,24 +208,19 @@ const LoginPage = () => {
                       autoComplete="current-password"
                       value={formData.password}
                       onChange={handleChange}
-                      onFocus={() => handleFocus("password")}
-                      onBlur={handleBlur}
-                      className={`block w-full pl-10 pr-12 py-3.5 rounded-xl border transition-all duration-300 ${
+                      onFocus={() => setFocusedField("password")}
+                      onBlur={() => setFocusedField(null)}
+                      className={`block w-full pl-10 pr-12 py-3.5 rounded-xl border ${
                         errors.password
                           ? "border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50"
-                          : focusedField === "password"
-                          ? "border-indigo-500 focus:ring-indigo-500 focus:border-indigo-500 bg-indigo-50/30 shadow-md"
-                          : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 hover:bg-white"
+                          : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
                       } focus:outline-none text-sm font-medium`}
                       placeholder="••••••••"
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                       onClick={() => setShowPassword(!showPassword)}
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
                     >
                       {showPassword ? (
                         <EyeSlashIcon className="h-5 w-5" />
@@ -301,11 +256,11 @@ const LoginPage = () => {
                       type="checkbox"
                       checked={formData.rememberMe}
                       onChange={handleChange}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer transition-colors duration-200"
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                     <label
                       htmlFor="remember-me"
-                      className="ml-2 block text-sm text-gray-700 cursor-pointer"
+                      className="ml-2 block text-sm text-gray-700"
                     >
                       Remember me
                     </label>
@@ -313,7 +268,7 @@ const LoginPage = () => {
                   <div className="text-sm">
                     <a
                       href="/forgot-password"
-                      className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors duration-200 hover:underline"
+                      className="font-medium text-indigo-600 hover:text-indigo-500"
                     >
                       Forgot password?
                     </a>
@@ -325,10 +280,8 @@ const LoginPage = () => {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className={`w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transform transition-all duration-300 ${
-                      isLoading
-                        ? "opacity-75 cursor-not-allowed"
-                        : "hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg"
+                    className={`w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                      isLoading ? "opacity-75 cursor-not-allowed" : ""
                     }`}
                   >
                     {isLoading ? (
@@ -378,7 +331,7 @@ const LoginPage = () => {
               Need help?{" "}
               <a
                 href="/support"
-                className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors duration-200"
+                className="font-medium text-indigo-600 hover:text-indigo-500"
               >
                 Contact Support
               </a>
@@ -390,22 +343,6 @@ const LoginPage = () => {
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 };
