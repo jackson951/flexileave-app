@@ -47,6 +47,12 @@ const isAdminOrManager = (req, res, next) => {
   next();
 };
 
+// Helper function to get leave balance
+const getLeaveBalance = (leaveBalances, leaveType) => {
+  if (!leaveBalances) return 0;
+  return leaveBalances[leaveType] || 0;
+};
+
 // -------------------- ROUTES -------------------- //
 
 // Upload files
@@ -111,17 +117,21 @@ router.post(
           (new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)
         ) + 1;
 
-      // Fetch the user to get leaveBalance
+      // Fetch the user to get leaveBalances
       const user = await prisma.user.findUnique({
         where: { id: req.user.userId },
       });
 
       if (!user) return res.status(404).json({ message: "User not found" });
 
-      if (user.leaveBalance < days)
+      // Check leave balance for the specific leave type
+      const available = getLeaveBalance(user.leaveBalances, leaveType);
+
+      if (available < days) {
         return res.status(400).json({
-          message: `Insufficient leave balance. You have ${user.leaveBalance} day(s) remaining.`,
+          message: `Insufficient ${leaveType} balance. You have ${available} day(s) remaining.`,
         });
+      }
 
       // Check for overlapping leaves
       const overlappingLeave = await prisma.leave.findFirst({
@@ -292,7 +302,7 @@ router.put("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// Approve leave and deduct leave days
+// Approve leave and deduct leave days from specific leave type
 router.put(
   "/:id/approve",
   authenticateToken,
@@ -315,12 +325,20 @@ router.put(
           .status(400)
           .json({ message: "Only pending leaves can be approved" });
 
-      // Check if user has enough leave balance
-      if (leave.user.leaveBalance < leave.days) {
-        return res
-          .status(400)
-          .json({ message: "User does not have enough leave balance" });
+      // Check if user has enough leave balance for the specific leave type
+      const currentBalance = getLeaveBalance(leave.user.leaveBalances, leave.leaveType);
+      
+      if (currentBalance < leave.days) {
+        return res.status(400).json({
+          message: `User does not have enough ${leave.leaveType} balance. Available: ${currentBalance}, Requested: ${leave.days}`
+        });
       }
+
+      // Update leaveBalances for the specific leave type
+      const updatedLeaveBalances = {
+        ...leave.user.leaveBalances,
+        [leave.leaveType]: currentBalance - leave.days
+      };
 
       // Deduct leave days and update leave status
       const updatedLeave = await prisma.leave.update({
@@ -330,19 +348,19 @@ router.put(
           rejectionReason: null,
           user: {
             update: {
-              leaveBalance: leave.user.leaveBalance - leave.days,
+              leaveBalances: updatedLeaveBalances,
             },
           },
         },
         include: {
           user: {
-            select: { id: true, name: true, email: true, leaveBalance: true },
+            select: { id: true, name: true, email: true, leaveBalances: true },
           },
         },
       });
 
       res.json({
-        message: `Leave approved and ${leave.days} days deducted from user's leave balance`,
+        message: `Leave approved and ${leave.days} days deducted from ${leave.leaveType} balance`,
         leave: updatedLeave,
       });
     } catch (error) {
