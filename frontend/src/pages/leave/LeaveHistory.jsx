@@ -174,8 +174,6 @@ const LeaveHistory = () => {
     const end = new Date(formData.endDate);
 
     if (start > end) errors.endDate = "End date cannot be before start date";
-    if (isAfter(start, new Date()))
-      errors.startDate = "Start date cannot be in the future";
 
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
     if (days > userBalance) {
