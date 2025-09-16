@@ -39,16 +39,42 @@ const LeaveHistory = () => {
   });
   const [fileUploading, setFileUploading] = useState(false);
   const [fileUploadError, setFileUploadError] = useState("");
-  const [userBalance, setUserBalance] = useState(0);
+  const [userBalances, setUserBalances] = useState({
+    AnnualLeave: 0,
+    SickLeave: 0,
+    FamilyResponsibility: 0,
+    UnpaidLeave: 0,
+    Other: 0,
+  });
   const [formErrors, setFormErrors] = useState({});
 
-  // Fetch user's leave history and balance
+  // Map display names to backend values
+  const leaveTypeMapping = {
+    "Annual Leave": "AnnualLeave",
+    "Sick Leave": "SickLeave",
+    "Family Responsibility": "FamilyResponsibility",
+    "Unpaid Leave": "UnpaidLeave",
+    Other: "Other",
+  };
+
+  // Reverse mapping for display
+  const reverseLeaveTypeMapping = {
+    AnnualLeave: "Annual Leave",
+    SickLeave: "Sick Leave",
+    FamilyResponsibility: "Family Responsibility",
+    UnpaidLeave: "Unpaid Leave",
+    Other: "Other",
+  };
+
+  // Fetch user's leave history and balances
   useEffect(() => {
     const fetchLeaveHistory = async () => {
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem("authToken");
+        const token =
+          localStorage.getItem("authToken") ||
+          sessionStorage.getItem("authToken");
         if (!token) {
           throw new Error("Authentication token not found");
         }
@@ -70,10 +96,10 @@ const LeaveHistory = () => {
 
         const leaves = await leavesResponse.json();
 
-        // Fetch user profile to get leave balance
-
-        const userData = await user;
-        setUserBalance(userData.leaveBalance);
+        // Get user balances from context
+        if (user?.leaveBalances) {
+          setUserBalances(user.leaveBalances);
+        }
 
         setLeaveHistory(leaves);
         setFilteredLeaves(leaves);
@@ -88,8 +114,10 @@ const LeaveHistory = () => {
       }
     };
 
-    fetchLeaveHistory();
-  }, [logout]);
+    if (user) {
+      fetchLeaveHistory();
+    }
+  }, [user, logout]);
 
   // Filter and search logic
   useEffect(() => {
@@ -100,16 +128,20 @@ const LeaveHistory = () => {
       const term = searchTerm.toLowerCase();
       result = result.filter(
         (leave) =>
-          leave.leaveType.toLowerCase().includes(term) ||
-          leave.reason.toLowerCase().includes(term) ||
-          leave.user?.name.toLowerCase().includes(term)
+          (leave.leaveType && leave.leaveType.toLowerCase().includes(term)) ||
+          (leave.reason && leave.reason.toLowerCase().includes(term)) ||
+          (leave.user?.name && leave.user.name.toLowerCase().includes(term))
       );
     }
 
     // Filter by status or leave type
     if (filter !== "all") {
       result = result.filter(
-        (leave) => leave.status === filter || leave.leaveType === filter
+        (leave) =>
+          leave.status === filter ||
+          leave.leaveType === filter ||
+          leave.leaveType === leaveTypeMapping[filter] ||
+          reverseLeaveTypeMapping[leave.leaveType] === filter
       );
     }
 
@@ -134,8 +166,13 @@ const LeaveHistory = () => {
     }
 
     setEditingLeave(leave);
+
+    // Convert backend leave type to display name if needed
+    const displayLeaveType =
+      reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType;
+
     setFormData({
-      leaveType: leave.leaveType,
+      leaveType: displayLeaveType,
       startDate: leave.startDate.split("T")[0],
       endDate: leave.endDate.split("T")[0],
       reason: leave.reason || "",
@@ -160,6 +197,17 @@ const LeaveHistory = () => {
         [name]: "",
       }));
     }
+
+    // Also clear days error when dates change
+    if (name === "startDate" || name === "endDate") {
+      if (formErrors.days) {
+        setFormErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors.days;
+          return newErrors;
+        });
+      }
+    }
   };
 
   const validateForm = () => {
@@ -175,9 +223,17 @@ const LeaveHistory = () => {
 
     if (start > end) errors.endDate = "End date cannot be before start date";
 
+    // Calculate days
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-    if (days > userBalance) {
-      errors.days = `Insufficient leave balance. You have ${userBalance} day(s) remaining.`;
+
+    // Get the backend leave type
+    const backendLeaveType = leaveTypeMapping[formData.leaveType];
+
+    // Check if user has sufficient balance for this leave type
+    if (backendLeaveType && userBalances[backendLeaveType] !== undefined) {
+      if (days > userBalances[backendLeaveType]) {
+        errors.days = `Insufficient ${formData.leaveType} balance. You have ${userBalances[backendLeaveType]} day(s) remaining.`;
+      }
     }
 
     // Check for overlapping leaves (frontend hint — backend still enforces)
@@ -204,9 +260,16 @@ const LeaveHistory = () => {
 
     setFileUploading(true);
     try {
-      const token = localStorage.getItem("authToken");
+      const token =
+        localStorage.getItem("authToken") ||
+        sessionStorage.getItem("authToken");
+
+      // Convert display name to backend value
+      const backendLeaveType =
+        leaveTypeMapping[formData.leaveType] || formData.leaveType;
+
       const payload = {
-        leaveType: formData.leaveType,
+        leaveType: backendLeaveType,
         startDate: formData.startDate,
         endDate: formData.endDate,
         reason: formData.reason,
@@ -233,8 +296,19 @@ const LeaveHistory = () => {
       }
 
       const updatedLeave = await response.json();
+
+      // Convert backend leave type to display name for consistency in UI
+      const updatedLeaveWithDisplayName = {
+        ...updatedLeave,
+        leaveType:
+          reverseLeaveTypeMapping[updatedLeave.leaveType] ||
+          updatedLeave.leaveType,
+      };
+
       setLeaveHistory((prev) =>
-        prev.map((l) => (l.id === updatedLeave.id ? updatedLeave : l))
+        prev.map((l) =>
+          l.id === updatedLeave.id ? updatedLeaveWithDisplayName : l
+        )
       );
       setIsEditModalOpen(false);
       setEditingLeave(null);
@@ -268,10 +342,12 @@ const LeaveHistory = () => {
     setFileUploadError("");
 
     try {
-      const token = localStorage.getItem("authToken");
-      const formData = new FormData();
+      const token =
+        localStorage.getItem("authToken") ||
+        sessionStorage.getItem("authToken");
+      const uploadFormData = new FormData();
       files.forEach((file) => {
-        formData.append("files", file);
+        uploadFormData.append("files", file);
       });
 
       const response = await fetch("http://localhost:5000/api/leaves/upload", {
@@ -279,11 +355,12 @@ const LeaveHistory = () => {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        body: formData,
+        body: uploadFormData,
       });
 
       if (!response.ok) {
-        throw new Error("Failed to upload files");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to upload files");
       }
 
       const uploadedFiles = await response.json();
@@ -301,7 +378,9 @@ const LeaveHistory = () => {
 
   const removeFile = async (fileId) => {
     try {
-      const token = localStorage.getItem("authToken");
+      const token =
+        localStorage.getItem("authToken") ||
+        sessionStorage.getItem("authToken");
       const response = await fetch(
         `http://localhost:5000/api/leaves/files/${fileId}`,
         {
@@ -313,7 +392,8 @@ const LeaveHistory = () => {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to delete file");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete file");
       }
 
       setFormData((prev) => ({
@@ -333,7 +413,9 @@ const LeaveHistory = () => {
       return;
 
     try {
-      const token = localStorage.getItem("authToken");
+      const token =
+        localStorage.getItem("authToken") ||
+        sessionStorage.getItem("authToken");
       const response = await fetch(
         `http://localhost:5000/api/leaves/${id}/cancel`,
         {
@@ -346,7 +428,8 @@ const LeaveHistory = () => {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to cancel leave");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to cancel leave");
       }
 
       setLeaveHistory((prev) =>
@@ -461,11 +544,27 @@ const LeaveHistory = () => {
           View and manage your leave requests. Edit pending requests before they
           are approved.
         </p>
-        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 inline-block">
-          <p className="text-sm text-blue-800">
-            <strong>Current Leave Balance:</strong> {userBalance} day
-            {userBalance !== 1 ? "s" : ""}
-          </p>
+
+        {/* Leave Balances Display */}
+        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-blue-800 mb-2">
+            Current Leave Balances:
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {Object.entries(userBalances).map(([leaveType, balance]) => (
+              <div
+                key={leaveType}
+                className="flex justify-between items-center bg-white px-3 py-2 rounded"
+              >
+                <span className="text-sm font-medium text-gray-700">
+                  {reverseLeaveTypeMapping[leaveType] || leaveType}:
+                </span>
+                <span className="text-sm font-bold text-blue-600">
+                  {balance} day{balance !== 1 ? "s" : ""}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -507,6 +606,7 @@ const LeaveHistory = () => {
                 Family Responsibility
               </option>
               <option value="Unpaid Leave">Unpaid Leave</option>
+              <option value="Other">Other</option>
             </select>
           </div>
         </div>
@@ -524,7 +624,7 @@ const LeaveHistory = () => {
               You haven't submitted any leave requests yet.
             </p>
             <button
-              onClick={() => (window.location.href = "/leave/new")}
+              onClick={() => (window.location.href = "leave/new")}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
             >
               <PlusIcon className="h-5 w-5 mr-2" />
@@ -533,161 +633,167 @@ const LeaveHistory = () => {
           </div>
         ) : (
           <ul className="divide-y divide-gray-200">
-            {filteredLeaves.map((leave) => (
-              <li key={leave.id}>
-                <div className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div
-                        className={`flex-shrink-0 rounded-full p-1 ${
-                          leave.status === "approved"
-                            ? "bg-green-100"
-                            : leave.status === "rejected"
-                            ? "bg-red-100"
-                            : leave.status === "cancelled"
-                            ? "bg-gray-100"
-                            : "bg-yellow-100"
-                        }`}
-                      >
-                        {getStatusIcon(leave.status)}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {leave.leaveType} - {leave.days} day
-                          {leave.days !== 1 ? "s" : ""}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {formatDate(leave.startDate)} to{" "}
-                          {formatDate(leave.endDate)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="ml-2 flex-shrink-0 flex">
-                      <div className="text-right mr-4">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                            leave.status
-                          )}`}
+            {filteredLeaves.map((leave) => {
+              // Convert backend leave type to display name for consistent display
+              const displayLeaveType =
+                reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType;
+
+              return (
+                <li key={leave.id}>
+                  <div className="px-4 py-4 sm:px-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div
+                          className={`flex-shrink-0 rounded-full p-1 ${
+                            leave.status === "approved"
+                              ? "bg-green-100"
+                              : leave.status === "rejected"
+                              ? "bg-red-100"
+                              : leave.status === "cancelled"
+                              ? "bg-gray-100"
+                              : "bg-yellow-100"
+                          }`}
                         >
-                          {leave.status.charAt(0).toUpperCase() +
-                            leave.status.slice(1)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(leave.id)}
-                        className="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-500"
-                      >
-                        {expandedRequest === leave.id ? (
-                          <ChevronUpIcon className="h-5 w-5" />
-                        ) : (
-                          <ChevronDownIcon className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {expandedRequest === leave.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <div className="text-sm text-gray-700 mb-4">
-                        <p className="font-medium">Reason:</p>
-                        <p className="mt-1">{leave.reason}</p>
-                      </div>
-
-                      {leave.attachments && leave.attachments.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-gray-700">
-                            Supporting Documents:
-                          </p>
-                          <ul className="mt-1 border border-gray-200 rounded-md divide-y divide-gray-200">
-                            {leave.attachments.map((doc) => (
-                              <li
-                                key={doc.id}
-                                className="pl-3 pr-4 py-3 flex items-center justify-between text-sm"
-                              >
-                                <div className="w-0 flex-1 flex items-center">
-                                  <DocumentTextIcon
-                                    className="flex-shrink-0 h-5 w-5 text-gray-400"
-                                    aria-hidden="true"
-                                  />
-                                  <span className="ml-2 flex-1 w-0 truncate">
-                                    {doc.name}
-                                  </span>
-                                  <span className="ml-2 text-xs text-gray-500">
-                                    {(doc.size / 1024).toFixed(1)} KB
-                                  </span>
-                                </div>
-                                <div className="ml-4 flex-shrink-0">
-                                  <button
-                                    type="button"
-                                    className="font-medium text-indigo-600 hover:text-indigo-500"
-                                    onClick={() =>
-                                      window.open(
-                                        `http://localhost:5000${doc.url}`,
-                                        "_blank"
-                                      )
-                                    }
-                                  >
-                                    View
-                                  </button>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
+                          {getStatusIcon(leave.status)}
                         </div>
-                      )}
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {displayLeaveType} - {leave.days} day
+                            {leave.days !== 1 ? "s" : ""}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(leave.startDate)} to{" "}
+                            {formatDate(leave.endDate)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="ml-2 flex-shrink-0 flex">
+                        <div className="text-right mr-4">
+                          <span
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                              leave.status
+                            )}`}
+                          >
+                            {leave.status.charAt(0).toUpperCase() +
+                              leave.status.slice(1)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(leave.id)}
+                          className="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-500"
+                        >
+                          {expandedRequest === leave.id ? (
+                            <ChevronUpIcon className="h-5 w-5" />
+                          ) : (
+                            <ChevronDownIcon className="h-5 w-5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
 
-                      <div className="text-xs text-gray-500 mb-4">
-                        <p>Submitted: {formatDateTime(leave.submittedAt)}</p>
-                        {leave.approvedAt && (
-                          <p>
-                            Approved: {formatDateTime(leave.approvedAt)} by{" "}
-                            {leave.approvedBy || "System"}
-                          </p>
-                        )}
-                        {leave.rejectionReason && (
-                          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                            <strong className="text-red-800">
-                              Rejection Reason:
-                            </strong>{" "}
-                            {leave.rejectionReason}
+                    {expandedRequest === leave.id && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="text-sm text-gray-700 mb-4">
+                          <p className="font-medium">Reason:</p>
+                          <p className="mt-1">{leave.reason}</p>
+                        </div>
+
+                        {leave.attachments && leave.attachments.length > 0 && (
+                          <div className="mb-4">
+                            <p className="text-sm font-medium text-gray-700">
+                              Supporting Documents:
+                            </p>
+                            <ul className="mt-1 border border-gray-200 rounded-md divide-y divide-gray-200">
+                              {leave.attachments.map((doc) => (
+                                <li
+                                  key={doc.id}
+                                  className="pl-3 pr-4 py-3 flex items-center justify-between text-sm"
+                                >
+                                  <div className="w-0 flex-1 flex items-center">
+                                    <DocumentTextIcon
+                                      className="flex-shrink-0 h-5 w-5 text-gray-400"
+                                      aria-hidden="true"
+                                    />
+                                    <span className="ml-2 flex-1 w-0 truncate">
+                                      {doc.name}
+                                    </span>
+                                    <span className="ml-2 text-xs text-gray-500">
+                                      {(doc.size / 1024).toFixed(1)} KB
+                                    </span>
+                                  </div>
+                                  <div className="ml-4 flex-shrink-0">
+                                    <button
+                                      type="button"
+                                      className="font-medium text-indigo-600 hover:text-indigo-500"
+                                      onClick={() =>
+                                        window.open(
+                                          `http://localhost:5000${doc.url}`,
+                                          "_blank"
+                                        )
+                                      }
+                                    >
+                                      View
+                                    </button>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                         )}
-                      </div>
 
-                      <div className="flex space-x-3">
-                        {leave.status === "pending" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleEditClick(leave)}
-                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            >
-                              <PencilIcon className="-ml-0.5 mr-2 h-4 w-4" />
-                              Edit Request
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => cancelLeave(leave.id)}
-                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                            >
-                              <XMarkIcon className="-ml-0.5 mr-2 h-4 w-4" />
-                              Cancel Request
-                            </button>
-                          </>
-                        )}
+                        <div className="text-xs text-gray-500 mb-4">
+                          <p>Submitted: {formatDateTime(leave.submittedAt)}</p>
+                          {leave.approvedAt && (
+                            <p>
+                              Approved: {formatDateTime(leave.approvedAt)} by{" "}
+                              {leave.approvedBy || "System"}
+                            </p>
+                          )}
+                          {leave.rejectionReason && (
+                            <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                              <strong className="text-red-800">
+                                Rejection Reason:
+                              </strong>{" "}
+                              {leave.rejectionReason}
+                            </div>
+                          )}
+                        </div>
 
-                        {leave.status === "cancelled" && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            Cancelled
-                          </span>
-                        )}
+                        <div className="flex space-x-3">
+                          {leave.status === "pending" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleEditClick(leave)}
+                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                              >
+                                <PencilIcon className="-ml-0.5 mr-2 h-4 w-4" />
+                                Edit Request
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => cancelLeave(leave.id)}
+                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                              >
+                                <XMarkIcon className="-ml-0.5 mr-2 h-4 w-4" />
+                                Cancel Request
+                              </button>
+                            </>
+                          )}
+
+                          {leave.status === "cancelled" && (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              Cancelled
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              </li>
-            ))}
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -726,12 +832,20 @@ const LeaveHistory = () => {
                       }`}
                     >
                       <option value="">Select leave type</option>
-                      <option value="Annual Leave">Annual Leave</option>
-                      <option value="Sick Leave">Sick Leave</option>
-                      <option value="Family Responsibility">
-                        Family Responsibility
-                      </option>
-                      <option value="Unpaid Leave">Unpaid Leave</option>
+                      {Object.entries(userBalances).map(
+                        ([backendType, balance]) => {
+                          const displayName =
+                            reverseLeaveTypeMapping[backendType] || backendType;
+                          return (
+                            <option key={backendType} value={displayName}>
+                              {displayName} ({balance} days remaining)
+                              {balance <= 0 && backendType !== "UnpaidLeave"
+                                ? " - EXHAUSTED"
+                                : ""}
+                            </option>
+                          );
+                        }
+                      )}
                     </select>
                     {formErrors.leaveType && (
                       <p className="mt-1 text-sm text-red-600">
@@ -749,6 +863,7 @@ const LeaveHistory = () => {
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleInputChange}
+                      min={new Date().toISOString().split("T")[0]}
                       className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
                         formErrors.startDate
                           ? "border-red-500"
@@ -771,6 +886,10 @@ const LeaveHistory = () => {
                       name="endDate"
                       value={formData.endDate}
                       onChange={handleInputChange}
+                      min={
+                        formData.startDate ||
+                        new Date().toISOString().split("T")[0]
+                      }
                       className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
                         formErrors.endDate
                           ? "border-red-500"

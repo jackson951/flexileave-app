@@ -17,7 +17,13 @@ async function main() {
       department: "IT",
       position: "Administrator",
       joinDate: new Date("2023-01-01"),
-      leaveBalance: 30,
+      leaveBalances: {
+        AnnualLeave: 15,
+        SickLeave: 10,
+        FamilyResponsibility: 5,
+        UnpaidLeave: 0,
+        Other: 3,
+      },
       role: "admin",
       avatar:
         "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",

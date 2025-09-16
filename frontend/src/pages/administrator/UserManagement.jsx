@@ -19,6 +19,15 @@ import {
 
 const API_BASE_URL = "http://localhost:5000/api";
 
+// Define leave types
+const LEAVE_TYPES = [
+  "AnnualLeave",
+  "SickLeave",
+  "FamilyResponsibility",
+  "UnpaidLeave",
+  "Other",
+];
+
 const UserManagement = () => {
   const { user } = useAuth();
   const [token, setToken] = useState(
@@ -41,11 +50,17 @@ const UserManagement = () => {
     department: "",
     position: "",
     joinDate: "",
-    leaveBalance: "",
     role: "employee",
     avatar: "",
     password: "",
     confirmPassword: "",
+    leaveBalances: {
+      AnnualLeave: 0,
+      SickLeave: 0,
+      FamilyResponsibility: 0,
+      UnpaidLeave: 0,
+      Other: 0,
+    },
   });
 
   // Departments for filtering and selection
@@ -67,7 +82,7 @@ const UserManagement = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/users`, {
         method: "GET",
-        credentials: "include", // Important for cookies/sessions
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -92,7 +107,6 @@ const UserManagement = () => {
 
   // Load employees on component mount
   useEffect(() => {
-    console.log("Current token:", token); // Check if token exists
     if (token) {
       fetchEmployees();
     } else {
@@ -127,10 +141,23 @@ const UserManagement = () => {
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+
+    // Check if this is a leave balance field
+    if (name.startsWith("leaveBalance_")) {
+      const leaveType = name.replace("leaveBalance_", "");
+      setFormData({
+        ...formData,
+        leaveBalances: {
+          ...formData.leaveBalances,
+          [leaveType]: parseInt(value) || 0,
+        },
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+    }
   };
 
   // Handle form submission for create/update
@@ -156,12 +183,12 @@ const UserManagement = () => {
         department: formData.department,
         position: formData.position,
         joinDate: formData.joinDate || new Date().toISOString().split("T")[0],
-        leaveBalance: parseInt(formData.leaveBalance),
         role: formData.role,
+        leaveBalances: formData.leaveBalances,
         avatar:
-          formData?.avatar ||
+          formData.avatar ||
           `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            FormData.name || "User"
+            formData.name || "User"
           )}&background=random&size=128`,
         // Only include password if it's being set/changed
         ...(!editingEmployee && { password: formData.password }),
@@ -228,11 +255,17 @@ const UserManagement = () => {
       department: "",
       position: "",
       joinDate: "",
-      leaveBalance: "",
       role: "employee",
       avatar: "",
       password: "",
       confirmPassword: "",
+      leaveBalances: {
+        AnnualLeave: 0,
+        SickLeave: 0,
+        FamilyResponsibility: 0,
+        UnpaidLeave: 0,
+        Other: 0,
+      },
     });
     setError(null);
   };
@@ -249,11 +282,17 @@ const UserManagement = () => {
       joinDate: employee.joinDate
         ? new Date(employee.joinDate).toISOString().split("T")[0]
         : "",
-      leaveBalance: employee.leaveBalance?.toString() || "",
       role: employee.role || "employee",
       avatar: employee.avatar || "",
       password: "", // Don't pre-fill password fields
       confirmPassword: "",
+      leaveBalances: employee.leaveBalances || {
+        AnnualLeave: 0,
+        SickLeave: 0,
+        FamilyResponsibility: 0,
+        UnpaidLeave: 0,
+        Other: 0,
+      },
     });
     setIsModalOpen(true);
   };
@@ -291,6 +330,15 @@ const UserManagement = () => {
     setIsModalOpen(false);
     setEditingEmployee(null);
     resetForm();
+  };
+
+  // Calculate total leave balance for display in table
+  const calculateTotalLeaveBalance = (leaveBalances) => {
+    if (!leaveBalances) return 0;
+    return Object.values(leaveBalances).reduce(
+      (sum, balance) => sum + (balance || 0),
+      0
+    );
   };
 
   // Loading skeleton
@@ -455,7 +503,7 @@ const UserManagement = () => {
                   scope="col"
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
-                  Leave Balance
+                  Total Leave Balance
                 </th>
                 <th
                   scope="col"
@@ -527,7 +575,8 @@ const UserManagement = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
                         <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                          {employee.leaveBalance} days
+                          {calculateTotalLeaveBalance(employee.leaveBalances)}{" "}
+                          days
                         </span>
                       </div>
                     </td>
@@ -581,27 +630,30 @@ const UserManagement = () => {
 
       {/* Add/Edit Employee Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-          <div className="relative p-8 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div className="absolute top-4 right-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 p-4">
+          <div className="relative max-w-2xl w-full max-h-[90vh] bg-white rounded-lg shadow-xl flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">
+                {editingEmployee ? "Edit Employee" : "Add New Employee"}
+              </h3>
               <button
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
               >
                 ×
               </button>
             </div>
-            <div className="text-center">
-              <h3 className="text-2xl font-semibold text-gray-900 mb-6">
-                {editingEmployee ? "Edit Employee" : "Add New Employee"}
-              </h3>
-              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+
+            {/* Modal Body with Scroll */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
                   <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm">
                     {error}
                   </div>
                 )}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div>
                     <label
                       htmlFor="name"
@@ -717,25 +769,6 @@ const UserManagement = () => {
                   </div>
                   <div>
                     <label
-                      htmlFor="leaveBalance"
-                      className="block text-sm font-medium text-gray-700 text-left"
-                    >
-                      Leave Balance
-                    </label>
-                    <input
-                      type="number"
-                      name="leaveBalance"
-                      id="leaveBalance"
-                      required
-                      min="0"
-                      value={formData.leaveBalance}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <div>
-                    <label
                       htmlFor="role"
                       className="block text-sm font-medium text-gray-700 text-left"
                     >
@@ -755,6 +788,29 @@ const UserManagement = () => {
                       <option value="admin">Admin</option>
                     </select>
                   </div>
+
+                  {/* Leave Balance Fields */}
+                  {LEAVE_TYPES.map((leaveType) => (
+                    <div key={leaveType}>
+                      <label
+                        htmlFor={`leaveBalance_${leaveType}`}
+                        className="block text-sm font-medium text-gray-700 text-left"
+                      >
+                        {leaveType.replace(/([A-Z])/g, " $1").trim()} Days
+                      </label>
+                      <input
+                        type="number"
+                        name={`leaveBalance_${leaveType}`}
+                        id={`leaveBalance_${leaveType}`}
+                        min="0"
+                        value={formData.leaveBalances[leaveType] || 0}
+                        onChange={handleInputChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                        disabled={isLoading}
+                      />
+                    </div>
+                  ))}
+
                   {/* Password fields - only show when creating new user */}
                   {!editingEmployee && (
                     <>
@@ -843,52 +899,55 @@ const UserManagement = () => {
                     />
                   </div>
                 </div>
-                <div className="flex justify-end space-x-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                  >
-                    {isLoading ? (
-                      <>
-                        <svg
-                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        {editingEmployee ? "Updating..." : "Saving..."}
-                      </>
-                    ) : editingEmployee ? (
-                      "Update Employee"
-                    ) : (
-                      "Add Employee"
-                    )}
-                  </button>
-                </div>
               </form>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                onClick={handleSubmit}
+                disabled={isLoading}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isLoading ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    {editingEmployee ? "Updating..." : "Saving..."}
+                  </>
+                ) : editingEmployee ? (
+                  "Update Employee"
+                ) : (
+                  "Add Employee"
+                )}
+              </button>
             </div>
           </div>
         </div>

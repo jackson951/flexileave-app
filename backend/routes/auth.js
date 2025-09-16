@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-// POST /auth/login — Generate JWT token on successful login
+// -------------------- LOGIN --------------------
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -47,15 +47,15 @@ router.post("/login", async (req, res) => {
 
     // Sign token (expires in 24 hours)
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "24h", // You can adjust: '1h', '7d', etc.
+      expiresIn: "24h",
     });
 
-    // Send token and user data (without password)
+    // Remove password and send user details (include leaveBalances)
     const { password: pwd, ...userData } = user;
 
     res.json({
       message: "Login successful",
-      token, // <-- This is what your frontend will store and send in Authorization header
+      token, // frontend stores this
       user: userData,
     });
   } catch (error) {
@@ -66,22 +66,18 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Optional: POST /auth/logout (frontend just deletes token)
-// No server-side logout needed for JWT unless you implement token blacklisting
-
-// Optional: GET /auth/verify — Verify token and return user info
+// -------------------- VERIFY TOKEN --------------------
 router.get("/verify", authenticateToken, (req, res) => {
-  // req.user is set by authenticateToken middleware
   res.json({
     valid: true,
     user: req.user,
   });
 });
 
-// Middleware to verify JWT token (copied from your userRoutes for completeness)
+// -------------------- AUTH MIDDLEWARE --------------------
 function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+  const token = authHeader && authHeader.split(" ")[1]; // "Bearer TOKEN"
 
   if (!token) {
     return res.status(401).json({ message: "Access token required" });
