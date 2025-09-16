@@ -237,27 +237,6 @@ const LeaveApprovals = () => {
   if (currentView === "history") {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header with back button */}
-        <div className="mb-8 flex items-center justify-between">
-          <div className="flex items-center">
-            <button
-              onClick={() => toggleView("approvals")}
-              className="mr-4 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              <ArrowLeftIcon className="h-4 w-4 mr-2" />
-              Back to Approvals
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                My Leave History
-              </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                View your personal leave requests and their status
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Render LeaveHistory component */}
         <LeaveHistory />
       </div>

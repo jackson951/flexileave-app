@@ -444,15 +444,17 @@ const LeaveHistory = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back Button */}
-      <div className="mb-6">
-        <a
-          href="/dashboard"
-          className="inline-flex items-center text-indigo-600 hover:text-indigo-500 transition-colors duration-200"
-        >
-          <ArrowLeftIcon className="h-5 w-5 mr-1" />
-          Back to Dashboard
-        </a>
-      </div>
+      {user?.role === "admin" && (
+        <div className="mb-6">
+          <a
+            href="/dashboard"
+            className="inline-flex items-center text-indigo-600 hover:text-indigo-500 transition-colors duration-200"
+          >
+            <ArrowLeftIcon className="h-5 w-5 mr-1" />
+            Back to Dashboard
+          </a>
+        </div>
+      )}
 
       {/* Header */}
       <div className="mb-8">
