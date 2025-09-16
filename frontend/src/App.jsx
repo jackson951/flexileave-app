@@ -2,12 +2,15 @@ import React from "react";
 import "./App.css";
 import AppRoutes from "./Routes/AppRoutes";
 import Header from "./components/header"; // Make sure path is correct
+import { useAuth } from "./contexts/AuthContext";
 
 function App() {
+  const { isLoggedIn } = useAuth();
+
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Universal Header */}
-      <Header variant="default" />
+      {/* Show header ONLY when not logged in */}
+      {!isLoggedIn && <Header variant="default" />}
 
       {/* Main Content / Routes */}
       <main className="flex-1">

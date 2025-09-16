@@ -18,6 +18,7 @@ import {
   CheckCircleIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
+import digititanLogo from "../assets/digititan-logo.jpeg";
 
 const DashboardLayout = ({ userType, user, onLogout }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -65,12 +66,6 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
   }, [darkMode]);
 
   const navigation = [
-    {
-      name: "Dashboard",
-      href: "/dashboard",
-      icon: HomeIcon,
-      show: true,
-    },
     {
       name: "Leave Requests",
       href: "/dashboard/leave",
@@ -150,7 +145,7 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
               <div className="absolute top-0 right-0 -mr-12 pt-2">
                 <button
                   type="button"
-                  className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+                  className="ml-1 flex items-center justify-center h-10 w-10 rounded-full"
                   onClick={() => setSidebarOpen(false)}
                 >
                   <span className="sr-only">Close sidebar</span>
@@ -162,9 +157,23 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
               </div>
               <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
                 <div className="flex-shrink-0 flex items-center px-4">
-                  <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                    LeaveTrack
-                  </h1>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
+                      <img
+                        src={digititanLogo}
+                        alt="Digititan Logo"
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                        Digititan
+                      </h1>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
+                        Leave Management
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <nav aria-label="Sidebar" className="mt-5">
                   <div className="px-2 space-y-1">
@@ -234,9 +243,23 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
       <div className="hidden lg:flex lg:flex-shrink-0">
         <div className="flex flex-col w-64 border-r border-gray-200 dark:border-gray-700 pt-5 pb-4 bg-white dark:bg-gray-800 overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-4">
-            <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-              LeaveTrack
-            </h1>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
+                <img
+                  src={digititanLogo}
+                  alt="Digititan Logo"
+                  className="w-full h-full object-cover rounded-lg"
+                />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Digititan
+                </h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
+                  Leave Management
+                </p>
+              </div>
+            </div>
           </div>
 
           <nav className="mt-5 flex-1" aria-label="Sidebar">
@@ -306,7 +329,7 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
         <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 lg:hidden">
           <button
             type="button"
-            className="px-4 border-r border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 lg:hidden"
+            className="px-4 border-r border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
             onClick={() => setSidebarOpen(true)}
           >
             <span className="sr-only">Open sidebar</span>
@@ -315,16 +338,25 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
           <div className="flex-1 flex justify-between px-4 sm:px-6">
             <div className="flex-1 flex">
               <div className="w-full flex md:ml-0">
-                <h1 className="text-xl font-semibold text-gray-900 dark:text-white self-center">
-                  LeaveTrack
-                </h1>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
+                    <img
+                      src={digititanLogo}
+                      alt="Digititan Logo"
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Digititan
+                  </h1>
+                </div>
               </div>
             </div>
             <div className="ml-4 flex items-center md:ml-6 space-x-3">
               <button
                 type="button"
                 onClick={() => setDarkMode(!darkMode)}
-                className="p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
               >
                 {darkMode ? (
                   <SunIcon className="h-6 w-6" aria-hidden="true" />
@@ -337,7 +369,7 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
               <div className="relative">
                 <button
                   type="button"
-                  className="relative p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="relative p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
                   onClick={() => setNotificationsOpen(!notificationsOpen)}
                 >
                   <span className="sr-only">View notifications</span>
@@ -350,7 +382,7 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
                 </button>
 
                 {notificationsOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                  <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
                     <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                       <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                         Notifications
@@ -419,7 +451,7 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
 
               <button
                 type="button"
-                className="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300"
                 onClick={onLogout}
               >
                 <ArrowRightOnRectangleIcon
@@ -445,7 +477,7 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
               <button
                 type="button"
                 onClick={() => setDarkMode(!darkMode)}
-                className="p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
               >
                 {darkMode ? (
                   <SunIcon className="h-6 w-6" aria-hidden="true" />
@@ -458,7 +490,7 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
               <div className="relative ml-3">
                 <button
                   type="button"
-                  className="relative p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="relative p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
                   onClick={() => setNotificationsOpen(!notificationsOpen)}
                 >
                   <span className="sr-only">View notifications</span>
@@ -471,7 +503,7 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
                 </button>
 
                 {notificationsOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                  <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
                     <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                       <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                         Notifications
@@ -543,7 +575,7 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
                 <div>
                   <button
                     type="button"
-                    className="max-w-xs flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    className="max-w-xs flex items-center text-sm rounded-full"
                     onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                   >
                     <img
@@ -567,19 +599,28 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
                 </div>
 
                 {profileDropdownOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
                     <button
-                      onClick={() => navigate("/dashboard/profile")}
+                      onClick={() => {
+                        navigate("/dashboard/profile");
+                        setProfileDropdownOpen(false);
+                      }}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 w-full text-left"
                     >
                       Your Profile
                     </button>
-                    <button className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 w-full text-left">
+                    <button
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 w-full text-left"
+                    >
                       Settings
                     </button>
                     <div className="border-t border-gray-200 dark:border-gray-700"></div>
                     <button
-                      onClick={onLogout}
+                      onClick={() => {
+                        onLogout();
+                        setProfileDropdownOpen(false);
+                      }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
                       Sign out

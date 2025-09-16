@@ -2,8 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import LoginPage from "../pages/Login";
 import DashboardLayout from "../components/DashboardLayout";
-import UserDashboard from "../pages/user/Dashboard";
-import AdminDashboard from "../pages/administrator/Dashboard";
 import NewLeaveRequest from "../pages/leave/NewLeaveRequest";
 import LeaveHistory from "../pages/leave/LeaveHistory";
 import LeaveApprovals from "../pages/administrator/LeaveApproval";
@@ -95,8 +93,8 @@ const AppRoutes = () => {
           element={
             <RoleBased
               user={user}
-              userComponent={<UserDashboard />}
-              adminComponent={<AdminDashboard />}
+              userComponent={<LeaveHistory />}
+              adminComponent={<LeaveApprovals />}
             />
           }
         />
