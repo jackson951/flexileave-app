@@ -124,8 +124,9 @@ const NotFoundPage = () => {
           </h1>
           <h2 className="text-2xl font-bold text-gray-800">Page Not Found</h2>
           <p className="text-lg text-gray-600 leading-relaxed">
-            Oops! The page you're looking for seems to have wandered off into
-            the digital void. Let's get you back on track.
+            Oops! We apologize, but the page you are looking for cannot be
+            found. It may have been removed, renamed, or is temporarily
+            unavailable
           </p>
         </div>
 
