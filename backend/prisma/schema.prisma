@@ -8,49 +8,47 @@ generator client {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String   @unique
-  phone        String?
-  department   String?
-  position     String?
-  joinDate     DateTime
-  leaveBalance Int
-  role         String
-  avatar       String?
-  password     String
-  createdAt    DateTime @default(now())
-  leaves       Leave[]
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  phone         String?
+  department    String?
+  position      String?
+  joinDate      DateTime
+  leaveBalances Json     // no @default for SQLite JSON
+  role          String
+  avatar        String?
+  password      String
+  createdAt     DateTime @default(now())
+  leaves        Leave[]
 }
 
 model Leave {
-  id             Int      @id @default(autoincrement())
-  leaveType      String
-  startDate      DateTime
-  endDate        DateTime
-  days           Int
-  reason         String
-  status         String   @default("pending") // pending, approved, rejected
-  submittedAt    DateTime @default(now())
-  rejectionReason String? // optional, only filled if rejected
+  id               Int      @id @default(autoincrement())
+  leaveType        String
+  startDate        DateTime
+  endDate          DateTime
+  days             Int
+  reason           String
+  status           String   @default("pending")
+  submittedAt      DateTime @default(now())
+  rejectionReason  String?
   emergencyContact String?
   emergencyPhone   String?
 
-  // Relations
-  userId        Int
-  user          User      @relation(fields: [userId], references: [id])
-  attachments   File[]    // One leave can have multiple files
+  userId  Int
+  user    User   @relation(fields: [userId], references: [id])
+  attachments File[]
 }
 
 model File {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   name      String
   url       String
   size      Int
   type      String
   uploadedAt DateTime @default(now())
 
-  // Relations
-  leaveId   Int?     // optional to allow pre-upload
+  leaveId   Int?
   leave     Leave?   @relation(fields: [leaveId], references: [id])
 }

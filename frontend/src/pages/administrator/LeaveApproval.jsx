@@ -11,6 +11,7 @@ import {
   UserIcon,
   ArrowLeftIcon,
   ClipboardDocumentListIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import LeaveHistory from "../leave/LeaveHistory";
 import { useAuth } from "../../contexts/AuthContext";
@@ -24,8 +25,33 @@ const LeaveApprovals = () => {
   const [filter, setFilter] = useState("all"); // all, pending, approved, rejected
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [leaveTypes, setLeaveTypes] = useState([
+    "Annual Leave",
+    "Sick Leave",
+    "Family Responsibility",
+    "Unpaid Leave",
+    "Other",
+  ]);
 
   const { user } = useAuth();
+
+  // Map display names to backend values
+  const leaveTypeMapping = {
+    "Annual Leave": "AnnualLeave",
+    "Sick Leave": "SickLeave",
+    "Family Responsibility": "FamilyResponsibility",
+    "Unpaid Leave": "UnpaidLeave",
+    Other: "Other",
+  };
+
+  // Reverse mapping for display
+  const reverseLeaveTypeMapping = {
+    AnnualLeave: "Annual Leave",
+    SickLeave: "Sick Leave",
+    FamilyResponsibility: "Family Responsibility",
+    UnpaidLeave: "Unpaid Leave",
+    Other: "Other",
+  };
 
   // Fetch all leave requests from API (excluding admin's own leaves)
   useEffect(() => {
@@ -35,7 +61,9 @@ const LeaveApprovals = () => {
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem("authToken");
+        const token =
+          localStorage.getItem("authToken") ||
+          sessionStorage.getItem("authToken");
         if (!token) {
           throw new Error("Authentication token not found");
         }
@@ -63,8 +91,15 @@ const LeaveApprovals = () => {
           (leave) => leave.userId !== currentUserId
         );
 
-        setLeaves(filteredData);
-        setFilteredLeaves(filteredData);
+        // Convert backend leave types to display names
+        const processedData = filteredData.map((leave) => ({
+          ...leave,
+          leaveType:
+            reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType,
+        }));
+
+        setLeaves(processedData);
+        setFilteredLeaves(processedData);
       } catch (err) {
         console.error("Error fetching leaves:", err);
         setError(err.message);
@@ -87,9 +122,13 @@ const LeaveApprovals = () => {
       const term = searchTerm.toLowerCase();
       result = result.filter(
         (leave) =>
-          leave.user?.name.toLowerCase().includes(term) ||
-          leave.leaveType.toLowerCase().includes(term) ||
-          leave.reason.toLowerCase().includes(term)
+          (leave.user?.name && leave.user.name.toLowerCase().includes(term)) ||
+          (leave.leaveType && leave.leaveType.toLowerCase().includes(term)) ||
+          (leave.reason && leave.reason.toLowerCase().includes(term)) ||
+          (leave.user?.department &&
+            leave.user.department.toLowerCase().includes(term)) ||
+          (leave.user?.position &&
+            leave.user.position.toLowerCase().includes(term))
       );
     }
 
@@ -118,8 +157,16 @@ const LeaveApprovals = () => {
   };
 
   const handleApprove = async (id) => {
+    if (
+      !window.confirm("Are you sure you want to approve this leave request?")
+    ) {
+      return;
+    }
+
     try {
-      const token = localStorage.getItem("authToken");
+      const token =
+        localStorage.getItem("authToken") ||
+        sessionStorage.getItem("authToken");
       const response = await fetch(
         `http://localhost:5000/api/leaves/${id}/approve`,
         {
@@ -136,12 +183,21 @@ const LeaveApprovals = () => {
         throw new Error(errorData.message || "Failed to approve leave request");
       }
 
+      const updatedLeave = await response.json();
+
+      // Convert backend leave type to display name
+      const processedLeave = {
+        ...updatedLeave.leave,
+        leaveType:
+          reverseLeaveTypeMapping[updatedLeave.leave.leaveType] ||
+          updatedLeave.leave.leaveType,
+      };
+
       // Update local state
       setLeaves((prev) =>
-        prev.map((leave) =>
-          leave.id === id ? { ...leave, status: "approved" } : leave
-        )
+        prev.map((leave) => (leave.id === id ? processedLeave : leave))
       );
+
       alert("Leave request approved successfully!");
     } catch (err) {
       console.error("Error approving leave:", err);
@@ -154,7 +210,9 @@ const LeaveApprovals = () => {
     if (!reason || reason.trim() === "") return;
 
     try {
-      const token = localStorage.getItem("authToken");
+      const token =
+        localStorage.getItem("authToken") ||
+        sessionStorage.getItem("authToken");
       const response = await fetch(
         `http://localhost:5000/api/leaves/${id}/reject`,
         {
@@ -172,11 +230,25 @@ const LeaveApprovals = () => {
         throw new Error(errorData.message || "Failed to reject leave request");
       }
 
+      const updatedLeave = await response.json();
+
+      // Convert backend leave type to display name
+      const processedLeave = {
+        ...updatedLeave,
+        leaveType:
+          reverseLeaveTypeMapping[updatedLeave.leaveType] ||
+          updatedLeave.leaveType,
+      };
+
       // Update local state
       setLeaves((prev) =>
         prev.map((leave) =>
           leave.id === id
-            ? { ...leave, status: "rejected", rejectionReason: reason.trim() }
+            ? {
+                ...processedLeave,
+                status: "rejected",
+                rejectionReason: reason.trim(),
+              }
             : leave
         )
       );
@@ -247,8 +319,11 @@ const LeaveApprovals = () => {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-center items-center h-64">
-          <p className="text-gray-600">Loading leave requests...</p>
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+            <p className="text-gray-600 text-lg">Loading leave requests...</p>
+          </div>
         </div>
       </div>
     );
@@ -257,13 +332,14 @@ const LeaveApprovals = () => {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+        <div className="bg-red-50 border-l-4 border-red-400 p-6 rounded-lg">
           <div className="flex">
             <div className="flex-shrink-0">
-              <XMarkIcon className="h-5 w-5 text-red-400" aria-hidden="true" />
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-400" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm font-medium text-red-800">Error</p>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
             </div>
           </div>
         </div>
@@ -275,50 +351,115 @@ const LeaveApprovals = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header with view toggle */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Leave Approvals</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Review and manage all leave requests — approve, reject, or view
-            history
-          </p>
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Leave Approvals
+            </h1>
+            <p className="mt-2 text-gray-600">
+              Review and manage all leave requests — approve, reject, or view
+              your leave history
+            </p>
+          </div>
+
+          <button
+            onClick={() => toggleView("history")}
+            className="inline-flex items-center px-5 py-3 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 transform hover:scale-105"
+          >
+            <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
+            View My Leave History
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+              <ClockIcon className="h-6 w-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Pending</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {leaves.filter((l) => l.status === "pending").length}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <button
-          onClick={() => toggleView("history")}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
-          View My Leave History
-        </button>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-green-100 text-green-600">
+              <CheckCircleIcon className="h-6 w-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Approved</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {leaves.filter((l) => l.status === "approved").length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-red-100 text-red-600">
+              <XMarkIcon className="h-6 w-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Rejected</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {leaves.filter((l) => l.status === "rejected").length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-gray-100 text-gray-600">
+              <UserIcon className="h-6 w-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">
+                Total Requests
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {leaves.length}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white shadow rounded-lg mb-6 p-4">
-        <div className="flex flex-col md:flex-row gap-4">
+      <div className="bg-white shadow-sm rounded-xl border border-gray-200 mb-8 p-6">
+        <div className="flex flex-col md:flex-row gap-6">
           {/* Search */}
           <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
             </div>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Search by name, type, or reason..."
+              className="block w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-all duration-200"
+              placeholder="Search by name, department, leave type, or reason..."
             />
           </div>
 
           {/* Status Filter */}
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <FunnelIcon className="h-5 w-5 text-gray-400" />
             </div>
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="block w-full pl-12 pr-10 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-all duration-200 appearance-none bg-white"
             >
               <option value="all">All Statuses</option>
               <option value="pending">Pending</option>
@@ -326,67 +467,126 @@ const LeaveApprovals = () => {
               <option value="rejected">Rejected</option>
               <option value="cancelled">Cancelled</option>
             </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+              <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Requests List */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+      <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Leave Requests ({filteredLeaves.length})
+          </h2>
+        </div>
+
         {filteredLeaves.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">
-            <UserIcon className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium mb-2">
+          <div className="p-16 text-center">
+            <div className="mx-auto h-24 w-24 text-gray-400 mb-4">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
               No leave requests found
             </h3>
-            <p>Try adjusting your search or filter criteria.</p>
+            <p className="text-gray-500 mb-6">
+              Try adjusting your search or filter criteria.
+            </p>
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={() => setFilter("all")}
+                className="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors duration-200"
+              >
+                Clear Filters
+              </button>
+              <button
+                onClick={() => setSearchTerm("")}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+              >
+                Clear Search
+              </button>
+            </div>
           </div>
         ) : (
-          <ul className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200">
             {filteredLeaves.map((leave) => (
-              <li key={leave.id}>
-                <div className="px-4 py-4 sm:px-6">
+              <div
+                key={leave.id}
+                className="group hover:bg-gray-50 transition-colors duration-200"
+              >
+                <div className="px-6 py-5">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center min-w-0">
+                    <div className="flex items-center min-w-0 space-x-4">
                       <div className="flex-shrink-0">
                         {leave.user?.avatar ? (
                           <img
-                            className="h-10 w-10 rounded-full object-cover"
+                            className="h-12 w-12 rounded-full object-cover border-2 border-white shadow-sm"
                             src={leave.user.avatar}
                             alt={leave.user.name}
+                            onError={(e) => {
+                              e.target.src =
+                                "https://via.placeholder.com/150?text=User";
+                            }}
                           />
                         ) : (
-                          <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                            <span className="text-gray-600 font-medium text-sm">
-                              {leave.user?.name?.charAt(0) || "U"}
-                            </span>
+                          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                            {leave.user?.name?.charAt(0) || "U"}
                           </div>
                         )}
                       </div>
-                      <div className="ml-4 min-w-0">
-                        <div className="text-sm font-medium text-indigo-600 truncate">
-                          {leave.user?.name || "Unknown User"}
+                      <div className="min-w-0">
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                            {leave.user?.name || "Unknown User"}
+                          </h3>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                              leave.status
+                            )}`}
+                          >
+                            {getStatusIcon(leave.status)}
+                            <span className="ml-1 capitalize">
+                              {leave.status}
+                            </span>
+                          </span>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {leave.user?.department || "Unknown"} •{" "}
-                          {leave.user?.position || "Unknown"}
+                        <div className="text-xs text-gray-500 mt-1">
+                          <span className="font-medium">
+                            {leave.user?.department || "Unknown Dept"}
+                          </span>
+                          {leave.user?.position && (
+                            <>
+                              {" • "}
+                              <span>{leave.user?.position}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <div className="ml-2 flex-shrink-0 flex">
-                      <div className="text-right mr-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
                         <p className="text-sm font-medium text-gray-900">
                           {leave.leaveType}
                         </p>
                         <p className="text-xs text-gray-500">
                           {formatDate(leave.startDate)} to{" "}
-                          {formatDate(leave.endDate)} ({leave.days} day
-                          {leave.days !== 1 ? "s" : ""})
+                          {formatDate(leave.endDate)}
+                          <span className="mx-1">•</span>
+                          {leave.days} day{leave.days !== 1 ? "s" : ""}
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => toggleExpand(leave.id)}
-                        className="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-500"
+                        className="ml-2 flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all duration-200 group-hover:bg-gray-100"
                       >
                         {expandedRequest === leave.id ? (
                           <ChevronUpIcon className="h-5 w-5" />
@@ -398,117 +598,151 @@ const LeaveApprovals = () => {
                   </div>
 
                   {expandedRequest === leave.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <div className="text-sm text-gray-700 mb-4">
-                        <p className="font-medium">Reason:</p>
-                        <p className="mt-1">{leave.reason}</p>
-                      </div>
-
-                      {leave.attachments && leave.attachments.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-gray-700">
-                            Supporting Documents:
-                          </p>
-                          <ul className="mt-1 border border-gray-200 rounded-md divide-y divide-gray-200">
-                            {leave.attachments.map((doc) => (
-                              <li
-                                key={doc.id}
-                                className="pl-3 pr-4 py-3 flex items-center justify-between text-sm"
-                              >
-                                <div className="w-0 flex-1 flex items-center">
-                                  <DocumentTextIcon
-                                    className="flex-shrink-0 h-5 w-5 text-gray-400"
-                                    aria-hidden="true"
-                                  />
-                                  <span className="ml-2 flex-1 w-0 truncate">
-                                    {doc.name}
-                                  </span>
-                                  <span className="ml-2 text-xs text-gray-500">
-                                    {(doc.size / 1024).toFixed(1)} KB
-                                  </span>
-                                </div>
-                                <div className="ml-4 flex-shrink-0">
-                                  <button
-                                    type="button"
-                                    className="font-medium text-indigo-600 hover:text-indigo-500"
-                                    onClick={() =>
-                                      window.open(
-                                        `http://localhost:5000${doc.url}`,
-                                        "_blank"
-                                      )
-                                    }
-                                  >
-                                    View
-                                  </button>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      <div className="text-xs text-gray-500 mb-4">
-                        Submitted: {formatDateTime(leave.submittedAt)}
-                        {leave.approvedAt && (
-                          <>
-                            {" • "}Approved: {formatDateTime(leave.approvedAt)}
-                          </>
-                        )}
-                        {leave.rejectionReason && (
-                          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                            <strong className="text-red-800">
-                              Rejection Reason:
-                            </strong>{" "}
-                            {leave.rejectionReason}
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2">
+                          <div className="mb-6">
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">
+                              Reason
+                            </h4>
+                            <p className="text-sm text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                              {leave.reason}
+                            </p>
                           </div>
-                        )}
-                      </div>
 
-                      <div className="flex space-x-3">
-                        {leave.status === "pending" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleApprove(leave.id)}
-                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                            >
-                              <CheckCircleIcon
-                                className="-ml-0.5 mr-2 h-4 w-4"
-                                aria-hidden="true"
-                              />
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleReject(leave.id)}
-                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                            >
-                              <XMarkIcon
-                                className="-ml-0.5 mr-2 h-4 w-4"
-                                aria-hidden="true"
-                              />
-                              Reject
-                            </button>
-                          </>
-                        )}
+                          {leave.attachments &&
+                            leave.attachments.length > 0 && (
+                              <div className="mb-6">
+                                <h4 className="text-sm font-medium text-gray-700 mb-3">
+                                  Supporting Documents
+                                </h4>
+                                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                  {leave.attachments.map((doc) => (
+                                    <div
+                                      key={doc.id}
+                                      className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors duration-200 border-b border-gray-100 last:border-b-0"
+                                    >
+                                      <div className="flex items-center space-x-3">
+                                        <DocumentTextIcon className="h-5 w-5 text-gray-400" />
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-medium text-gray-900 truncate">
+                                            {doc.name}
+                                          </p>
+                                          <p className="text-xs text-gray-500">
+                                            {(doc.size / 1024).toFixed(1)} KB •{" "}
+                                            {doc.type}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                                        onClick={() =>
+                                          window.open(
+                                            `http://localhost:5000${doc.url}`,
+                                            "_blank"
+                                          )
+                                        }
+                                      >
+                                        View
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                        </div>
 
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                            leave.status
-                          )}`}
-                        >
-                          {getStatusIcon(leave.status)}
-                          <span className="ml-1 capitalize">
-                            {leave.status}
-                          </span>
-                        </span>
+                        <div className="space-y-4">
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <h4 className="text-sm font-medium text-gray-700 mb-3">
+                              Request Details
+                            </h4>
+                            <div className="space-y-3 text-sm">
+                              <div>
+                                <span className="text-gray-500">
+                                  Submitted:
+                                </span>
+                                <p className="font-medium text-gray-900">
+                                  {formatDateTime(leave.submittedAt)}
+                                </p>
+                              </div>
+                              {leave.approvedAt && (
+                                <div>
+                                  <span className="text-gray-500">
+                                    Approved:
+                                  </span>
+                                  <p className="font-medium text-gray-900">
+                                    {formatDateTime(leave.approvedAt)}
+                                  </p>
+                                </div>
+                              )}
+                              {leave.rejectionReason && (
+                                <div>
+                                  <span className="text-gray-500">
+                                    Rejection Reason:
+                                  </span>
+                                  <p className="font-medium text-red-600 bg-red-50 p-2 rounded mt-1">
+                                    {leave.rejectionReason}
+                                  </p>
+                                </div>
+                              )}
+                              {leave.emergencyContact && (
+                                <div>
+                                  <span className="text-gray-500">
+                                    Emergency Contact:
+                                  </span>
+                                  <p className="font-medium text-gray-900">
+                                    {leave.emergencyContact}
+                                  </p>
+                                </div>
+                              )}
+                              {leave.emergencyPhone && (
+                                <div>
+                                  <span className="text-gray-500">
+                                    Emergency Phone:
+                                  </span>
+                                  <p className="font-medium text-gray-900">
+                                    {leave.emergencyPhone}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {leave.status === "pending" && (
+                            <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                              <h4 className="text-sm font-medium text-gray-700 mb-4">
+                                Actions
+                              </h4>
+                              <div className="space-y-3">
+                                <button
+                                  type="button"
+                                  onClick={() => handleApprove(leave.id)}
+                                  className="w-full inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 transform hover:scale-105"
+                                >
+                                  <CheckCircleIcon className="h-5 w-5 mr-2" />
+                                  Approve Request
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReject(leave.id)}
+                                  className="w-full inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200 transform hover:scale-105"
+                                >
+                                  <XMarkIcon className="h-5 w-5 mr-2" />
+                                  Reject Request
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </div>

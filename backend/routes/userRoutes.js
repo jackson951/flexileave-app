@@ -28,11 +28,37 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
+// Validator for leaveBalances object
+const validateLeaveBalances = body("leaveBalances").custom((value) => {
+  if (typeof value !== "object" || Array.isArray(value) || value === null) {
+    throw new Error("Leave balances must be a valid JSON object");
+  }
+
+  const requiredKeys = [
+    "AnnualLeave",
+    "SickLeave",
+    "FamilyResponsibility",
+    "UnpaidLeave",
+    "Other",
+  ];
+
+  for (const key of requiredKeys) {
+    if (!(key in value)) {
+      throw new Error(`Missing leave type: ${key}`);
+    }
+    if (typeof value[key] !== "number" || value[key] < 0) {
+      throw new Error(`${key} must be a non-negative number`);
+    }
+  }
+
+  return true;
+});
+
+// ---------------- ROUTES ----------------
+
 // GET all users (protected, admin only)
 router.get("/", authenticateToken, isAdmin, async (req, res) => {
   try {
-    console.log("User making request:", req.user); // Log the user making the request
-
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -42,30 +68,28 @@ router.get("/", authenticateToken, isAdmin, async (req, res) => {
         department: true,
         position: true,
         joinDate: true,
-        leaveBalance: true,
+        leaveBalances: true,
         role: true,
         avatar: true,
         createdAt: true,
       },
     });
 
-    console.log("Fetched users:", users.length); // Log how many users were fetched
     res.json(users);
   } catch (error) {
-    console.error("Detailed error:", error);
-    res.status(500).json({
-      message: "Internal server error",
-      error: error.message,
-    });
+    console.error("Error fetching users:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 });
+
 // GET single user (protected)
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const requestingUserId = req.user.userId;
 
-    // Users can only access their own profile unless they're admin
     if (parseInt(id) !== requestingUserId && req.user.role !== "admin") {
       return res.status(403).json({ message: "Unauthorized access" });
     }
@@ -80,7 +104,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
         department: true,
         position: true,
         joinDate: true,
-        leaveBalance: true,
+        leaveBalances: true,
         role: true,
         avatar: true,
         createdAt: true,
@@ -111,9 +135,7 @@ router.post(
       .withMessage("Password must be at least 8 characters"),
     body("department").trim().notEmpty().withMessage("Department is required"),
     body("position").trim().notEmpty().withMessage("Position is required"),
-    body("leaveBalance")
-      .isInt({ min: 0 })
-      .withMessage("Leave balance must be a positive number"),
+    validateLeaveBalances,
     body("role")
       .isIn(["employee", "manager", "admin"])
       .withMessage("Invalid role"),
@@ -144,7 +166,7 @@ router.post(
           department: true,
           position: true,
           joinDate: true,
-          leaveBalance: true,
+          leaveBalances: true,
           role: true,
           avatar: true,
           createdAt: true,
@@ -161,6 +183,7 @@ router.post(
     }
   }
 );
+
 // UPDATE user (protected)
 router.put(
   "/:id",
@@ -186,10 +209,7 @@ router.put(
       .trim()
       .notEmpty()
       .withMessage("Position cannot be empty"),
-    body("leaveBalance")
-      .optional()
-      .isInt({ min: 0 })
-      .withMessage("Leave balance must be a positive number"),
+    validateLeaveBalances.optional(),
     body("role")
       .optional()
       .isIn(["employee", "manager", "admin"])
@@ -209,26 +229,18 @@ router.put(
       const { id } = req.params;
       const requestingUserId = req.user.userId;
 
-      // Users can only update their own profile unless they're admin
       if (parseInt(id) !== requestingUserId && req.user.role !== "admin") {
         return res.status(403).json({ message: "Unauthorized access" });
       }
 
       const { password, joinDate, ...updateData } = req.body;
 
-      // If password is being updated, hash it
       if (password) {
         updateData.password = await bcrypt.hash(password, 10);
       }
 
-      // Convert joinDate string to JS Date for Prisma
       if (joinDate) {
         updateData.joinDate = new Date(joinDate);
-      }
-
-      // Admins can update role, others cannot
-      if (req.user.role !== "admin" && updateData.role) {
-        return res.status(403).json({ message: "Cannot update role" });
       }
 
       const updatedUser = await prisma.user.update({
@@ -242,7 +254,7 @@ router.put(
           department: true,
           position: true,
           joinDate: true,
-          leaveBalance: true,
+          leaveBalances: true,
           role: true,
           avatar: true,
           createdAt: true,
@@ -268,7 +280,6 @@ router.delete("/:id", authenticateToken, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Prevent admin from deleting themselves
     if (parseInt(id) === req.user.userId) {
       return res
         .status(400)

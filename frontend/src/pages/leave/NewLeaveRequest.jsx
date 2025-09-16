@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import { DateRangePicker } from "react-date-range";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
@@ -12,10 +13,12 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   HomeIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 
 const NewLeaveRequest = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     leaveType: "",
@@ -38,6 +41,15 @@ const NewLeaveRequest = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
+  // Map display names to backend values
+  const leaveTypeMapping = {
+    "Annual Leave": "AnnualLeave",
+    "Sick Leave": "SickLeave",
+    "Family Responsibility": "FamilyResponsibility",
+    "Unpaid Leave": "UnpaidLeave",
+    Other: "Other",
+  };
+
   const leaveTypes = [
     "Annual Leave",
     "Sick Leave",
@@ -46,23 +58,86 @@ const NewLeaveRequest = () => {
     "Other",
   ];
 
+  // Get leave balance for a specific leave type
+  const getLeaveBalance = (leaveTypeDisplayName) => {
+    if (!user?.leaveBalances) return 0;
+    const backendType = leaveTypeMapping[leaveTypeDisplayName];
+    return user.leaveBalances[backendType] || 0;
+  };
+
+  // Calculate total days in date range
+  const calculateDays = () => {
+    const diffTime = Math.abs(dateRange[0].endDate - dateRange[0].startDate);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  // Validate if requested days exceed available balance
+  const hasSufficientLeaveBalance = (leaveType, requestedDays) => {
+    if (!leaveType) return true; // No type selected yet
+    const availableBalance = getLeaveBalance(leaveType);
+    return requestedDays <= availableBalance;
+  };
+
+  // Validate Step 1
   const validateStep1 = () => {
     const newErrors = {};
-    if (!formData.leaveType) newErrors.leaveType = "Please select a leave type";
-    if (!formData.reason) newErrors.reason = "Please provide a reason";
+    const requestedDays = calculateDays();
+
+    if (!formData.leaveType) {
+      newErrors.leaveType = "Please select a leave type";
+    } else {
+      const availableBalance = getLeaveBalance(formData.leaveType);
+      if (availableBalance <= 0) {
+        newErrors.leaveType = `You have no ${formData.leaveType} days remaining`;
+      }
+    }
+
+    if (!formData.reason) {
+      newErrors.reason = "Please provide a reason";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // Validate Step 2
   const validateStep2 = () => {
     const days = calculateDays();
-    return days >= 1;
+    const hasValidDates = days >= 1;
+
+    if (!hasValidDates) {
+      setErrors({ dates: "Please select valid dates (at least 1 day)" });
+      return false;
+    }
+
+    // Check if requested days exceed available balance
+    if (!hasSufficientLeaveBalance(formData.leaveType, days)) {
+      const availableBalance = getLeaveBalance(formData.leaveType);
+      setErrors({
+        dates: `You only have ${availableBalance} ${formData.leaveType} days remaining, but you're requesting ${days} days`,
+      });
+      return false;
+    }
+
+    setErrors({});
+    return true;
   };
 
+  // Handle date change
   const handleDateChange = (ranges) => {
     setDateRange([ranges.selection]);
+
+    // Clear date-related errors when dates change
+    if (errors.dates) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.dates;
+        return newErrors;
+      });
+    }
   };
 
+  // Handle file upload
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length + formData.supportingDocs.length > 5) {
@@ -74,11 +149,13 @@ const NewLeaveRequest = () => {
     setFileUploadError("");
 
     try {
-      const token = localStorage.getItem("authToken");
-      const formData = new FormData();
+      const token =
+        localStorage.getItem("authToken") ||
+        sessionStorage.getItem("authToken");
+      const uploadFormData = new FormData();
 
       files.forEach((file) => {
-        formData.append("files", file);
+        uploadFormData.append("files", file);
       });
 
       const response = await fetch("http://localhost:5000/api/leaves/upload", {
@@ -86,7 +163,7 @@ const NewLeaveRequest = () => {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        body: formData,
+        body: uploadFormData,
       });
 
       if (!response.ok) {
@@ -107,9 +184,12 @@ const NewLeaveRequest = () => {
     }
   };
 
+  // Remove file
   const removeFile = async (fileId) => {
     try {
-      const token = localStorage.getItem("authToken");
+      const token =
+        localStorage.getItem("authToken") ||
+        sessionStorage.getItem("authToken");
       const response = await fetch(
         `http://localhost:5000/api/leaves/files/${fileId}`,
         {
@@ -137,35 +217,51 @@ const NewLeaveRequest = () => {
     }
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (step === 1 && validateStep1()) {
-      setStep(2);
+    if (step === 1) {
+      if (validateStep1()) {
+        setStep(2);
+      }
       return;
     }
 
-    if (step === 2 && validateStep2()) {
-      setStep(3);
+    if (step === 2) {
+      if (validateStep2()) {
+        setStep(3);
+      }
       return;
     }
 
     if (step === 3) {
+      // Final validation before submission
+      const requestedDays = calculateDays();
+      if (!hasSufficientLeaveBalance(formData.leaveType, requestedDays)) {
+        const availableBalance = getLeaveBalance(formData.leaveType);
+        setSubmitError(
+          `Insufficient leave balance: You only have ${availableBalance} ${formData.leaveType} days remaining`
+        );
+        return;
+      }
+
       setIsSubmitting(true);
       setSubmitError("");
 
       try {
-        const token = localStorage.getItem("authToken");
+        const token =
+          localStorage.getItem("authToken") ||
+          sessionStorage.getItem("authToken");
 
         const leaveData = {
-          leaveType: formData.leaveType,
+          leaveType: leaveTypeMapping[formData.leaveType], // Convert to backend format
           reason: formData.reason,
           startDate: dateRange[0].startDate.toISOString(),
           endDate: dateRange[0].endDate.toISOString(),
-          days: calculateDays(),
+          days: requestedDays,
           emergencyContact: formData.emergencyContact,
           emergencyPhone: formData.emergencyPhone,
-          // ✅ CORRECT: Send array of file IDs
           fileIds: formData.supportingDocs.map((doc) => doc.id),
         };
 
@@ -195,11 +291,7 @@ const NewLeaveRequest = () => {
     }
   };
 
-  const calculateDays = () => {
-    const diffTime = Math.abs(dateRange[0].endDate - dateRange[0].startDate);
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  };
-
+  // Step Indicator Component
   const StepIndicator = ({ number, currentStep, label }) => (
     <li className="flex items-center">
       <span
@@ -227,6 +319,7 @@ const NewLeaveRequest = () => {
     </li>
   );
 
+  // Success screen
   if (isSubmitted) {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -246,6 +339,26 @@ const NewLeaveRequest = () => {
               <HomeIcon className="-ml-1 mr-2 h-5 w-5" />
               Return to Dashboard
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If user data is not available
+  if (!user) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                User data not available. Please log in again.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -284,6 +397,7 @@ const NewLeaveRequest = () => {
         </nav>
       </div>
 
+      {/* Submit Error Banner */}
       {submitError && (
         <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
           <div className="flex">
@@ -315,14 +429,30 @@ const NewLeaveRequest = () => {
                 } focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md`}
               >
                 <option value="">Select leave type</option>
-                {leaveTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
+                {leaveTypes.map((type) => {
+                  const balance = getLeaveBalance(type);
+                  const isExhausted = balance <= 0;
+
+                  return (
+                    <option
+                      key={type}
+                      value={type}
+                      disabled={isExhausted && type !== "Unpaid Leave"}
+                    >
+                      {type} ({balance} days remaining)
+                      {isExhausted && type !== "Unpaid Leave" && " - EXHAUSTED"}
+                    </option>
+                  );
+                })}
               </select>
               {errors.leaveType && (
                 <p className="mt-2 text-sm text-red-600">{errors.leaveType}</p>
+              )}
+              {formData.leaveType && !errors.leaveType && (
+                <p className="mt-2 text-sm text-gray-500">
+                  You have {getLeaveBalance(formData.leaveType)} days of{" "}
+                  {formData.leaveType} remaining.
+                </p>
               )}
             </div>
 
@@ -394,6 +524,7 @@ const NewLeaveRequest = () => {
                 months={1}
                 direction="horizontal"
                 className="border border-gray-300 rounded-lg shadow-sm"
+                minDate={new Date()}
               />
               <div className="mt-4 text-sm text-gray-600">
                 <p>
@@ -401,8 +532,24 @@ const NewLeaveRequest = () => {
                   {dateRange[0].endDate.toLocaleDateString()}
                 </p>
                 <p className="font-medium">Total Days: {calculateDays()}</p>
-                {calculateDays() < 1 && (
-                  <p className="text-red-500">Please select valid dates</p>
+
+                {/* Display balance warning if applicable */}
+                {formData.leaveType &&
+                  !hasSufficientLeaveBalance(
+                    formData.leaveType,
+                    calculateDays()
+                  ) && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-red-700 text-sm">
+                        <ExclamationTriangleIcon className="h-4 w-4 inline mr-1" />
+                        Insufficient {formData.leaveType} balance: You only have{" "}
+                        {getLeaveBalance(formData.leaveType)} days remaining
+                      </p>
+                    </div>
+                  )}
+
+                {errors.dates && (
+                  <p className="mt-2 text-sm text-red-600">{errors.dates}</p>
                 )}
               </div>
             </div>
@@ -495,7 +642,8 @@ const NewLeaveRequest = () => {
                       Leave Type
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900">
-                      {formData.leaveType}
+                      {formData.leaveType} (
+                      {getLeaveBalance(formData.leaveType)} days remaining)
                     </dd>
                   </div>
                   <div className="sm:col-span-1">
@@ -560,6 +708,24 @@ const NewLeaveRequest = () => {
                     </dd>
                   </div>
                 </dl>
+
+                {/* Balance Warning in Review Step */}
+                {formData.leaveType &&
+                  !hasSufficientLeaveBalance(
+                    formData.leaveType,
+                    calculateDays()
+                  ) && (
+                    <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md">
+                      <div className="flex">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+                        <p className="ml-3 text-sm text-red-700">
+                          You are requesting {calculateDays()} days of{" "}
+                          {formData.leaveType}, but you only have{" "}
+                          {getLeaveBalance(formData.leaveType)} days remaining.
+                        </p>
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -582,7 +748,15 @@ const NewLeaveRequest = () => {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={step === 2 && calculateDays() < 1}
+                disabled={
+                  (step === 1 && !formData.leaveType) ||
+                  (step === 2 &&
+                    (calculateDays() < 1 ||
+                      !hasSufficientLeaveBalance(
+                        formData.leaveType,
+                        calculateDays()
+                      )))
+                }
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
@@ -591,7 +765,13 @@ const NewLeaveRequest = () => {
             ) : (
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={
+                  isSubmitting ||
+                  !hasSufficientLeaveBalance(
+                    formData.leaveType,
+                    calculateDays()
+                  )
+                }
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-75"
               >
                 {isSubmitting ? (
