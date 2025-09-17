@@ -18,6 +18,7 @@ import {
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../contexts/AuthContext";
+import { ApiService, useApiInterceptors } from "../api/web-api-service";
 
 const ProfilePage = () => {
   const { user, updateUserProfile } = useAuth();
@@ -38,6 +39,9 @@ const ProfilePage = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Initialize interceptors
+  useApiInterceptors();
 
   // Initialize form data when user changes
   useEffect(() => {
@@ -124,31 +128,14 @@ const ProfilePage = () => {
         profileUpdates.password = formData.password;
       }
 
-      // Call the correct API endpoint
-      const token =
-        localStorage.getItem("authToken") ||
-        sessionStorage.getItem("authToken");
-      const response = await fetch(
-        `http://localhost:5000/api/users/${user.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(profileUpdates),
-        }
+      // Use ApiService for the PUT request
+      const response = await ApiService.put(
+        `/users/${user.id}`,
+        profileUpdates
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update profile");
-      }
-
-      const updatedUser = await response.json();
-
       // Update the auth context with new user data
-      await updateUserProfile(user?.id, updatedUser);
+      await updateUserProfile(user?.id, response.data);
 
       setSuccessMessage(
         updatePassword
@@ -170,7 +157,8 @@ const ProfilePage = () => {
     } catch (error) {
       console.error("Error updating profile:", error);
       setErrorMessage(
-        error.message || "Failed to update profile. Please try again."
+        error.response?.data?.message ||
+          "Failed to update profile. Please try again."
       );
     } finally {
       setLoading(false);
@@ -243,7 +231,7 @@ const ProfilePage = () => {
       {/* Back Button */}
       <div className="mb-6">
         <a
-          href="/dashboard"
+          href="/dashboard/leave"
           className="inline-flex items-center text-indigo-600 hover:text-indigo-500 transition-colors duration-200"
         >
           <ArrowLeftIcon className="h-5 w-5 mr-1" />

@@ -15,6 +15,7 @@ import {
   HomeIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
+import { ApiService, useApiInterceptors } from "../../api/web-api-service";
 
 const NewLeaveRequest = () => {
   const navigate = useNavigate();
@@ -40,6 +41,9 @@ const NewLeaveRequest = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+
+  // Initialize interceptors
+  useApiInterceptors();
 
   // Map display names to backend values
   const leaveTypeMapping = {
@@ -87,7 +91,7 @@ const NewLeaveRequest = () => {
       newErrors.leaveType = "Please select a leave type";
     } else {
       const availableBalance = getLeaveBalance(formData.leaveType);
-      if (availableBalance <= 0) {
+      if (availableBalance <= 0 && formData.leaveType !== "Unpaid Leave") {
         newErrors.leaveType = `You have no ${formData.leaveType} days remaining`;
       }
     }
@@ -110,13 +114,15 @@ const NewLeaveRequest = () => {
       return false;
     }
 
-    // Check if requested days exceed available balance
-    if (!hasSufficientLeaveBalance(formData.leaveType, days)) {
-      const availableBalance = getLeaveBalance(formData.leaveType);
-      setErrors({
-        dates: `You only have ${availableBalance} ${formData.leaveType} days remaining, but you're requesting ${days} days`,
-      });
-      return false;
+    // Skip balance check for unpaid leave
+    if (formData.leaveType !== "Unpaid Leave") {
+      if (!hasSufficientLeaveBalance(formData.leaveType, days)) {
+        const availableBalance = getLeaveBalance(formData.leaveType);
+        setErrors({
+          dates: `You only have ${availableBalance} ${formData.leaveType} days remaining, but you're requesting ${days} days`,
+        });
+        return false;
+      }
     }
 
     setErrors({});
@@ -149,36 +155,27 @@ const NewLeaveRequest = () => {
     setFileUploadError("");
 
     try {
-      const token =
-        localStorage.getItem("authToken") ||
-        sessionStorage.getItem("authToken");
       const uploadFormData = new FormData();
-
       files.forEach((file) => {
         uploadFormData.append("files", file);
       });
 
-      const response = await fetch("http://localhost:5000/api/leaves/upload", {
-        method: "POST",
+      // Use ApiService for file upload
+      const response = await ApiService.post("/leaves/upload", uploadFormData, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
         },
-        body: uploadFormData,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to upload files");
-      }
-
-      const uploadedFiles = await response.json();
       setFormData((prev) => ({
         ...prev,
-        supportingDocs: [...prev.supportingDocs, ...uploadedFiles],
+        supportingDocs: [...prev.supportingDocs, ...response.data],
       }));
     } catch (err) {
       console.error("Error uploading files:", err);
-      setFileUploadError(err.message);
+      setFileUploadError(
+        err.response?.data?.message || "Failed to upload files"
+      );
     } finally {
       setFileUploading(false);
     }
@@ -187,23 +184,8 @@ const NewLeaveRequest = () => {
   // Remove file
   const removeFile = async (fileId) => {
     try {
-      const token =
-        localStorage.getItem("authToken") ||
-        sessionStorage.getItem("authToken");
-      const response = await fetch(
-        `http://localhost:5000/api/leaves/files/${fileId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete file");
-      }
+      // Use ApiService for file deletion
+      await ApiService.delete(`/leaves/files/${fileId}`);
 
       setFormData((prev) => ({
         ...prev,
@@ -213,7 +195,9 @@ const NewLeaveRequest = () => {
       }));
     } catch (err) {
       console.error("Error deleting file:", err);
-      setFileUploadError(err.message);
+      setFileUploadError(
+        err.response?.data?.message || "Failed to delete file"
+      );
     }
   };
 
@@ -238,7 +222,10 @@ const NewLeaveRequest = () => {
     if (step === 3) {
       // Final validation before submission
       const requestedDays = calculateDays();
-      if (!hasSufficientLeaveBalance(formData.leaveType, requestedDays)) {
+      if (
+        formData.leaveType !== "Unpaid Leave" &&
+        !hasSufficientLeaveBalance(formData.leaveType, requestedDays)
+      ) {
         const availableBalance = getLeaveBalance(formData.leaveType);
         setSubmitError(
           `Insufficient leave balance: You only have ${availableBalance} ${formData.leaveType} days remaining`
@@ -250,10 +237,6 @@ const NewLeaveRequest = () => {
       setSubmitError("");
 
       try {
-        const token =
-          localStorage.getItem("authToken") ||
-          sessionStorage.getItem("authToken");
-
         const leaveData = {
           leaveType: leaveTypeMapping[formData.leaveType], // Convert to backend format
           reason: formData.reason,
@@ -265,26 +248,15 @@ const NewLeaveRequest = () => {
           fileIds: formData.supportingDocs.map((doc) => doc.id),
         };
 
-        const response = await fetch("http://localhost:5000/api/leaves", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(leaveData),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.message || "Failed to submit leave request"
-          );
-        }
+        // Use ApiService for leave submission
+        await ApiService.post("/leaves", leaveData);
 
         setIsSubmitted(true);
       } catch (err) {
         console.error("Error submitting leave request:", err);
-        setSubmitError(err.message);
+        setSubmitError(
+          err.response?.data?.message || "Failed to submit leave request"
+        );
       } finally {
         setIsSubmitting(false);
       }
@@ -333,7 +305,7 @@ const NewLeaveRequest = () => {
           </p>
           <div className="mt-8">
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/dashboard/leave", { replace: true })}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               <HomeIcon className="-ml-1 mr-2 h-5 w-5" />
@@ -431,16 +403,12 @@ const NewLeaveRequest = () => {
                 <option value="">Select leave type</option>
                 {leaveTypes.map((type) => {
                   const balance = getLeaveBalance(type);
-                  const isExhausted = balance <= 0;
+                  const isExhausted = balance <= 0 && type !== "Unpaid Leave";
 
                   return (
-                    <option
-                      key={type}
-                      value={type}
-                      disabled={isExhausted && type !== "Unpaid Leave"}
-                    >
+                    <option key={type} value={type} disabled={isExhausted}>
                       {type} ({balance} days remaining)
-                      {isExhausted && type !== "Unpaid Leave" && " - EXHAUSTED"}
+                      {isExhausted && " - EXHAUSTED"}
                     </option>
                   );
                 })}
@@ -534,7 +502,7 @@ const NewLeaveRequest = () => {
                 <p className="font-medium">Total Days: {calculateDays()}</p>
 
                 {/* Display balance warning if applicable */}
-                {formData.leaveType &&
+                {formData.leaveType !== "Unpaid Leave" &&
                   !hasSufficientLeaveBalance(
                     formData.leaveType,
                     calculateDays()
@@ -604,7 +572,7 @@ const NewLeaveRequest = () => {
                             {file.name}
                           </span>
                           <span className="ml-2 text-xs text-gray-500">
-                            {file.size} KB
+                            {(file.size / 1024).toFixed(1)} KB
                           </span>
                         </div>
                         <button
@@ -696,7 +664,7 @@ const NewLeaveRequest = () => {
                                   {file.name}
                                 </span>
                                 <span className="ml-2 text-xs text-gray-500">
-                                  {file.size} KB
+                                  {(file.size / 1024).toFixed(1)} KB
                                 </span>
                               </div>
                             </li>
@@ -710,7 +678,7 @@ const NewLeaveRequest = () => {
                 </dl>
 
                 {/* Balance Warning in Review Step */}
-                {formData.leaveType &&
+                {formData.leaveType !== "Unpaid Leave" &&
                   !hasSufficientLeaveBalance(
                     formData.leaveType,
                     calculateDays()
@@ -752,10 +720,11 @@ const NewLeaveRequest = () => {
                   (step === 1 && !formData.leaveType) ||
                   (step === 2 &&
                     (calculateDays() < 1 ||
-                      !hasSufficientLeaveBalance(
-                        formData.leaveType,
-                        calculateDays()
-                      )))
+                      (formData.leaveType !== "Unpaid Leave" &&
+                        !hasSufficientLeaveBalance(
+                          formData.leaveType,
+                          calculateDays()
+                        ))))
                 }
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -767,10 +736,11 @@ const NewLeaveRequest = () => {
                 type="submit"
                 disabled={
                   isSubmitting ||
-                  !hasSufficientLeaveBalance(
-                    formData.leaveType,
-                    calculateDays()
-                  )
+                  (formData.leaveType !== "Unpaid Leave" &&
+                    !hasSufficientLeaveBalance(
+                      formData.leaveType,
+                      calculateDays()
+                    ))
                 }
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-75"
               >

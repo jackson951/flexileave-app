@@ -91,7 +91,7 @@ const LoginPage = () => {
         userData,
         rememberMe: formData.rememberMe,
       });
-      navigate("/dashboard");
+      navigate("/dashboard/leave");
     } catch (error) {
       setErrors({ submit: error.response?.data?.message || "Login failed" });
     } finally {
