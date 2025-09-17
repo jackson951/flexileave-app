@@ -293,9 +293,17 @@ router.delete("/:id", authenticateToken, isAdmin, async (req, res) => {
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("Error deleting user:", error);
+
     if (error.code === "P2025") {
       return res.status(404).json({ message: "User not found" });
     }
+    if (error.code === "P2003") {
+      return res.status(400).json({
+        message:
+          "Cannot delete user because there are related records in the database",
+      });
+    }
+
     res.status(500).json({ message: "Internal server error" });
   }
 });
