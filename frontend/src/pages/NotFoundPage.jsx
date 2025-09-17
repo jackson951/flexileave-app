@@ -22,7 +22,7 @@ const NotFoundPage = () => {
   };
 
   const handleGoHome = () => {
-    navigate("/dashboard", { replace: true });
+    navigate("/dashboard/leave", { replace: true });
   };
 
   const handleRefresh = () => {

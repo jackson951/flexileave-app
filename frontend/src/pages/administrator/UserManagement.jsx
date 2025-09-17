@@ -16,6 +16,7 @@ import {
   EyeIcon,
   EyeSlashIcon,
 } from "@heroicons/react/24/outline";
+import { ApiService, useApiInterceptors } from "../../api/web-api-service";
 
 const API_BASE_URL = "http://localhost:5000/api";
 
@@ -33,6 +34,7 @@ const UserManagement = () => {
   const [token, setToken] = useState(
     localStorage.getItem("authToken") || sessionStorage.getItem("authToken")
   );
+  useApiInterceptors();
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -79,26 +81,23 @@ const UserManagement = () => {
   const fetchEmployees = async () => {
     setIsLoading(true);
     setError(null);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/users`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // Axios automatically attaches token & parses JSON
+      const response = await ApiService.get("/users");
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to fetch employees");
-      }
+      // Axios puts parsed data in response.data
+      const data = response.data;
 
-      const data = await response.json();
       setEmployees(data);
       setFilteredEmployees(data);
     } catch (err) {
-      setError(err.message || "Failed to fetch employees");
+      // Axios error handling
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to fetch employees";
+      setError(message);
       console.error("Error fetching employees:", err);
     } finally {
       setIsLoading(false);
@@ -159,7 +158,6 @@ const UserManagement = () => {
       });
     }
   };
-
   // Handle form submission for create/update
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -194,36 +192,20 @@ const UserManagement = () => {
         ...(!editingEmployee && { password: formData.password }),
       };
 
-      let response;
+      let savedEmployee;
 
       if (editingEmployee) {
-        // Update existing employee
-        response = await fetch(`${API_BASE_URL}/users/${editingEmployee.id}`, {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
+        // Update existing employee using ApiService
+        const response = await ApiService.put(
+          `/users/${editingEmployee.id}`,
+          payload
+        );
+        savedEmployee = response.data; // Axios response data is in response.data
       } else {
-        // Create new employee
-        response = await fetch(`${API_BASE_URL}/users`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
+        // Create new employee using ApiService for consistency
+        const response = await ApiService.post("/users", payload);
+        savedEmployee = response.data;
       }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Operation failed");
-      }
-
-      const savedEmployee = await response.json();
 
       if (editingEmployee) {
         setEmployees(
@@ -239,7 +221,10 @@ const UserManagement = () => {
       setEditingEmployee(null);
       resetForm();
     } catch (err) {
-      setError(err.message);
+      // Handle Axios errors
+      const errorMessage =
+        err.response?.data?.message || err.message || "Operation failed";
+      setError(errorMessage);
       console.error("Error saving employee:", err);
     } finally {
       setIsLoading(false);
@@ -298,6 +283,7 @@ const UserManagement = () => {
   };
 
   // Delete employee
+  // Delete employee
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this employee?"))
       return;
@@ -306,19 +292,14 @@ const UserManagement = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) throw new Error("Failed to delete employee");
-
+      await ApiService.delete(`/users/${id}`);
       setEmployees(employees.filter((employee) => employee.id !== id));
     } catch (err) {
-      setError(err.message);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to delete employee";
+      setError(errorMessage);
       console.error("Error deleting employee:", err);
     } finally {
       setIsLoading(false);

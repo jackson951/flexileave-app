@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { ApiService } from "../api/web-api-service";
 
 const AuthContext = createContext();
 
@@ -76,16 +77,7 @@ export const AuthProvider = ({ children }) => {
   const updateUserProfile = async (id, updatedData) => {
     if (!authToken) throw new Error("No auth token found");
 
-    const response = await axios.put(
-      `http://localhost:5000/api/users/${id}`,
-      updatedData,
-      {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const response = await ApiService.put(`/users/${id}`, updatedData);
 
     const updatedUser = response.data;
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import {
   CheckCircleIcon,
   ChevronDownIcon,
@@ -15,6 +15,7 @@ import {
 } from "@heroicons/react/24/outline";
 import LeaveHistory from "../leave/LeaveHistory";
 import { useAuth } from "../../contexts/AuthContext";
+import { ApiService, useApiInterceptors } from "../../api/web-api-service";
 
 const LeaveApprovals = () => {
   const [currentView, setCurrentView] = useState("approvals"); // "approvals" or "history"
@@ -32,6 +33,8 @@ const LeaveApprovals = () => {
     "Unpaid Leave",
     "Other",
   ]);
+
+  useApiInterceptors();
 
   const { user } = useAuth();
 
@@ -61,33 +64,14 @@ const LeaveApprovals = () => {
       setLoading(true);
       setError(null);
       try {
-        const token =
-          localStorage.getItem("authToken") ||
-          sessionStorage.getItem("authToken");
-        if (!token) {
-          throw new Error("Authentication token not found");
-        }
-
-        const response = await fetch("http://localhost:5000/api/leaves", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.message || "Failed to fetch leave requests"
-          );
-        }
-
-        const data = await response.json();
+        // Use ApiService instead of fetch
+        const response = await ApiService.get("/leaves");
 
         // Get current user ID from auth context
         const currentUserId = user?.id;
 
         // Filter out the current user's leaves to prevent self-approval
-        const filteredData = data.filter(
+        const filteredData = response.data.filter(
           (leave) => leave.userId !== currentUserId
         );
 
@@ -102,7 +86,11 @@ const LeaveApprovals = () => {
         setFilteredLeaves(processedData);
       } catch (err) {
         console.error("Error fetching leaves:", err);
-        setError(err.message);
+        const errorMessage =
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to fetch leave requests";
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -164,33 +152,14 @@ const LeaveApprovals = () => {
     }
 
     try {
-      const token =
-        localStorage.getItem("authToken") ||
-        sessionStorage.getItem("authToken");
-      const response = await fetch(
-        `http://localhost:5000/api/leaves/${id}/approve`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to approve leave request");
-      }
-
-      const updatedLeave = await response.json();
+      const response = await ApiService.put(`/leaves/${id}/approve`);
 
       // Convert backend leave type to display name
       const processedLeave = {
-        ...updatedLeave.leave,
+        ...response.data.leave,
         leaveType:
-          reverseLeaveTypeMapping[updatedLeave.leave.leaveType] ||
-          updatedLeave.leave.leaveType,
+          reverseLeaveTypeMapping[response.data.leave.leaveType] ||
+          response.data.leave.leaveType,
       };
 
       // Update local state
@@ -201,7 +170,11 @@ const LeaveApprovals = () => {
       alert("Leave request approved successfully!");
     } catch (err) {
       console.error("Error approving leave:", err);
-      alert(`Failed to approve leave: ${err.message}`);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to approve leave request";
+      alert(`Failed to approve leave: ${errorMessage}`);
     }
   };
 
@@ -210,34 +183,16 @@ const LeaveApprovals = () => {
     if (!reason || reason.trim() === "") return;
 
     try {
-      const token =
-        localStorage.getItem("authToken") ||
-        sessionStorage.getItem("authToken");
-      const response = await fetch(
-        `http://localhost:5000/api/leaves/${id}/reject`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ rejectionReason: reason.trim() }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to reject leave request");
-      }
-
-      const updatedLeave = await response.json();
+      const response = await ApiService.put(`/leaves/${id}/reject`, {
+        rejectionReason: reason.trim(),
+      });
 
       // Convert backend leave type to display name
       const processedLeave = {
-        ...updatedLeave,
+        ...response.data,
         leaveType:
-          reverseLeaveTypeMapping[updatedLeave.leaveType] ||
-          updatedLeave.leaveType,
+          reverseLeaveTypeMapping[response.data.leaveType] ||
+          response.data.leaveType,
       };
 
       // Update local state
@@ -255,7 +210,11 @@ const LeaveApprovals = () => {
       alert("Leave request rejected successfully!");
     } catch (err) {
       console.error("Error rejecting leave:", err);
-      alert(`Failed to reject leave: ${err.message}`);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to reject leave request";
+      alert(`Failed to reject leave: ${errorMessage}`);
     }
   };
 
