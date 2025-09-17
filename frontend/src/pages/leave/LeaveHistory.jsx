@@ -16,9 +16,10 @@ import {
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../contexts/AuthContext";
 import { format, isAfter, subDays } from "date-fns";
+import { ApiService, useApiInterceptors } from "../../api/web-api-service";
 
 const LeaveHistory = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [leaveHistory, setLeaveHistory] = useState([]);
   const [filteredLeaves, setFilteredLeaves] = useState([]);
   const [expandedRequest, setExpandedRequest] = useState(null);
@@ -48,6 +49,8 @@ const LeaveHistory = () => {
   });
   const [formErrors, setFormErrors] = useState({});
 
+  useApiInterceptors();
+
   // Map display names to backend values
   const leaveTypeMapping = {
     "Annual Leave": "AnnualLeave",
@@ -72,43 +75,30 @@ const LeaveHistory = () => {
       setLoading(true);
       setError(null);
       try {
-        const token =
-          localStorage.getItem("authToken") ||
-          sessionStorage.getItem("authToken");
-        if (!token) {
-          throw new Error("Authentication token not found");
-        }
-
-        // Fetch leave history
-        const leavesResponse = await fetch(
-          "http://localhost:5000/api/leaves/my",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (!leavesResponse.ok) {
-          const errorData = await leavesResponse.json();
-          throw new Error(errorData.message || "Failed to fetch leave history");
-        }
-
-        const leaves = await leavesResponse.json();
+        // Fetch leave history using ApiService
+        const response = await ApiService.get("/leaves/my");
 
         // Get user balances from context
         if (user?.leaveBalances) {
           setUserBalances(user.leaveBalances);
         }
 
-        setLeaveHistory(leaves);
-        setFilteredLeaves(leaves);
+        // Convert backend leave types to display names for UI consistency
+        const processedLeaves = response.data.map((leave) => ({
+          ...leave,
+          leaveType:
+            reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType,
+        }));
+
+        setLeaveHistory(processedLeaves);
+        setFilteredLeaves(processedLeaves);
       } catch (err) {
         console.error("Error fetching leave history:", err);
-        setError(err.message);
-        if (err.message.includes("Authentication token")) {
-          logout(); // Redirect to login if token invalid
-        }
+        setError(
+          err.response?.data?.message ||
+            err.message ||
+            "Failed to fetch leave history"
+        );
       } finally {
         setLoading(false);
       }
@@ -117,7 +107,7 @@ const LeaveHistory = () => {
     if (user) {
       fetchLeaveHistory();
     }
-  }, [user, logout]);
+  }, [user]);
 
   // Filter and search logic
   useEffect(() => {
@@ -140,8 +130,7 @@ const LeaveHistory = () => {
         (leave) =>
           leave.status === filter ||
           leave.leaveType === filter ||
-          leave.leaveType === leaveTypeMapping[filter] ||
-          reverseLeaveTypeMapping[leave.leaveType] === filter
+          leave.leaveType === leaveTypeMapping[filter]
       );
     }
 
@@ -149,11 +138,7 @@ const LeaveHistory = () => {
   }, [searchTerm, filter, leaveHistory]);
 
   const toggleExpand = (id) => {
-    if (expandedRequest === id) {
-      setExpandedRequest(null);
-    } else {
-      setExpandedRequest(id);
-    }
+    setExpandedRequest(expandedRequest === id ? null : id);
   };
 
   const handleEditClick = (leave) => {
@@ -167,12 +152,8 @@ const LeaveHistory = () => {
 
     setEditingLeave(leave);
 
-    // Convert backend leave type to display name if needed
-    const displayLeaveType =
-      reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType;
-
     setFormData({
-      leaveType: displayLeaveType,
+      leaveType: reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType,
       startDate: leave.startDate.split("T")[0],
       endDate: leave.endDate.split("T")[0],
       reason: leave.reason || "",
@@ -192,10 +173,10 @@ const LeaveHistory = () => {
 
     // Clear error when user types
     if (formErrors[name]) {
-      setFormErrors((prev) => ({
-        ...prev,
+      setFormErrors({
+        ...formErrors,
         [name]: "",
-      }));
+      });
     }
 
     // Also clear days error when dates change
@@ -239,7 +220,7 @@ const LeaveHistory = () => {
     // Check for overlapping leaves (frontend hint — backend still enforces)
     const overlapping = leaveHistory.some(
       (l) =>
-        l.id !== editingLeave.id &&
+        l.id !== editingLeave?.id &&
         l.status !== "rejected" &&
         l.status !== "cancelled" &&
         new Date(l.startDate) <= end &&
@@ -260,10 +241,6 @@ const LeaveHistory = () => {
 
     setFileUploading(true);
     try {
-      const token =
-        localStorage.getItem("authToken") ||
-        sessionStorage.getItem("authToken");
-
       // Convert display name to backend value
       const backendLeaveType =
         leaveTypeMapping[formData.leaveType] || formData.leaveType;
@@ -278,36 +255,25 @@ const LeaveHistory = () => {
         fileIds: formData.supportingDocs.map((doc) => doc.id),
       };
 
-      const response = await fetch(
-        `http://localhost:5000/api/leaves/${editingLeave.id}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
+      // Use ApiService for the PUT request
+      const response = await ApiService.put(
+        `/leaves/${editingLeave.id}`,
+        payload
       );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update leave request");
-      }
-
-      const updatedLeave = await response.json();
 
       // Convert backend leave type to display name for consistency in UI
       const updatedLeaveWithDisplayName = {
-        ...updatedLeave,
+        ...response.data,
         leaveType:
-          reverseLeaveTypeMapping[updatedLeave.leaveType] ||
-          updatedLeave.leaveType,
+          reverseLeaveTypeMapping[response.data.leaveType] ||
+          response.data.leaveType,
       };
 
       setLeaveHistory((prev) =>
         prev.map((l) =>
-          l.id === updatedLeave.id ? updatedLeaveWithDisplayName : l
+          l.id === updatedLeaveWithDisplayName.id
+            ? updatedLeaveWithDisplayName
+            : l
         )
       );
       setIsEditModalOpen(false);
@@ -325,7 +291,9 @@ const LeaveHistory = () => {
       alert("Leave request updated successfully!");
     } catch (err) {
       console.error("Error updating leave:", err);
-      alert(`Failed to update leave: ${err.message}`);
+      alert(
+        `Failed to update leave: ${err.response?.data?.message || err.message}`
+      );
     } finally {
       setFileUploading(false);
     }
@@ -342,35 +310,26 @@ const LeaveHistory = () => {
     setFileUploadError("");
 
     try {
-      const token =
-        localStorage.getItem("authToken") ||
-        sessionStorage.getItem("authToken");
       const uploadFormData = new FormData();
       files.forEach((file) => {
         uploadFormData.append("files", file);
       });
 
-      const response = await fetch("http://localhost:5000/api/leaves/upload", {
-        method: "POST",
+      // Use ApiService for file upload
+      const response = await ApiService.post("/leaves/upload", uploadFormData, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
         },
-        body: uploadFormData,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to upload files");
-      }
-
-      const uploadedFiles = await response.json();
 
       setFormData((prev) => ({
         ...prev,
-        supportingDocs: [...prev.supportingDocs, ...uploadedFiles],
+        supportingDocs: [...prev.supportingDocs, ...response.data],
       }));
     } catch (err) {
-      setFileUploadError(err.message);
+      setFileUploadError(
+        err.response?.data?.message || err.message || "Failed to upload files"
+      );
     } finally {
       setFileUploading(false);
     }
@@ -378,23 +337,8 @@ const LeaveHistory = () => {
 
   const removeFile = async (fileId) => {
     try {
-      const token =
-        localStorage.getItem("authToken") ||
-        sessionStorage.getItem("authToken");
-      const response = await fetch(
-        `http://localhost:5000/api/leaves/files/${fileId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete file");
-      }
+      // Use ApiService for file deletion
+      await ApiService.delete(`/leaves/files/${fileId}`);
 
       setFormData((prev) => ({
         ...prev,
@@ -404,7 +348,9 @@ const LeaveHistory = () => {
       }));
     } catch (err) {
       console.error("Error deleting file:", err);
-      setFileUploadError("Failed to delete file: " + err.message);
+      setFileUploadError(
+        err.response?.data?.message || "Failed to delete file"
+      );
     }
   };
 
@@ -413,24 +359,8 @@ const LeaveHistory = () => {
       return;
 
     try {
-      const token =
-        localStorage.getItem("authToken") ||
-        sessionStorage.getItem("authToken");
-      const response = await fetch(
-        `http://localhost:5000/api/leaves/${id}/cancel`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to cancel leave");
-      }
+      // Use ApiService for cancel request
+      await ApiService.put(`/leaves/${id}/cancel`);
 
       setLeaveHistory((prev) =>
         prev.map((leave) =>
@@ -439,7 +369,9 @@ const LeaveHistory = () => {
       );
     } catch (err) {
       console.error("Error cancelling leave:", err);
-      alert(`Failed to cancel leave: ${err.message}`);
+      alert(
+        `Failed to cancel leave: ${err.response?.data?.message || err.message}`
+      );
     }
   };
 
@@ -528,7 +460,7 @@ const LeaveHistory = () => {
       {user?.role === "admin" && (
         <div className="mb-6">
           <a
-            href="/dashboard"
+            href="/dashboard/leave"
             className="inline-flex items-center text-indigo-600 hover:text-indigo-500 transition-colors duration-200"
           >
             <ArrowLeftIcon className="h-5 w-5 mr-1" />
@@ -621,7 +553,9 @@ const LeaveHistory = () => {
               No leave requests found
             </h3>
             <p className="mb-4">
-              You haven't submitted any leave requests yet.
+              {filter === "all"
+                ? "You haven't submitted any leave requests yet."
+                : "No leave requests match your current filters."}
             </p>
             <button
               onClick={() => (window.location.href = "leave/new")}
@@ -633,167 +567,158 @@ const LeaveHistory = () => {
           </div>
         ) : (
           <ul className="divide-y divide-gray-200">
-            {filteredLeaves.map((leave) => {
-              // Convert backend leave type to display name for consistent display
-              const displayLeaveType =
-                reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType;
-
-              return (
-                <li key={leave.id}>
-                  <div className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div
-                          className={`flex-shrink-0 rounded-full p-1 ${
-                            leave.status === "approved"
-                              ? "bg-green-100"
-                              : leave.status === "rejected"
-                              ? "bg-red-100"
-                              : leave.status === "cancelled"
-                              ? "bg-gray-100"
-                              : "bg-yellow-100"
-                          }`}
-                        >
-                          {getStatusIcon(leave.status)}
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {displayLeaveType} - {leave.days} day
-                            {leave.days !== 1 ? "s" : ""}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {formatDate(leave.startDate)} to{" "}
-                            {formatDate(leave.endDate)}
-                          </div>
-                        </div>
+            {filteredLeaves.map((leave) => (
+              <li key={leave.id}>
+                <div className="px-4 py-4 sm:px-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div
+                        className={`flex-shrink-0 rounded-full p-1 ${
+                          leave.status === "approved"
+                            ? "bg-green-100"
+                            : leave.status === "rejected"
+                            ? "bg-red-100"
+                            : leave.status === "cancelled"
+                            ? "bg-gray-100"
+                            : "bg-yellow-100"
+                        }`}
+                      >
+                        {getStatusIcon(leave.status)}
                       </div>
-                      <div className="ml-2 flex-shrink-0 flex">
-                        <div className="text-right mr-4">
-                          <span
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                              leave.status
-                            )}`}
-                          >
-                            {leave.status.charAt(0).toUpperCase() +
-                              leave.status.slice(1)}
-                          </span>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {leave.leaveType} - {leave.days} day
+                          {leave.days !== 1 ? "s" : ""}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleExpand(leave.id)}
-                          className="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-500"
-                        >
-                          {expandedRequest === leave.id ? (
-                            <ChevronUpIcon className="h-5 w-5" />
-                          ) : (
-                            <ChevronDownIcon className="h-5 w-5" />
-                          )}
-                        </button>
+                        <div className="text-xs text-gray-500">
+                          {formatDate(leave.startDate)} to{" "}
+                          {formatDate(leave.endDate)}
+                        </div>
                       </div>
                     </div>
+                    <div className="ml-2 flex-shrink-0 flex">
+                      <div className="text-right mr-4">
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                            leave.status
+                          )}`}
+                        >
+                          {leave.status.charAt(0).toUpperCase() +
+                            leave.status.slice(1)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(leave.id)}
+                        className="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-500"
+                      >
+                        {expandedRequest === leave.id ? (
+                          <ChevronUpIcon className="h-5 w-5" />
+                        ) : (
+                          <ChevronDownIcon className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
 
-                    {expandedRequest === leave.id && (
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <div className="text-sm text-gray-700 mb-4">
-                          <p className="font-medium">Reason:</p>
-                          <p className="mt-1">{leave.reason}</p>
+                  {expandedRequest === leave.id && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div className="text-sm text-gray-700 mb-4">
+                        <p className="font-medium">Reason:</p>
+                        <p className="mt-1">{leave.reason}</p>
+                      </div>
+
+                      {leave.attachments && leave.attachments.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-gray-700">
+                            Supporting Documents:
+                          </p>
+                          <ul className="mt-1 border border-gray-200 rounded-md divide-y divide-gray-200">
+                            {leave.attachments.map((doc) => (
+                              <li
+                                key={doc.id}
+                                className="pl-3 pr-4 py-3 flex items-center justify-between text-sm"
+                              >
+                                <div className="w-0 flex-1 flex items-center">
+                                  <DocumentTextIcon
+                                    className="flex-shrink-0 h-5 w-5 text-gray-400"
+                                    aria-hidden="true"
+                                  />
+                                  <span className="ml-2 flex-1 w-0 truncate">
+                                    {doc.name}
+                                  </span>
+                                  <span className="ml-2 text-xs text-gray-500">
+                                    {(doc.size / 1024).toFixed(1)} KB
+                                  </span>
+                                </div>
+                                <div className="ml-4 flex-shrink-0">
+                                  <button
+                                    type="button"
+                                    className="font-medium text-indigo-600 hover:text-indigo-500"
+                                    onClick={() =>
+                                      window.open(doc.url, "_blank")
+                                    }
+                                  >
+                                    View
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
+                      )}
 
-                        {leave.attachments && leave.attachments.length > 0 && (
-                          <div className="mb-4">
-                            <p className="text-sm font-medium text-gray-700">
-                              Supporting Documents:
-                            </p>
-                            <ul className="mt-1 border border-gray-200 rounded-md divide-y divide-gray-200">
-                              {leave.attachments.map((doc) => (
-                                <li
-                                  key={doc.id}
-                                  className="pl-3 pr-4 py-3 flex items-center justify-between text-sm"
-                                >
-                                  <div className="w-0 flex-1 flex items-center">
-                                    <DocumentTextIcon
-                                      className="flex-shrink-0 h-5 w-5 text-gray-400"
-                                      aria-hidden="true"
-                                    />
-                                    <span className="ml-2 flex-1 w-0 truncate">
-                                      {doc.name}
-                                    </span>
-                                    <span className="ml-2 text-xs text-gray-500">
-                                      {(doc.size / 1024).toFixed(1)} KB
-                                    </span>
-                                  </div>
-                                  <div className="ml-4 flex-shrink-0">
-                                    <button
-                                      type="button"
-                                      className="font-medium text-indigo-600 hover:text-indigo-500"
-                                      onClick={() =>
-                                        window.open(
-                                          `http://localhost:5000${doc.url}`,
-                                          "_blank"
-                                        )
-                                      }
-                                    >
-                                      View
-                                    </button>
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
+                      <div className="text-xs text-gray-500 mb-4">
+                        <p>Submitted: {formatDateTime(leave.submittedAt)}</p>
+                        {leave.approvedAt && (
+                          <p>
+                            Approved: {formatDateTime(leave.approvedAt)} by{" "}
+                            {leave.approvedBy || "System"}
+                          </p>
+                        )}
+                        {leave.rejectionReason && (
+                          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                            <strong className="text-red-800">
+                              Rejection Reason:
+                            </strong>{" "}
+                            {leave.rejectionReason}
                           </div>
                         )}
-
-                        <div className="text-xs text-gray-500 mb-4">
-                          <p>Submitted: {formatDateTime(leave.submittedAt)}</p>
-                          {leave.approvedAt && (
-                            <p>
-                              Approved: {formatDateTime(leave.approvedAt)} by{" "}
-                              {leave.approvedBy || "System"}
-                            </p>
-                          )}
-                          {leave.rejectionReason && (
-                            <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                              <strong className="text-red-800">
-                                Rejection Reason:
-                              </strong>{" "}
-                              {leave.rejectionReason}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex space-x-3">
-                          {leave.status === "pending" && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleEditClick(leave)}
-                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                              >
-                                <PencilIcon className="-ml-0.5 mr-2 h-4 w-4" />
-                                Edit Request
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => cancelLeave(leave.id)}
-                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                              >
-                                <XMarkIcon className="-ml-0.5 mr-2 h-4 w-4" />
-                                Cancel Request
-                              </button>
-                            </>
-                          )}
-
-                          {leave.status === "cancelled" && (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              Cancelled
-                            </span>
-                          )}
-                        </div>
                       </div>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
+
+                      <div className="flex space-x-3">
+                        {leave.status === "pending" && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleEditClick(leave)}
+                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                              <PencilIcon className="-ml-0.5 mr-2 h-4 w-4" />
+                              Edit Request
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => cancelLeave(leave.id)}
+                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            >
+                              <XMarkIcon className="-ml-0.5 mr-2 h-4 w-4" />
+                              Cancel Request
+                            </button>
+                          </>
+                        )}
+
+                        {leave.status === "cancelled" && (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            Cancelled
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
           </ul>
         )}
       </div>

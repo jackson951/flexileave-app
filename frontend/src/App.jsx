@@ -4,8 +4,11 @@ import AppRoutes from "./Routes/AppRoutes";
 import Header from "./components/header"; // Make sure path is correct
 import { useAuth } from "./contexts/AuthContext";
 
+import { useApiInterceptors } from "./api/web-api-service";
+
 function App() {
   const { isLoggedIn } = useAuth();
+  useApiInterceptors();
 
   return (
     <div className="min-h-screen flex flex-col">

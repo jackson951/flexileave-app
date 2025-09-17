@@ -11,6 +11,7 @@ import ProfilePage from "../pages/profilePage";
 import NotFoundPage from "../pages/NotFoundPage";
 import TeamCalender from "../pages/administrator/TeamCalender";
 import ForgotPasswordPage from "../pages/ForgotPassword";
+import { useApiInterceptors } from "../api/web-api-service";
 
 // Role-based protected route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -64,7 +65,7 @@ const RoleBased = ({ user, userComponent, adminComponent }) => {
 
 const AppRoutes = () => {
   const { user, logout } = useAuth();
-
+  useApiInterceptors();
   return (
     <Routes>
       {/* Public Routes */}

@@ -26,6 +26,8 @@ import "jspdf-autotable";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
+import { ApiService, useApiInterceptors } from "../../api/web-api-service";
+
 const LeaveReportsPage = () => {
   const { user } = useAuth();
   const [reports, setReports] = useState([]);
@@ -56,6 +58,8 @@ const LeaveReportsPage = () => {
     "reason",
   ]);
 
+  useApiInterceptors();
+
   // View Detail Modal State
   const [selectedReport, setSelectedReport] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -76,64 +80,47 @@ const LeaveReportsPage = () => {
       setLoading(true);
       setError(null);
       try {
-        const token =
-          localStorage.getItem("authToken") ||
-          sessionStorage.getItem("authToken");
-        if (!token) {
-          throw new Error("Authentication token not found");
-        }
+        // Fetch both leaves and users in parallel using ApiService
+        const [leavesResponse, usersResponse] = await Promise.all([
+          ApiService.get("/leaves"),
+          ApiService.get("/users"),
+        ]);
 
-        // Fetch leave reports
-        const leavesResponse = await fetch("http://localhost:5000/api/leaves", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        // Map backend data to frontend structure
+        const mappedReports = leavesResponse.data.map((report) => {
+          const user =
+            usersResponse.data.find((u) => u.id === report.userId) || {};
+
+          return {
+            id: report.id,
+            employeeName: user.name || "Unknown",
+            employeeId: report.userId,
+            department: user.department || "Unknown",
+            type: report.leaveType,
+            startDate: report.startDate,
+            endDate: report.endDate,
+            days: report.days,
+            status: report.status.toLowerCase(),
+            reason: report.reason || "",
+            submittedAt: report.submittedAt,
+            approvedBy: report.approvedBy || "System",
+            notes: report.notes || "",
+            user: {
+              // Include full user data
+              ...user,
+              avatar: user.avatar || null,
+            },
+          };
         });
 
-        if (!leavesResponse.ok) {
-          const errorData = await leavesResponse.json();
-          throw new Error(errorData.message || "Failed to fetch leave reports");
-        }
-
-        const leavesData = await leavesResponse.json();
-
-        // Fetch users for leave balance information
-        const usersResponse = await fetch("http://localhost:5000/api/users", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!usersResponse.ok) {
-          const errorData = await usersResponse.json();
-          throw new Error(errorData.message || "Failed to fetch users");
-        }
-
-        const usersData = await usersResponse.json();
-        setUsers(usersData);
-
-        // Map backend data to match frontend expectations
-        const mappedReports = leavesData.map((report) => ({
-          id: report.id,
-          employeeName: report.user?.name || "Unknown",
-          employeeId: report.userId,
-          department: report.user?.department || "Unknown",
-          type: report.leaveType,
-          startDate: report.startDate,
-          endDate: report.endDate,
-          days: report.days,
-          status: report.status.toLowerCase(),
-          reason: report.reason || "",
-          submittedAt: report.submittedAt,
-          approvedBy: report.approvedBy || "System",
-          notes: report.notes || "",
-        }));
-
+        setUsers(usersResponse.data);
         setReports(mappedReports);
         setFilteredReports(mappedReports);
       } catch (err) {
         console.error("Error fetching leave reports:", err);
-        setError(err.message);
+        setError(
+          err.response?.data?.message || err.message || "Failed to fetch data"
+        );
       } finally {
         setLoading(false);
       }
@@ -141,7 +128,6 @@ const LeaveReportsPage = () => {
 
     fetchLeaveData();
   }, []);
-
   // Get user by ID
   const getUserById = (userId) => {
     return users.find((user) => user.id === userId) || null;
