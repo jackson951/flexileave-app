@@ -21,6 +21,7 @@ model User {
   password      String
   createdAt     DateTime @default(now())
   leaves        Leave[]
+  refreshToken String? // <-- add this field (nullable)
 }
 
 model Leave {

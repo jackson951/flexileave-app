@@ -1,7 +1,10 @@
+// ------------------- Load Environment -------------------
 require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const cookieParser = require("cookie-parser"); // <-- Needed for cookies
 const { PrismaClient } = require("@prisma/client");
 
 const app = express();
@@ -10,18 +13,16 @@ const prisma = new PrismaClient();
 // ------------------- CORS Setup -------------------
 const corsOptions = {
   origin: "http://localhost:5173", // React dev server
-  credentials: true, // Allow cookies, authorization headers
+  credentials: true, // Allow cookies and authorization headers
   optionsSuccessStatus: 200,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions)); // Preflight handling
 
-// Preflight handling
-app.options(/.*/, cors(corsOptions));
-
-// Additional headers
+// Additional headers (redundant but safe)
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "http://localhost:5173");
   res.header("Access-Control-Allow-Credentials", "true");
@@ -34,6 +35,7 @@ app.use((req, res, next) => {
 
 // ------------------- Middleware -------------------
 app.use(express.json()); // Parse JSON requests
+app.use(cookieParser()); // Parse cookies
 
 // Serve uploaded files statically
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

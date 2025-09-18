@@ -1,7 +1,7 @@
+// src/contexts/AuthContext.js
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { ApiService } from "../api/web-api-service";
+import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext();
 
@@ -14,6 +14,8 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
+
   const safeParseUser = (value) => {
     try {
       if (!value || value === "undefined" || value === "null") return null;
@@ -24,29 +26,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authToken, setAuthToken] = useState(null);
+  const [authToken, setAuthToken] = useState(
+    localStorage.getItem("authToken") || sessionStorage.getItem("authToken")
+  );
   const [user, setUser] = useState(safeParseUser(localStorage.getItem("user")));
   const [loading, setLoading] = useState(true);
 
-  // Load auth state from localStorage/sessionStorage on mount
+  // -------------------- INITIAL LOAD --------------------
   useEffect(() => {
-    const token =
-      localStorage.getItem("authToken") || sessionStorage.getItem("authToken");
-    const storedUser = safeParseUser(localStorage.getItem("user"));
-
-    if (token) {
-      setAuthToken(token);
-      setIsLoggedIn(true);
-    }
-
-    if (storedUser) {
-      setUser(storedUser);
-    }
-
+    if (authToken) setIsLoggedIn(true);
     setLoading(false);
-  }, []);
+  }, [authToken]);
 
-  // Login handler
+  // -------------------- LOGIN --------------------
   const login = async ({ token, userData, rememberMe = false }) => {
     setAuthToken(token);
     setUser(userData);
@@ -57,37 +49,44 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("user", JSON.stringify(userData));
     } else {
       sessionStorage.setItem("authToken", token);
-      // still store user in localStorage for persistence
-      localStorage.setItem("user", JSON.stringify(userData));
+      localStorage.setItem("user", JSON.stringify(userData)); // keep user always
     }
   };
 
-  // Logout handler
-  const logout = () => {
-    setAuthToken(null);
-    setUser(null);
-    setIsLoggedIn(false);
+  // -------------------- LOGOUT --------------------
+  const logout = async () => {
+    try {
+      // Call backend logout (clears refresh token + cookie)
+      await ApiService.post("/auth/logout", {}, { withCredentials: true });
+    } catch (err) {
+      console.warn("Logout request failed:", err.message);
+    } finally {
+      setAuthToken(null);
+      setUser(null);
+      setIsLoggedIn(false);
 
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("user");
-    sessionStorage.removeItem("authToken");
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+      sessionStorage.removeItem("authToken");
+
+      navigate("/login");
+    }
   };
 
-  // ✅ Update user profile
+  // -------------------- UPDATE PROFILE --------------------
   const updateUserProfile = async (id, updatedData) => {
     if (!authToken) throw new Error("No auth token found");
 
     const response = await ApiService.put(`/users/${id}`, updatedData);
-
     const updatedUser = response.data;
 
-    // update state + storage so UI reflects immediately
     setUser(updatedUser);
     localStorage.setItem("user", JSON.stringify(updatedUser));
 
     return updatedUser;
   };
 
+  // -------------------- PROVIDER VALUE --------------------
   const value = {
     isLoggedIn,
     authToken,
@@ -95,7 +94,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
-    updateUserProfile, // ✅ exposed here
+    updateUserProfile,
+    setAuthToken, // optional, useful for interceptors
   };
 
   return (
