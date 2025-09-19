@@ -11,21 +11,35 @@ const prisma = new PrismaClient();
 
 // ------------------- CORS Setup -------------------
 const corsOptions = {
-  origin: [
-    "http://localhost:5173", // for local dev
-    "https://digititan-leave-app.vercel.app", // your deployed frontend
-    "https://digititan-leave-he1i8zvmo-jackson951s-projects.vercel.app", // this deployment
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      "http://localhost:5173", // for local dev
+      "https://digititan-leave-app.vercel.app", // your deployed frontend
+      "https://digititan-leave-byk4dk808-jackson951s-projects.vercel.app", // the origin from the request
+      "https://digititan-leave-he1i8zvmo-jackson951s-projects.vercel.app", // another deployment
+    ];
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log("Not allowed by CORS:", origin);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions)); // Preflight handling
 
 // ------------------- Middleware -------------------
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // Serve uploaded files
@@ -43,21 +57,40 @@ app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leaves", leaveRoutes);
 
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    message: "Server is running",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ------------------- React SPA fallback -------------------
-app.get(/.*/, (req, res) => {
+app.get(/^(?!\/api).*/, (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/dist", "index.html"));
 });
 
 // ------------------- Global Error Handler -------------------
 app.use((err, req, res, next) => {
   console.error("Global error:", err.stack);
-  res.status(500).json({ message: "Internal server error." });
+
+  if (err.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      message: "CORS policy: Request origin not allowed",
+      error: process.env.NODE_ENV === "development" ? err.message : {},
+    });
+  }
+
+  res.status(500).json({
+    message: "Internal server error.",
+    error: process.env.NODE_ENV === "development" ? err.message : {},
+  });
 });
 
 // ------------------- Start Server -------------------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`✅ Accepting requests from: ${corsOptions.origin}`);
+  console.log(`✅ Accepting requests from configured origins`);
   console.log(`✅ File uploads directory: ${path.join(__dirname, "uploads")}`);
 });
