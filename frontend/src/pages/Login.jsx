@@ -21,8 +21,9 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
-  // Express API base URL
-  const BASE_URL = import.meta.env.VITE_API_URL;
+
+  // Express API base URL - Clean trailing slash to prevent double slashes
+  const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
 
   useEffect(() => {
     const emailInput = document.getElementById("email");
@@ -69,10 +70,17 @@ const LoginPage = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${BASE_URL}auth/login`, {
-        email: formData.email,
-        password: formData.password,
-      });
+      // Fixed: Added leading slash to ensure proper URL construction
+      const response = await axios.post(
+        `${BASE_URL}/auth/login`,
+        {
+          email: formData.email,
+          password: formData.password,
+        },
+        {
+          withCredentials: true, // Add this for consistency with your API service
+        }
+      );
 
       const userData = response.data.user;
 
