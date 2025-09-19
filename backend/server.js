@@ -9,30 +9,25 @@ const { PrismaClient } = require("@prisma/client");
 const app = express();
 const prisma = new PrismaClient();
 
+const allowedOrigins = [
+  "http://localhost:5173", // for local dev
+  "https://digititan-leave-app.vercel.app", // your deployed frontend
+  "https://digititan-leave-byk4dk808-jackson951s-projects.vercel.app", // the origin from the request
+  "https://digititan-leave-he1i8zvmo-jackson951s-projects.vercel.app", // another deployment
+];
+
 // ------------------- CORS Setup -------------------
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-
-    const allowedOrigins = [
-      "http://localhost:5173", // for local dev
-      "https://digititan-leave-app.vercel.app", // your deployed frontend
-      "https://digititan-leave-byk4dk808-jackson951s-projects.vercel.app", // the origin from the request
-      "https://digititan-leave-he1i8zvmo-jackson951s-projects.vercel.app", // another deployment
-    ];
-
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log("Not allowed by CORS:", origin);
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  optionsSuccessStatus: 200,
+  credentials: true, // Set to true if your API requires credentials (cookies, HTTP authentication)
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE", // Specify allowed HTTP methods
+  allowedHeaders: "Content-Type,Authorization", // Specify allowed headers
 };
 
 app.use(cors(corsOptions));
