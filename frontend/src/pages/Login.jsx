@@ -21,6 +21,8 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
+  // Express API base URL
+  const BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const emailInput = document.getElementById("email");
@@ -67,13 +69,10 @@ const LoginPage = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(
-        "http://localhost:5000/api/auth/login",
-        {
-          email: formData.email,
-          password: formData.password,
-        }
-      );
+      const response = await axios.post(`${BASE_URL}auth/login`, {
+        email: formData.email,
+        password: formData.password,
+      });
 
       const userData = response.data.user;
 
