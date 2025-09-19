@@ -1,10 +1,9 @@
-// ------------------- Load Environment -------------------
 require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const cookieParser = require("cookie-parser"); // <-- Needed for cookies
+const cookieParser = require("cookie-parser");
 const { PrismaClient } = require("@prisma/client");
 
 const app = express();
@@ -12,9 +11,8 @@ const prisma = new PrismaClient();
 
 // ------------------- CORS Setup -------------------
 const corsOptions = {
-  origin: "http://localhost:5173", // React dev server
-  credentials: true, // Allow cookies and authorization headers
-  optionsSuccessStatus: 200,
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
@@ -22,23 +20,15 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions)); // Preflight handling
 
-// Additional headers (redundant but safe)
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "http://localhost:5173");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-  );
-  next();
-});
-
 // ------------------- Middleware -------------------
-app.use(express.json()); // Parse JSON requests
-app.use(cookieParser()); // Parse cookies
+app.use(express.json());
+app.use(cookieParser());
 
-// Serve uploaded files statically
+// Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Serve React build
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
 // ------------------- Routes -------------------
 const userRoutes = require("./routes/userRoutes");
@@ -49,9 +39,9 @@ app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leaves", leaveRoutes);
 
-// ------------------- Test Route -------------------
-app.get("/", (req, res) => {
-  res.send("API is running! ✅ CORS configured.");
+// ------------------- React SPA fallback -------------------
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/dist", "index.html"));
 });
 
 // ------------------- Global Error Handler -------------------
@@ -64,6 +54,6 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`✅ Accepting requests from: http://localhost:5173`);
+  console.log(`✅ Accepting requests from: ${corsOptions.origin}`);
   console.log(`✅ File uploads directory: ${path.join(__dirname, "uploads")}`);
 });
