@@ -5,8 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "react-toastify";
 
-// Express API base URL
-const BASE_URL = import.meta.env.VITE_API_URL;
+// Express API base URL - remove trailing slash to prevent double slashes
+const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
 
 // Create Axios instance
 export const ApiService = axios.create({
@@ -97,7 +97,7 @@ export const useApiInterceptors = () => {
           try {
             // Attempt to refresh the token
             const { data } = await axios.post(
-              `${BASE_URL}auth/refresh`,
+              `${BASE_URL}/auth/refresh`, // Fixed: added leading slash since BASE_URL no longer has trailing slash
               {},
               { withCredentials: true } // Send refresh token cookie
             );
