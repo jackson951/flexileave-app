@@ -12,9 +12,9 @@ const prisma = new PrismaClient();
 // ------------------- CORS Setup -------------------
 const corsOptions = {
   origin: [
-    process.env.FRONTEND_URL || "http://localhost:5173",
-    "https://digititan-leave-app.vercel.app",
-    "https://digititan-leave-jz2wof8tr-jackson951s-projects.vercel.app", // add this
+    "http://localhost:5173", // for local dev
+    "https://digititan-leave-app.vercel.app", // your deployed frontend
+    "https://digititan-leave-he1i8zvmo-jackson951s-projects.vercel.app", // this deployment
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
