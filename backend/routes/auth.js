@@ -10,7 +10,7 @@ const generateAccessToken = (user) => {
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role, name: user.name },
     process.env.JWT_SECRET,
-    { expiresIn: "15m" } // short-lived access token
+    { expiresIn: "24h" } // short-lived access token
   );
 };
 
