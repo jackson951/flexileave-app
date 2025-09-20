@@ -42,9 +42,20 @@ const NewLeaveRequest = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // Initialize interceptors
   useApiInterceptors();
+
+  // Handle window resize for responsiveness
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Map display names to backend values
   const leaveTypeMapping = {
@@ -187,10 +198,9 @@ const NewLeaveRequest = () => {
   };
 
   // Remove file
-  // MODIFIED: Use the correct endpoint (singular 'file')
   const removeFile = async (fileId) => {
     try {
-      // Use ApiService for file deletion - CORRECTED ENDPOINT
+      // Use ApiService for file deletion
       await ApiService.delete(`/leaves/file/${fileId}`);
 
       setFormData((prev) => ({
@@ -293,7 +303,7 @@ const NewLeaveRequest = () => {
         )}
       </span>
       <span
-        className={`ml-3 text-sm font-medium ${
+        className={`ml-3 text-sm font-medium hidden sm:inline ${
           currentStep === number ? "text-indigo-600" : "text-gray-500"
         }`}
       >
@@ -370,7 +380,7 @@ const NewLeaveRequest = () => {
       {/* Progress Steps */}
       <div className="mb-8">
         <nav className="flex items-center justify-center" aria-label="Progress">
-          <ol className="flex items-center space-x-8">
+          <ol className="flex items-center space-x-2 sm:space-x-8">
             <StepIndicator
               number={1}
               currentStep={step}
@@ -551,12 +561,12 @@ const NewLeaveRequest = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Leave Dates <span className="text-red-500">*</span>
               </label>
-              <div className="border border-gray-300 rounded-lg shadow-sm p-4 bg-white">
+              <div className="border border-gray-300 rounded-lg shadow-sm p-2 sm:p-4 bg-white overflow-x-auto">
                 <DateRangePicker
                   onChange={handleDateChange}
                   ranges={dateRange}
-                  months={1}
-                  direction="horizontal"
+                  months={isMobile ? 1 : 2}
+                  direction={isMobile ? "vertical" : "horizontal"}
                   minDate={new Date()}
                   rangeColors={["#4F46E5"]}
                 />
@@ -609,7 +619,7 @@ const NewLeaveRequest = () => {
               <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors duration-200">
                 <div className="space-y-1 text-center">
                   <ArrowUpTrayIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600 justify-center">
+                  <div className="flex text-sm text-gray-600 justify-center flex-wrap">
                     <label
                       htmlFor="file-upload"
                       className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2"
@@ -667,7 +677,7 @@ const NewLeaveRequest = () => {
                     {formData.supportingDocs.map((file) => (
                       <li
                         key={file.id}
-                        className="pl-4 pr-4 py-3 flex items-center justify-between text-sm hover:bg-gray-100 transition-colors duration-150"
+                        className="pl-3 pr-3 py-3 flex items-center justify-between text-sm hover:bg-gray-100 transition-colors duration-150"
                       >
                         <div className="flex items-center flex-1 min-w-0">
                           <DocumentTextIcon className="flex-shrink-0 h-5 w-5 text-gray-400 mr-3" />
@@ -683,17 +693,17 @@ const NewLeaveRequest = () => {
                         <button
                           type="button"
                           onClick={() => removeFile(file.id)}
-                          className="ml-4 flex-shrink-0 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-150"
+                          className="ml-2 flex-shrink-0 inline-flex items-center p-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-150"
                           title="Remove this file"
                         >
-                          <XMarkIcon className="h-4 w-4 mr-1" />
-                          Remove
+                          <XMarkIcon className="h-4 w-4" />
                         </button>
                       </li>
                     ))}
                   </ul>
                   <p className="mt-2 text-xs text-gray-500">
-                    Click "Remove" to delete a file permanently from the system.
+                    Click the X button to delete a file permanently from the
+                    system.
                   </p>
                 </div>
               )}
@@ -771,7 +781,7 @@ const NewLeaveRequest = () => {
                           {formData.supportingDocs.map((file) => (
                             <li
                               key={file.id}
-                              className="pl-4 pr-4 py-3 flex items-center justify-between text-sm"
+                              className="pl-3 pr-3 py-3 flex items-center justify-between text-sm"
                             >
                               <div className="flex items-center flex-1 min-w-0">
                                 <DocumentTextIcon className="flex-shrink-0 h-5 w-5 text-gray-400 mr-3" />
@@ -787,11 +797,10 @@ const NewLeaveRequest = () => {
                               <button
                                 type="button"
                                 onClick={() => removeFile(file.id)}
-                                className="ml-4 flex-shrink-0 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                className="ml-2 flex-shrink-0 inline-flex items-center p-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                                 title="Remove this file"
                               >
-                                <XMarkIcon className="h-4 w-4 mr-1" />
-                                Remove
+                                <XMarkIcon className="h-4 w-4" />
                               </button>
                             </li>
                           ))}
@@ -872,7 +881,7 @@ const NewLeaveRequest = () => {
               className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
             >
               <ChevronLeftIcon className="-ml-1 mr-2 h-5 w-5 text-gray-500" />
-              Back
+              <span className="hidden sm:inline">Back</span>
             </button>
           )}
           <div className="ml-auto">
@@ -892,7 +901,7 @@ const NewLeaveRequest = () => {
                 }
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
               >
-                Next
+                <span className="hidden sm:inline">Next</span>
                 <ChevronRightIcon className="ml-2 -mr-1 h-5 w-5" />
               </button>
             ) : (
