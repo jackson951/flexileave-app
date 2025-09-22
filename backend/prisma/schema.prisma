@@ -15,13 +15,15 @@ model User {
   department    String?
   position      String?
   joinDate      DateTime
-  leaveBalances Json     // no @default for SQLite JSON
+  leaveBalances Json
   role          String
   avatar        String?
   password      String
   createdAt     DateTime @default(now())
-  leaves        Leave[]
-  refreshToken String? // <-- add this field (nullable)
+  refreshToken  String?
+  leaves        Leave[]  // REMOVED onDelete from here
+
+  @@map("users")
 }
 
 model Leave {
@@ -38,8 +40,10 @@ model Leave {
   emergencyPhone   String?
 
   userId  Int
-  user    User   @relation(fields: [userId], references: [id])
-  attachments File[]
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade) // KEEP onDelete here
+  attachments File[]  // REMOVED onDelete from here
+
+  @@map("leaves")
 }
 
 model File {
@@ -51,5 +55,7 @@ model File {
   uploadedAt DateTime @default(now())
 
   leaveId   Int?
-  leave     Leave?   @relation(fields: [leaveId], references: [id])
+  leave     Leave?   @relation(fields: [leaveId], references: [id], onDelete: Cascade) // KEEP onDelete here
+
+  @@map("files")
 }
