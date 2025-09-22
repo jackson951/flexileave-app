@@ -222,7 +222,7 @@ const DashboardLayout = () => {
                       {authUser?.name}
                     </p>
                     <p className="text-xs font-medium text-gray-500 group-hover:text-gray-700 dark:text-gray-400">
-                      {authUser?.role}
+                      {authUser?.position}
                     </p>
                   </div>
                   <button
@@ -313,7 +313,7 @@ const DashboardLayout = () => {
                   {authUser?.name}
                 </p>
                 <p className="text-xs font-medium text-gray-500 group-hover:text-gray-700 dark:text-gray-400">
-                  {authUser?.role}
+                  {authUser?.position}
                 </p>
               </div>
               <button
@@ -608,7 +608,7 @@ const DashboardLayout = () => {
                         {authUser?.name}
                       </p>
                       <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                        {authUser?.role}
+                        {authUser?.position}
                       </p>
                     </div>
                     <ChevronDownIcon className="ml-1 h-4 w-4 text-gray-400" />
