@@ -18,9 +18,11 @@ import {
   CheckCircleIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
+import { useAuth } from "../contexts/AuthContext";
 import digititanLogo from "../assets/digititan-logo.jpeg";
 
-const DashboardLayout = ({ userType, user, onLogout }) => {
+const DashboardLayout = () => {
+  const { user: authUser, logout, logoutLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -82,19 +84,19 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
       name: "Team Calendar",
       href: "/dashboard/calendar",
       icon: CalendarDaysIcon,
-      show: userType === "admin",
+      show: authUser?.role === "admin",
     },
     {
       name: "Reports",
       href: "/dashboard/reports",
       icon: ChartBarIcon,
-      show: userType === "admin",
+      show: authUser?.role === "admin",
     },
     {
       name: "Employees",
       href: "/dashboard/users",
       icon: UserGroupIcon,
-      show: userType === "admin",
+      show: authUser?.role === "admin",
     },
     {
       name: "Profile Settings",
@@ -209,28 +211,33 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
                     <img
                       className="inline-block h-10 w-10 rounded-full"
                       src={
-                        user?.avatar ||
-                        "https://ui-avatars.com/api/?name=" + user?.name
+                        authUser?.avatar ||
+                        "https://ui-avatars.com/api/?name=" + authUser?.name
                       }
                       alt=""
                     />
                   </div>
                   <div className="ml-3">
                     <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900 dark:text-gray-200">
-                      {user?.name}
+                      {authUser?.name}
                     </p>
                     <p className="text-xs font-medium text-gray-500 group-hover:text-gray-700 dark:text-gray-400">
-                      {user?.role}
+                      {authUser?.role}
                     </p>
                   </div>
                   <button
-                    onClick={onLogout}
-                    className="ml-auto flex-shrink-0 bg-white dark:bg-gray-800 p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                    onClick={logout}
+                    disabled={logoutLoading}
+                    className="ml-auto flex-shrink-0 bg-white dark:bg-gray-800 p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 disabled:opacity-50"
                   >
-                    <ArrowRightOnRectangleIcon
-                      className="h-6 w-6"
-                      aria-hidden="true"
-                    />
+                    {logoutLoading ? (
+                      <div className="h-6 w-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <ArrowRightOnRectangleIcon
+                        className="h-6 w-6"
+                        aria-hidden="true"
+                      />
+                    )}
                   </button>
                 </div>
               </div>
@@ -295,28 +302,33 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
                 <img
                   className="inline-block h-10 w-10 rounded-full"
                   src={
-                    user?.avatar ||
-                    "https://ui-avatars.com/api/?name=" + user?.name
+                    authUser?.avatar ||
+                    "https://ui-avatars.com/api/?name=" + authUser?.name
                   }
                   alt=""
                 />
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900 dark:text-gray-200">
-                  {user?.name}
+                  {authUser?.name}
                 </p>
                 <p className="text-xs font-medium text-gray-500 group-hover:text-gray-700 dark:text-gray-400">
-                  {user?.role}
+                  {authUser?.role}
                 </p>
               </div>
               <button
-                onClick={onLogout}
-                className="ml-auto flex-shrink-0 bg-white dark:bg-gray-800 p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                onClick={logout}
+                disabled={logoutLoading}
+                className="ml-auto flex-shrink-0 bg-white dark:bg-gray-800 p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 disabled:opacity-50"
               >
-                <ArrowRightOnRectangleIcon
-                  className="h-6 w-6"
-                  aria-hidden="true"
-                />
+                {logoutLoading ? (
+                  <div className="h-6 w-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <ArrowRightOnRectangleIcon
+                    className="h-6 w-6"
+                    aria-hidden="true"
+                  />
+                )}
               </button>
             </div>
           </div>
@@ -451,13 +463,18 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
 
               <button
                 type="button"
-                className="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300"
-                onClick={onLogout}
+                className="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 dark:bg-gray-800 dark:hover:text-gray-300 disabled:opacity-50"
+                onClick={logout}
+                disabled={logoutLoading}
               >
-                <ArrowRightOnRectangleIcon
-                  className="h-6 w-6"
-                  aria-hidden="true"
-                />
+                {logoutLoading ? (
+                  <div className="h-6 w-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <ArrowRightOnRectangleIcon
+                    className="h-6 w-6"
+                    aria-hidden="true"
+                  />
+                )}
               </button>
             </div>
           </div>
@@ -581,17 +598,17 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
                     <img
                       className="h-8 w-8 rounded-full"
                       src={
-                        user?.avatar ||
-                        "https://ui-avatars.com/api/?name=" + user?.name
+                        authUser?.avatar ||
+                        "https://ui-avatars.com/api/?name=" + authUser?.name
                       }
                       alt=""
                     />
                     <div className="ml-2 hidden md:block">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                        {user?.name}
+                        {authUser?.name}
                       </p>
                       <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                        {user?.role}
+                        {authUser?.role}
                       </p>
                     </div>
                     <ChevronDownIcon className="ml-1 h-4 w-4 text-gray-400" />
@@ -618,12 +635,20 @@ const DashboardLayout = ({ userType, user, onLogout }) => {
                     <div className="border-t border-gray-200 dark:border-gray-700"></div>
                     <button
                       onClick={() => {
-                        onLogout();
+                        logout();
                         setProfileDropdownOpen(false);
                       }}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      disabled={logoutLoading}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50 flex items-center"
                     >
-                      Sign out
+                      {logoutLoading ? (
+                        <>
+                          <div className="h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Signing out...
+                        </>
+                      ) : (
+                        "Sign out"
+                      )}
                     </button>
                   </div>
                 )}

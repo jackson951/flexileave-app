@@ -31,6 +31,7 @@ export const AuthProvider = ({ children }) => {
   );
   const [user, setUser] = useState(safeParseUser(localStorage.getItem("user")));
   const [loading, setLoading] = useState(true);
+  const [logoutLoading, setLogoutLoading] = useState(false);
 
   // -------------------- INITIAL LOAD --------------------
   useEffect(() => {
@@ -55,6 +56,8 @@ export const AuthProvider = ({ children }) => {
 
   // -------------------- LOGOUT --------------------
   const logout = async () => {
+    setLogoutLoading(true);
+
     try {
       // Call backend logout (clears refresh token + cookie)
       await ApiService.post("/auth/logout", {}, { withCredentials: true });
@@ -69,6 +72,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("user");
       sessionStorage.removeItem("authToken");
 
+      setLogoutLoading(false);
       navigate("/login");
     }
   };
@@ -92,10 +96,11 @@ export const AuthProvider = ({ children }) => {
     authToken,
     user,
     loading,
+    logoutLoading,
     login,
     logout,
     updateUserProfile,
-    setAuthToken, // optional, useful for interceptors
+    setAuthToken,
   };
 
   return (
