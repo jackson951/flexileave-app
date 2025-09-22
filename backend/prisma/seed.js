@@ -5,15 +5,15 @@ const prisma = new PrismaClient();
 
 async function main() {
   // Hash the admin password
-  const hashedPassword = await bcrypt.hash("Admin@123", 10); // replace with your desired password
+  const hashedPassword = await bcrypt.hash("Kgaogelo#99", 10); // replace with your desired password
 
   const adminUser = await prisma.user.upsert({
     where: { email: "admin@digititan.com" },
     update: {},
     create: {
-      name: "Admin User",
+      name: "Jackson Khuto",
       email: "admin@digititan.com",
-      phone: "+1 (555) 000-0000",
+      phone: "+27 661802747",
       department: "IT",
       position: "Administrator",
       joinDate: new Date("2023-01-01"),
