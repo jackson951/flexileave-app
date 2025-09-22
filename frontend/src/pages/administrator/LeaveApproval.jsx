@@ -63,6 +63,8 @@ const LeaveApprovals = () => {
     setError(null);
     try {
       const response = await ApiService.get("/leaves");
+      // FIX 2: Admins should see leaves from OTHER users, including other admins.
+      // Only filter out the CURRENT admin's own leaves.
       const filteredData = response.data.filter(
         (leave) => leave.userId !== user?.id
       );
@@ -602,12 +604,23 @@ const LeaveApprovals = () => {
                                       <button
                                         type="button"
                                         className="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-                                        onClick={() =>
-                                          window.open(
-                                            `http://localhost:5000${doc.url}`,
-                                            "_blank"
-                                          )
-                                        }
+                                        onClick={() => {
+                                          // --- FIX 1 START ---
+                                          // Construct the full URL for the file
+                                          let fileUrl = doc.url;
+                                          // If the URL is relative (starts with '/'), prepend the API base URL without '/api'
+                                          if (fileUrl.startsWith("/")) {
+                                            // Get the base URL from the environment variable
+                                            const apiBaseUrl = import.meta.env
+                                              .VITE_API;
+                                            // Remove the trailing '/api' to get the root domain
+                                            const rootDomain =
+                                              apiBaseUrl.replace(/\/api$/, "");
+                                            fileUrl = `${rootDomain}${fileUrl}`;
+                                          }
+                                          window.open(fileUrl, "_blank");
+                                          // --- FIX 1 END ---
+                                        }}
                                       >
                                         View
                                       </button>
