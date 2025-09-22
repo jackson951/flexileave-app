@@ -49,9 +49,6 @@ const LeaveHistory = () => {
     Other: 0,
   });
   const [formErrors, setFormErrors] = useState({});
-  // MODIFICATION: We no longer need `temporaryFiles` for cleanup on unmount.
-  // The backend's `cleanupOrphanedFiles` job will handle it.
-  // const [temporaryFiles, setTemporaryFiles] = useState([]);
 
   useApiInterceptors();
 
@@ -79,13 +76,10 @@ const LeaveHistory = () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch leave history using ApiService
         const response = await ApiService.get("/leaves/my");
-        // Get user balances from context
         if (user?.leaveBalances) {
           setUserBalances(user.leaveBalances);
         }
-        // Convert backend leave types to display names for UI consistency
         const processedLeaves = response.data.map((leave) => ({
           ...leave,
           leaveType:
@@ -104,7 +98,6 @@ const LeaveHistory = () => {
         setLoading(false);
       }
     };
-
     if (user) {
       fetchLeaveHistory();
     }
@@ -113,7 +106,6 @@ const LeaveHistory = () => {
   // Filter and search logic
   useEffect(() => {
     let result = [...leaveHistory];
-    // Search by leave type, reason, or date
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(
@@ -123,7 +115,6 @@ const LeaveHistory = () => {
           (leave.user?.name && leave.user.name.toLowerCase().includes(term))
       );
     }
-    // Filter by status or leave type
     if (filter !== "all") {
       result = result.filter(
         (leave) =>
@@ -135,52 +126,23 @@ const LeaveHistory = () => {
     setFilteredLeaves(result);
   }, [searchTerm, filter, leaveHistory]);
 
-  // MODIFICATION: Removed the useEffect for cleanupTemporaryFiles.
-  // Relying on backend cleanup job.
-  // useEffect(() => {
-  //     const cleanupTemporaryFiles = async () => {
-  //         if (temporaryFiles.length > 0) {
-  //             console.log("Cleaning up temporary files:", temporaryFiles);
-  //             for (const fileId of temporaryFiles) {
-  //                 try {
-  //                     await ApiService.delete(`/leaves/file/${fileId}`);
-  //                 } catch (err) {
-  //                     console.warn(
-  //                         `Failed to delete temporary file ${fileId}:`,
-  //                         err.message
-  //                     );
-  //                 }
-  //             }
-  //         }
-  //     };
-  //     return () => {
-  //         if (temporaryFiles.length > 0) {
-  //             cleanupTemporaryFiles();
-  //         }
-  //     };
-  // }, [temporaryFiles]);
-
   const toggleExpand = (id) => {
     setExpandedRequest(expandedRequest === id ? null : id);
   };
 
   const handleEditClick = (leave) => {
-    // Only allow editing if pending and end date is today or in future
     const endDate = new Date(leave.endDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     endDate.setHours(0, 0, 0, 0);
-
     if (leave.status !== "pending") {
       alert("You can only edit pending leave requests.");
       return;
     }
-
     if (isAfter(today, endDate)) {
       alert("You can only edit leave requests that haven't ended yet.");
       return;
     }
-
     setEditingLeave(leave);
     setFormData({
       leaveType: reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType,
@@ -191,11 +153,6 @@ const LeaveHistory = () => {
       emergencyPhone: leave.emergencyPhone || "",
       supportingDocs: leave.attachments || [],
     });
-
-    // MODIFICATION: Removed setting of `temporaryFiles`.
-    // We don't need to track them for cleanup on cancel anymore.
-    // setTemporaryFiles(leave.attachments?.map((f) => f.id) || []);
-
     setIsEditModalOpen(true);
   };
 
@@ -205,14 +162,12 @@ const LeaveHistory = () => {
       ...formData,
       [name]: value,
     });
-    // Clear error when user types
     if (formErrors[name]) {
       setFormErrors({
         ...formErrors,
         [name]: "",
       });
     }
-    // Also clear days error when dates change
     if (name === "startDate" || name === "endDate") {
       if (formErrors.days) {
         setFormErrors((prev) => {
@@ -230,23 +185,16 @@ const LeaveHistory = () => {
     if (!formData.startDate) errors.startDate = "Start date is required";
     if (!formData.endDate) errors.endDate = "End date is required";
     if (!formData.reason?.trim()) errors.reason = "Reason is required";
-
     const start = new Date(formData.startDate);
     const end = new Date(formData.endDate);
     if (start > end) errors.endDate = "End date cannot be before start date";
-
-    // Calculate days
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-    // Get the backend leave type
     const backendLeaveType = leaveTypeMapping[formData.leaveType];
-    // Check if user has sufficient balance for this leave type
     if (backendLeaveType && userBalances[backendLeaveType] !== undefined) {
       if (days > userBalances[backendLeaveType]) {
         errors.days = `Insufficient ${formData.leaveType} balance. You have ${userBalances[backendLeaveType]} day(s) remaining.`;
       }
     }
-
-    // Check for overlapping leaves (frontend hint — backend still enforces)
     const overlapping = leaveHistory.some(
       (l) =>
         l.id !== editingLeave?.id &&
@@ -255,39 +203,28 @@ const LeaveHistory = () => {
         new Date(l.startDate) <= end &&
         new Date(l.endDate) >= start
     );
-
     if (overlapping) {
       errors.overlap =
         "This period overlaps with another active leave request.";
     }
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleUpdateLeave = async () => {
     if (!validateForm()) return;
-
     setFileUploading(true);
     try {
-      // Convert display name to backend value
       const backendLeaveType =
         leaveTypeMapping[formData.leaveType] || formData.leaveType;
-
-      // Calculate days
       const start = new Date(formData.startDate);
       const end = new Date(formData.endDate);
       const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
-      // MODIFICATION: Prepare `removeFileIds`.
-      // Compare the original attachments from `editingLeave` with the current `formData.supportingDocs`.
-      // Any file that was in `editingLeave.attachments` but is NOT in `formData.supportingDocs` has been removed.
       const originalFileIds = editingLeave.attachments.map((file) => file.id);
       const currentFileIds = formData.supportingDocs.map((file) => file.id);
       const removeFileIds = originalFileIds.filter(
         (id) => !currentFileIds.includes(id)
       );
-
       const payload = {
         leaveType: backendLeaveType,
         startDate: formData.startDate,
@@ -295,24 +232,19 @@ const LeaveHistory = () => {
         reason: formData.reason.trim(),
         emergencyContact: formData.emergencyContact || undefined,
         emergencyPhone: formData.emergencyPhone || undefined,
-        fileIds: currentFileIds, // Send current file IDs to attach
-        removeFileIds: removeFileIds.length > 0 ? removeFileIds : undefined, // Send IDs of files to detach
+        fileIds: currentFileIds,
+        removeFileIds: removeFileIds.length > 0 ? removeFileIds : undefined,
       };
-
-      // Use ApiService for the PUT request
       const response = await ApiService.put(
         `/leaves/${editingLeave.id}`,
         payload
       );
-
-      // Convert backend leave type to display name for consistency in UI
       const updatedLeaveWithDisplayName = {
         ...response.data,
         leaveType:
           reverseLeaveTypeMapping[response.data.leaveType] ||
           response.data.leaveType,
       };
-
       setLeaveHistory((prev) =>
         prev.map((l) =>
           l.id === updatedLeaveWithDisplayName.id
@@ -320,9 +252,6 @@ const LeaveHistory = () => {
             : l
         )
       );
-
-      // MODIFICATION: No need to clear `temporaryFiles`.
-
       setIsEditModalOpen(false);
       setEditingLeave(null);
       setFormData({
@@ -335,8 +264,6 @@ const LeaveHistory = () => {
         supportingDocs: [],
       });
       setFormErrors({});
-
-      // Show success message
       alert("Leave request updated successfully!");
     } catch (err) {
       console.error("Error updating leave:", err);
@@ -356,31 +283,23 @@ const LeaveHistory = () => {
       setFileUploadError("You can upload a maximum of 5 files");
       return;
     }
-
     setFileUploading(true);
     setFileUploadError("");
-
     try {
       const uploadFormData = new FormData();
       files.forEach((file) => {
         uploadFormData.append("files", file);
       });
-
-      // Use ApiService for file upload
       const response = await ApiService.post("/leaves/upload", uploadFormData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
-
       const newFiles = response.data;
       setFormData((prev) => ({
         ...prev,
         supportingDocs: [...prev.supportingDocs, ...newFiles],
       }));
-
-      // MODIFICATION: Removed adding to `temporaryFiles`.
-      // setTemporaryFiles((prev) => [...prev, ...newFiles.map((f) => f.id)]);
     } catch (err) {
       console.error("Error uploading files:", err);
       setFileUploadError(
@@ -392,9 +311,6 @@ const LeaveHistory = () => {
     }
   };
 
-  // Remove file from current leave request (but keep it in system for potential reuse)
-  // MODIFIED: This function now only removes the file from the local state (`formData.supportingDocs`).
-  // The actual detachment from the leave happens in `handleUpdateLeave` when the user clicks "Save Changes".
   const removeFileFromRequest = (fileId) => {
     setFormData((prev) => ({
       ...prev,
@@ -402,26 +318,15 @@ const LeaveHistory = () => {
     }));
   };
 
-  // Permanently delete file from system
-  // MODIFIED: This function now calls the DELETE endpoint, which will detach AND delete the file.
   const deleteFilePermanently = async (fileId) => {
     try {
-      // Use ApiService for file deletion
       await ApiService.delete(`/leaves/file/${fileId}`);
-
-      // Remove from form data
       setFormData((prev) => ({
         ...prev,
         supportingDocs: prev.supportingDocs.filter(
           (file) => file.id !== fileId
         ),
       }));
-
-      // MODIFICATION: Removed from `temporaryFiles`.
-      // setTemporaryFiles((prev) => prev.filter((id) => id !== fileId));
-
-      // Optional: You could also update the `leaveHistory` state here to immediately reflect the deletion
-      // in the expanded view, but it's not strictly necessary as the next fetch or the update after save will reflect it.
     } catch (err) {
       console.error("Error deleting file:", err);
       setFileUploadError(
@@ -437,16 +342,13 @@ const LeaveHistory = () => {
     ) {
       return;
     }
-
     try {
-      // Use ApiService for cancel request
       await ApiService.put(`/leaves/${id}/cancel`);
       setLeaveHistory((prev) =>
         prev.map((leave) =>
           leave.id === id ? { ...leave, status: "cancelled" } : leave
         )
       );
-      // Show success message
       alert("Leave request cancelled successfully!");
     } catch (err) {
       console.error("Error cancelling leave:", err);
@@ -701,14 +603,12 @@ const LeaveHistory = () => {
                       </button>
                     </div>
                   </div>
-
                   {expandedRequest === leave.id && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <div className="text-sm text-gray-700 mb-4">
                         <p className="font-medium">Reason:</p>
                         <p className="mt-1">{leave.reason}</p>
                       </div>
-
                       {leave.attachments && leave.attachments.length > 0 && (
                         <div className="mb-4">
                           <p className="text-sm font-medium text-gray-700">
@@ -736,9 +636,24 @@ const LeaveHistory = () => {
                                   <button
                                     type="button"
                                     className="font-medium text-indigo-600 hover:text-indigo-500"
-                                    onClick={() =>
-                                      window.open(doc.url, "_blank")
-                                    }
+                                    onClick={() => {
+                                      let fileUrl = doc.url;
+                                      // Check if the URL is relative (starts with '/')
+                                      if (fileUrl.startsWith("/")) {
+                                        // Get the base API URL from the environment
+                                        const apiBaseUrl = import.meta.env
+                                          .VITE_API;
+                                        // Remove the trailing '/api' to get the root domain
+                                        // This is the CRITICAL FIX: We remove '/api' to avoid double /api in the path
+                                        const rootDomain = apiBaseUrl.replace(
+                                          /\/api$/,
+                                          ""
+                                        );
+                                        fileUrl = `${rootDomain}${fileUrl}`;
+                                      }
+                                      // Open the corrected URL
+                                      window.open(fileUrl, "_blank");
+                                    }}
                                   >
                                     View
                                   </button>
@@ -748,7 +663,6 @@ const LeaveHistory = () => {
                           </ul>
                         </div>
                       )}
-
                       <div className="text-xs text-gray-500 mb-4">
                         <p>Submitted: {formatDateTime(leave.submittedAt)}</p>
                         {leave.approvedAt && (
@@ -766,7 +680,6 @@ const LeaveHistory = () => {
                           </div>
                         )}
                       </div>
-
                       <div className="flex space-x-3">
                         {leave.status === "pending" && (
                           <>
@@ -819,7 +732,6 @@ const LeaveHistory = () => {
                   <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
-
               <form onSubmit={(e) => e.preventDefault()}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -858,7 +770,6 @@ const LeaveHistory = () => {
                       </p>
                     )}
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Start Date *
@@ -881,7 +792,6 @@ const LeaveHistory = () => {
                       </p>
                     )}
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       End Date *
@@ -912,7 +822,6 @@ const LeaveHistory = () => {
                       </p>
                     )}
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Days
@@ -932,7 +841,6 @@ const LeaveHistory = () => {
                       className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Emergency Contact
@@ -945,7 +853,6 @@ const LeaveHistory = () => {
                       className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Emergency Phone
@@ -959,7 +866,6 @@ const LeaveHistory = () => {
                     />
                   </div>
                 </div>
-
                 <div className="mt-6">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Reason *
@@ -989,7 +895,6 @@ const LeaveHistory = () => {
                     </div>
                   )}
                 </div>
-
                 <div className="mt-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Supporting Documents (Optional)
@@ -1017,7 +922,6 @@ const LeaveHistory = () => {
                       <p className="text-xs text-gray-500">
                         Drag and drop or click to upload
                       </p>
-
                       {fileUploading && (
                         <div className="flex items-center justify-center">
                           <svg
@@ -1045,7 +949,6 @@ const LeaveHistory = () => {
                           </p>
                         </div>
                       )}
-
                       {fileUploadError && (
                         <p className="text-xs text-red-500">
                           {fileUploadError}
@@ -1053,7 +956,6 @@ const LeaveHistory = () => {
                       )}
                     </div>
                   </div>
-
                   {formData.supportingDocs.length > 0 && (
                     <div className="mt-4">
                       <h4 className="text-sm font-medium text-gray-700 mb-2">
@@ -1102,7 +1004,6 @@ const LeaveHistory = () => {
                     </div>
                   )}
                 </div>
-
                 <div className="mt-8 flex justify-end space-x-4">
                   <button
                     type="button"
