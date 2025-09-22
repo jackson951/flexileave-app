@@ -7,10 +7,12 @@ import {
   ArrowPathIcon,
   CloudIcon,
 } from "@heroicons/react/24/outline";
+import {useAuth }from "../contexts/AuthContext";
 
 const NotFoundPage = () => {
   const navigate = useNavigate();
   const [isAnimating, setIsAnimating] = useState(false);
+  const { isLoggedIn } = useAuth();
 
   useEffect(() => {
     // Trigger animations after component mounts
@@ -156,14 +158,16 @@ const NotFoundPage = () => {
             Refresh
           </button>
 
-          <button
-            onClick={handleGoHome}
-            className="group inline-flex items-center justify-center px-5 py-3 bg-indigo-600 text-white font-medium rounded-lg shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
-            aria-label="Go to dashboard"
-          >
-            <HomeIcon className="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" />
-            Go to Dashboard
-          </button>
+          {isLoggedIn && (
+            <button
+              onClick={handleGoHome}
+              className="group inline-flex items-center justify-center px-5 py-3 bg-indigo-600 text-white font-medium rounded-lg shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+              aria-label="Go to dashboard"
+            >
+              <HomeIcon className="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" />
+              Go to Dashboard
+            </button>
+          )}
         </div>
 
         {/* Additional help section */}
