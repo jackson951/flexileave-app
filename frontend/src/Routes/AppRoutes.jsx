@@ -13,17 +13,31 @@ import TeamCalender from "../pages/administrator/TeamCalender";
 import ForgotPasswordPage from "../pages/ForgotPassword";
 import { useApiInterceptors } from "../api/web-api-service";
 
-// Role-based protected route wrapper
+// Loading spinner component
+const LoadingSpinner = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+  </div>
+);
+
+// Public route wrapper - only accessible when NOT logged in
+const PublicRoute = ({ children }) => {
+  const { isLoggedIn, loading } = useAuth();
+
+  if (loading) return <LoadingSpinner />;
+  
+  if (isLoggedIn) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
+// Protected route wrapper - only accessible when logged in
 const ProtectedRoute = ({ children }) => {
   const { isLoggedIn, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingSpinner />;
 
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />;
@@ -36,13 +50,7 @@ const ProtectedRoute = ({ children }) => {
 const AdminRoute = ({ children }) => {
   const { isLoggedIn, user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingSpinner />;
 
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />;
@@ -57,25 +65,39 @@ const AdminRoute = ({ children }) => {
 
 // Role-based component switcher
 const RoleBased = ({ user, userComponent, adminComponent }) => {
-  if (user?.role === "admin") {
-    return adminComponent;
-  }
-  return userComponent;
+  return user?.role === "admin" ? adminComponent : userComponent;
 };
 
 const AppRoutes = () => {
   const { user, logout } = useAuth();
+  
+  // Initialize API interceptors
   useApiInterceptors();
+
   return (
     <Routes>
-      {/* Public Routes */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      {/* Public Routes - Only accessible when NOT logged in */}
+      <Route 
+        path="/login" 
+        element={
+          <PublicRoute>
+            <LoginPage />
+          </PublicRoute>
+        } 
+      />
+      <Route 
+        path="/forgot-password" 
+        element={
+          <PublicRoute>
+            <ForgotPasswordPage />
+          </PublicRoute>
+        } 
+      />
 
-      {/* Redirect root to dashboard */}
+      {/* Root redirect */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-      {/* Protected Routes */}
+      {/* Protected Dashboard Routes */}
       <Route
         path="/dashboard"
         element={
@@ -88,7 +110,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
-        {/* Dashboard home: admin and user see different UIs */}
+        {/* Dashboard home - role-based default view */}
         <Route
           index
           element={
@@ -100,38 +122,8 @@ const AppRoutes = () => {
           }
         />
 
-        <Route
-          path="calendar"
-          element={
-            <AdminRoute>
-              <TeamCalender />
-            </AdminRoute>
-          }
-        />
-
-        {/* Reports - Admin only */}
-        <Route
-          path="reports"
-          element={
-            <AdminRoute>
-              <ReportsPage />
-            </AdminRoute>
-          }
-        />
-
-        {/* Leave requests - accessible to both users and admins */}
-        <Route
-          path="leave/new"
-          element={
-            <RoleBased
-              user={user}
-              userComponent={<NewLeaveRequest />}
-              adminComponent={<NewLeaveRequest />}
-            />
-          }
-        />
-
-        {/* Leave history (user) / approvals (admin) */}
+        {/* Leave Management Routes */}
+        <Route path="leave/new" element={<NewLeaveRequest />} />
         <Route
           path="leave"
           element={
@@ -143,7 +135,23 @@ const AppRoutes = () => {
           }
         />
 
-        {/* User Management - Admin only */}
+        {/* Admin-Only Routes */}
+        <Route
+          path="calendar"
+          element={
+            <AdminRoute>
+              <TeamCalender />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="reports"
+          element={
+            <AdminRoute>
+              <ReportsPage />
+            </AdminRoute>
+          }
+        />
         <Route
           path="users"
           element={
@@ -153,14 +161,14 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Profile Page - accessible to all authenticated users */}
+        {/* Profile - Available to all authenticated users */}
         <Route path="profile" element={<ProfilePage user={user} />} />
 
-        {/* Catch-all 404 Not Found inside dashboard */}
+        {/* Dashboard 404 */}
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
-      {/* Catch-all 404 Not Found for all other unknown routes */}
+      {/* Global 404 */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
