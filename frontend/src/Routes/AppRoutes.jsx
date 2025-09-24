@@ -25,9 +25,9 @@ const PublicRoute = ({ children }) => {
   const { isLoggedIn, loading } = useAuth();
 
   if (loading) return <LoadingSpinner />;
-  
+
   if (isLoggedIn) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/dashboard/leave" replace />;
   }
 
   return children;
@@ -57,7 +57,7 @@ const AdminRoute = ({ children }) => {
   }
 
   if (user?.role !== "admin") {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/dashboard/leave" replace />;
   }
 
   return children;
@@ -70,32 +70,32 @@ const RoleBased = ({ user, userComponent, adminComponent }) => {
 
 const AppRoutes = () => {
   const { user, logout } = useAuth();
-  
+
   // Initialize API interceptors
   useApiInterceptors();
 
   return (
     <Routes>
       {/* Public Routes - Only accessible when NOT logged in */}
-      <Route 
-        path="/login" 
+      <Route
+        path="/login"
         element={
           <PublicRoute>
             <LoginPage />
           </PublicRoute>
-        } 
+        }
       />
-      <Route 
-        path="/forgot-password" 
+      <Route
+        path="/forgot-password"
         element={
           <PublicRoute>
             <ForgotPasswordPage />
           </PublicRoute>
-        } 
+        }
       />
 
       {/* Root redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard/leave" replace />} />
 
       {/* Protected Dashboard Routes */}
       <Route
