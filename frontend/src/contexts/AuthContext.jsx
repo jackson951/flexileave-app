@@ -49,7 +49,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("authToken", token);
       localStorage.setItem("user", JSON.stringify(userData));
     } else {
-      sessionStorage.setItem("authToken", token);
       localStorage.setItem("authToken", token); // keep token always
       localStorage.setItem("user", JSON.stringify(userData)); // keep user always
     }
