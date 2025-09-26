@@ -95,12 +95,6 @@ const DashboardLayout = () => {
 
   const navigation = [
     {
-      name: "Dashboard",
-      href: "/dashboard",
-      icon: HomeIcon,
-      show: true,
-    },
-    {
       name: "Leave Requests",
       href: "/dashboard/leave",
       icon: DocumentTextIcon,
