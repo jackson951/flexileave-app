@@ -24,7 +24,13 @@ import digititanLogo from "../assets/digititan-logo.jpeg";
 const DashboardLayout = () => {
   const { user: authUser, logout, logoutLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    // Check if dark mode is preferred or previously set
+    return (
+      localStorage.getItem("darkMode") === "true" ||
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    );
+  });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const navigate = useNavigate();
@@ -62,12 +68,38 @@ const DashboardLayout = () => {
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add("dark");
+      localStorage.setItem("darkMode", "true");
     } else {
       document.documentElement.classList.remove("dark");
+      localStorage.setItem("darkMode", "false");
     }
   }, [darkMode]);
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        notificationsOpen &&
+        !event.target.closest(".notifications-dropdown")
+      ) {
+        setNotificationsOpen(false);
+      }
+      if (profileDropdownOpen && !event.target.closest(".profile-dropdown")) {
+        setProfileDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notificationsOpen, profileDropdownOpen]);
+
   const navigation = [
+    {
+      name: "Dashboard",
+      href: "/dashboard",
+      icon: HomeIcon,
+      show: true,
+    },
     {
       name: "Leave Requests",
       href: "/dashboard/leave",
@@ -212,7 +244,8 @@ const DashboardLayout = () => {
                       className="inline-block h-10 w-10 rounded-full"
                       src={
                         authUser?.avatar ||
-                        "https://ui-avatars.com/api/?name=" + authUser?.name
+                        "https://ui-avatars.com/api/?name=" +
+                          encodeURIComponent(authUser?.name || "User")
                       }
                       alt=""
                     />
@@ -303,7 +336,8 @@ const DashboardLayout = () => {
                   className="inline-block h-10 w-10 rounded-full"
                   src={
                     authUser?.avatar ||
-                    "https://ui-avatars.com/api/?name=" + authUser?.name
+                    "https://ui-avatars.com/api/?name=" +
+                      encodeURIComponent(authUser?.name || "User")
                   }
                   alt=""
                 />
@@ -369,6 +403,9 @@ const DashboardLayout = () => {
                 type="button"
                 onClick={() => setDarkMode(!darkMode)}
                 className="p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                title={
+                  darkMode ? "Switch to light mode" : "Switch to dark mode"
+                }
               >
                 {darkMode ? (
                   <SunIcon className="h-6 w-6" aria-hidden="true" />
@@ -378,7 +415,7 @@ const DashboardLayout = () => {
               </button>
 
               {/* Notifications dropdown for mobile */}
-              <div className="relative">
+              <div className="relative notifications-dropdown">
                 <button
                   type="button"
                   className="relative p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
@@ -495,6 +532,9 @@ const DashboardLayout = () => {
                 type="button"
                 onClick={() => setDarkMode(!darkMode)}
                 className="p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                title={
+                  darkMode ? "Switch to light mode" : "Switch to dark mode"
+                }
               >
                 {darkMode ? (
                   <SunIcon className="h-6 w-6" aria-hidden="true" />
@@ -504,7 +544,7 @@ const DashboardLayout = () => {
               </button>
 
               {/* Notifications dropdown */}
-              <div className="relative ml-3">
+              <div className="relative ml-3 notifications-dropdown">
                 <button
                   type="button"
                   className="relative p-1 rounded-full text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
@@ -588,7 +628,7 @@ const DashboardLayout = () => {
               </div>
 
               {/* Profile dropdown */}
-              <div className="relative ml-3">
+              <div className="relative ml-3 profile-dropdown">
                 <div>
                   <button
                     type="button"
@@ -599,7 +639,8 @@ const DashboardLayout = () => {
                       className="h-8 w-8 rounded-full"
                       src={
                         authUser?.avatar ||
-                        "https://ui-avatars.com/api/?name=" + authUser?.name
+                        "https://ui-avatars.com/api/?name=" +
+                          encodeURIComponent(authUser?.name || "User")
                       }
                       alt=""
                     />
