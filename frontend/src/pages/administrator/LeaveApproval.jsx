@@ -63,15 +63,21 @@ const LeaveApprovals = () => {
     setError(null);
     try {
       const response = await ApiService.get("/leaves");
-      // Filter out current user's own leaves and process the data
-      const filteredData = response.data.filter(
-        (leave) => leave.userId !== user?.id
-      );
+      let filteredData;
+
+      // Admins see ALL leaves (including their own)
+      // Non-admins see only others' leaves
+      if (user?.role === "admin") {
+        filteredData = response.data;
+      } else {
+        filteredData = response.data.filter(
+          (leave) => leave.userId !== user?.id
+        );
+      }
 
       const processedData = filteredData.map((leave) => ({
         ...leave,
         leaveType: reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType,
-        // The backend now includes actionedByUser properly
         actionedByUser: leave.actionedByUser || null,
       }));
 
@@ -101,7 +107,6 @@ const LeaveApprovals = () => {
 
     let result = [...leaves];
 
-    // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(
@@ -118,7 +123,6 @@ const LeaveApprovals = () => {
       );
     }
 
-    // Apply status filter
     if (filter !== "all") {
       result = result.filter((leave) => leave.status.toLowerCase() === filter);
     }
@@ -142,23 +146,16 @@ const LeaveApprovals = () => {
 
     try {
       const response = await ApiService.put(`/leaves/${id}/approve`);
-
-      // The backend now properly returns actionedByUser in the response
       const processedLeave = {
         ...response.data.leave,
         leaveType:
           reverseLeaveTypeMapping[response.data.leave.leaveType] ||
           response.data.leave.leaveType,
-        // Use the actionedByUser from backend response
         actionedByUser: response.data.leave.actionedByUser,
       };
-
-      // Update the leaves state with the approved leave
       setLeaves((prev) =>
         prev.map((leave) => (leave.id === id ? processedLeave : leave))
       );
-
-      // Show success message
       alert("Leave request approved successfully!");
     } catch (err) {
       console.error("Error approving leave:", err);
@@ -181,25 +178,18 @@ const LeaveApprovals = () => {
       const response = await ApiService.put(`/leaves/${id}/reject`, {
         rejectionReason: reason.trim(),
       });
-
-      // The backend now properly returns actionedByUser in the response
       const processedLeave = {
         ...response.data,
         leaveType:
           reverseLeaveTypeMapping[response.data.leaveType] ||
           response.data.leaveType,
-        // Use the actionedByUser from backend response
         actionedByUser: response.data.actionedByUser,
         status: "rejected",
         rejectionReason: reason.trim(),
       };
-
-      // Update the leaves state with the rejected leave
       setLeaves((prev) =>
         prev.map((leave) => (leave.id === id ? processedLeave : leave))
       );
-
-      // Show success message
       alert("Leave request rejected successfully!");
     } catch (err) {
       console.error("Error rejecting leave:", err);
@@ -266,7 +256,11 @@ const LeaveApprovals = () => {
     fetchLeaves();
   };
 
-  // Render actioned-by user information
+  // Helper to check if the leave belongs to the current user
+  const isOwnRequest = (leave) => {
+    return leave.userId === user?.id;
+  };
+
   const renderActionedByInfo = (leave) => {
     if (leave.status === "pending" || leave.status === "cancelled") {
       return null;
@@ -326,7 +320,6 @@ const LeaveApprovals = () => {
     );
   };
 
-  // Show leave history view
   if (currentView === "history") {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -335,7 +328,6 @@ const LeaveApprovals = () => {
     );
   }
 
-  // Show loading state
   if (loading && !refreshing) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -349,7 +341,6 @@ const LeaveApprovals = () => {
     );
   }
 
-  // Show error state
   if (error) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -377,7 +368,6 @@ const LeaveApprovals = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
       <div className="mb-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -385,7 +375,9 @@ const LeaveApprovals = () => {
               Leave Approvals
             </h1>
             <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
-              Review and manage leave requests from team members
+              {user?.role === "admin"
+                ? "Review all leave requests (including your own)"
+                : "Review and manage leave requests from team members"}
             </p>
           </div>
 
@@ -411,7 +403,6 @@ const LeaveApprovals = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="mb-6 sm:mb-8">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto pb-2 -mx-4 px-4">
           <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-4 min-w-[150px]">
@@ -480,7 +471,6 @@ const LeaveApprovals = () => {
         </div>
       </div>
 
-      {/* Search and Filters */}
       <div className="bg-white shadow-xs rounded-xl border border-gray-200 mb-6 sm:mb-8 p-4 sm:p-6">
         <div className="flex flex-col gap-4">
           <div className="relative">
@@ -521,7 +511,6 @@ const LeaveApprovals = () => {
         </div>
       </div>
 
-      {/* Requests List */}
       <div className="bg-white shadow-xs rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-900">
@@ -596,6 +585,11 @@ const LeaveApprovals = () => {
                         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
                           <h3 className="text-sm sm:text-base font-semibold text-gray-900 truncate">
                             {leave.user?.name || "Unknown User"}
+                            {isOwnRequest(leave) && user?.role === "admin" && (
+                              <span className="ml-2 text-xs text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded">
+                                Your Request
+                              </span>
+                            )}
                           </h3>
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 sm:mt-0 ${getStatusColor(
@@ -612,7 +606,6 @@ const LeaveApprovals = () => {
                           {leave.user?.department || "Unknown Dept"}
                           {leave.user?.position && ` • ${leave.user.position}`}
                         </div>
-                        {/* Show who actioned the leave in the main list view */}
                         {leave.status !== "pending" && leave.actionedByUser && (
                           <div className="text-xs text-gray-500 mt-1">
                             {leave.status === "approved"
@@ -794,35 +787,44 @@ const LeaveApprovals = () => {
                               )}
                             </div>
 
-                            {/* Render actioned by information */}
                             {renderActionedByInfo(leave)}
                           </div>
 
-                          {leave.status === "pending" && (
-                            <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-xs">
-                              <h4 className="text-sm font-medium text-gray-700 mb-3">
-                                Actions
-                              </h4>
-                              <div className="grid grid-cols-2 gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => handleApprove(leave.id)}
-                                  className="col-span-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200"
-                                >
-                                  <CheckCircleIcon className="h-4 w-4 mr-1 sm:mr-2" />
-                                  Approve
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleReject(leave.id)}
-                                  className="col-span-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
-                                >
-                                  <XMarkIcon className="h-4 w-4 mr-1 sm:mr-2" />
-                                  Reject
-                                </button>
+                          {leave.status === "pending" &&
+                            !isOwnRequest(leave) && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-xs">
+                                <h4 className="text-sm font-medium text-gray-700 mb-3">
+                                  Actions
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApprove(leave.id)}
+                                    className="col-span-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200"
+                                  >
+                                    <CheckCircleIcon className="h-4 w-4 mr-1 sm:mr-2" />
+                                    Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReject(leave.id)}
+                                    className="col-span-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
+                                  >
+                                    <XMarkIcon className="h-4 w-4 mr-1 sm:mr-2" />
+                                    Reject
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
+
+                          {leave.status === "pending" &&
+                            isOwnRequest(leave) && (
+                              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                <p className="text-sm text-gray-600 text-center">
+                                  You cannot approve or reject your own request.
+                                </p>
+                              </div>
+                            )}
                         </div>
                       </div>
                     </div>
