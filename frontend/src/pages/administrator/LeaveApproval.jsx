@@ -13,6 +13,7 @@ import {
   ClipboardDocumentListIcon,
   ExclamationTriangleIcon,
   ArrowPathIcon,
+  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import LeaveHistory from "../leave/LeaveHistory";
 import { useAuth } from "../../contexts/AuthContext";
@@ -31,7 +32,6 @@ const LeaveApprovals = () => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useApiInterceptors();
-
   const { user } = useAuth();
 
   useEffect(() => {
@@ -63,15 +63,18 @@ const LeaveApprovals = () => {
     setError(null);
     try {
       const response = await ApiService.get("/leaves");
-      // FIX 2: Admins should see leaves from OTHER users, including other admins.
-      // Only filter out the CURRENT admin's own leaves.
+      // Filter out current user's own leaves and process the data
       const filteredData = response.data.filter(
         (leave) => leave.userId !== user?.id
       );
+
       const processedData = filteredData.map((leave) => ({
         ...leave,
         leaveType: reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType,
+        // The backend now includes actionedByUser properly
+        actionedByUser: leave.actionedByUser || null,
       }));
+
       setLeaves(processedData);
       setFilteredLeaves(processedData);
     } catch (err) {
@@ -97,6 +100,8 @@ const LeaveApprovals = () => {
     if (currentView !== "approvals") return;
 
     let result = [...leaves];
+
+    // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(
@@ -107,10 +112,13 @@ const LeaveApprovals = () => {
           (leave.user?.department &&
             leave.user.department.toLowerCase().includes(term)) ||
           (leave.user?.position &&
-            leave.user.position.toLowerCase().includes(term))
+            leave.user.position.toLowerCase().includes(term)) ||
+          (leave.actionedByUser?.name &&
+            leave.actionedByUser.name.toLowerCase().includes(term))
       );
     }
 
+    // Apply status filter
     if (filter !== "all") {
       result = result.filter((leave) => leave.status.toLowerCase() === filter);
     }
@@ -129,25 +137,29 @@ const LeaveApprovals = () => {
     setExpandedRequest(expandedRequest === id ? null : id);
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchLeaves();
-  };
-
   const handleApprove = async (id) => {
     if (!window.confirm("Approve this leave request?")) return;
 
     try {
       const response = await ApiService.put(`/leaves/${id}/approve`);
+
+      // The backend now properly returns actionedByUser in the response
       const processedLeave = {
         ...response.data.leave,
         leaveType:
           reverseLeaveTypeMapping[response.data.leave.leaveType] ||
           response.data.leave.leaveType,
+        // Use the actionedByUser from backend response
+        actionedByUser: response.data.leave.actionedByUser,
       };
+
+      // Update the leaves state with the approved leave
       setLeaves((prev) =>
         prev.map((leave) => (leave.id === id ? processedLeave : leave))
       );
+
+      // Show success message
+      alert("Leave request approved successfully!");
     } catch (err) {
       console.error("Error approving leave:", err);
       const errorMessage =
@@ -160,29 +172,35 @@ const LeaveApprovals = () => {
 
   const handleReject = async (id) => {
     const reason = prompt("Reason for rejection:");
-    if (!reason?.trim()) return;
+    if (!reason?.trim()) {
+      alert("Rejection reason is required.");
+      return;
+    }
 
     try {
       const response = await ApiService.put(`/leaves/${id}/reject`, {
         rejectionReason: reason.trim(),
       });
+
+      // The backend now properly returns actionedByUser in the response
       const processedLeave = {
         ...response.data,
         leaveType:
           reverseLeaveTypeMapping[response.data.leaveType] ||
           response.data.leaveType,
+        // Use the actionedByUser from backend response
+        actionedByUser: response.data.actionedByUser,
+        status: "rejected",
+        rejectionReason: reason.trim(),
       };
+
+      // Update the leaves state with the rejected leave
       setLeaves((prev) =>
-        prev.map((leave) =>
-          leave.id === id
-            ? {
-                ...processedLeave,
-                status: "rejected",
-                rejectionReason: reason.trim(),
-              }
-            : leave
-        )
+        prev.map((leave) => (leave.id === id ? processedLeave : leave))
       );
+
+      // Show success message
+      alert("Leave request rejected successfully!");
     } catch (err) {
       console.error("Error rejecting leave:", err);
       const errorMessage =
@@ -204,7 +222,13 @@ const LeaveApprovals = () => {
 
   const formatDateTime = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleString();
+    return new Date(dateString).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const getStatusColor = (status) => {
@@ -237,6 +261,72 @@ const LeaveApprovals = () => {
     }
   };
 
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchLeaves();
+  };
+
+  // Render actioned-by user information
+  const renderActionedByInfo = (leave) => {
+    if (leave.status === "pending" || leave.status === "cancelled") {
+      return null;
+    }
+
+    const actionedBy = leave.actionedByUser;
+    const actionText =
+      leave.status === "approved" ? "Approved by" : "Rejected by";
+
+    return (
+      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center text-sm text-blue-800">
+          <UserCircleIcon className="h-5 w-5 mr-2 text-blue-600" />
+          <span className="font-semibold">{actionText}: </span>
+          {actionedBy ? (
+            <div className="ml-2 flex items-center">
+              {actionedBy.avatar ? (
+                <img
+                  className="h-6 w-6 rounded-full mr-2 object-cover border border-blue-200"
+                  src={actionedBy.avatar}
+                  alt={actionedBy.name}
+                  onError={(e) => {
+                    e.target.src = "https://via.placeholder.com/24?text=U";
+                  }}
+                />
+              ) : (
+                <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold mr-2">
+                  {actionedBy.name?.charAt(0) || "A"}
+                </div>
+              )}
+              <div>
+                <span className="font-medium text-blue-900 block">
+                  {actionedBy.name}
+                </span>
+                {(actionedBy.position || actionedBy.department) && (
+                  <span className="text-blue-700 text-xs">
+                    {actionedBy.position}
+                    {actionedBy.position && actionedBy.department && " • "}
+                    {actionedBy.department}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <span className="ml-2 text-blue-700">System Administrator</span>
+          )}
+        </div>
+        {leave.status === "rejected" && leave.rejectionReason && (
+          <div className="mt-2 text-sm">
+            <span className="font-medium text-blue-800">Reason: </span>
+            <span className="text-red-700 bg-red-50 px-2 py-1 rounded text-sm">
+              {leave.rejectionReason}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Show leave history view
   if (currentView === "history") {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -245,6 +335,7 @@ const LeaveApprovals = () => {
     );
   }
 
+  // Show loading state
   if (loading && !refreshing) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -258,6 +349,7 @@ const LeaveApprovals = () => {
     );
   }
 
+  // Show error state
   if (error) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -293,7 +385,7 @@ const LeaveApprovals = () => {
               Leave Approvals
             </h1>
             <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
-              Review and manage leave requests
+              Review and manage leave requests from team members
             </p>
           </div>
 
@@ -301,7 +393,7 @@ const LeaveApprovals = () => {
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="inline-flex items-center px-4 py-2.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+              className="inline-flex items-center px-4 py-2.5 border border-gray-300 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:opacity-50"
             >
               <ArrowPathIcon
                 className={`h-5 w-5 mr-2 ${refreshing ? "animate-spin" : ""}`}
@@ -319,10 +411,9 @@ const LeaveApprovals = () => {
         </div>
       </div>
 
-      {/* Stats Cards - Mobile Carousel */}
+      {/* Stats Cards */}
       <div className="mb-6 sm:mb-8">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto pb-2 -mx-4 px-4">
-          {/* Pending */}
           <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-4 min-w-[150px]">
             <div className="flex items-center">
               <div className="p-2 rounded-full bg-blue-100 text-blue-600">
@@ -339,7 +430,6 @@ const LeaveApprovals = () => {
             </div>
           </div>
 
-          {/* Approved */}
           <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-4 min-w-[150px]">
             <div className="flex items-center">
               <div className="p-2 rounded-full bg-green-100 text-green-600">
@@ -356,7 +446,6 @@ const LeaveApprovals = () => {
             </div>
           </div>
 
-          {/* Rejected */}
           <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-4 min-w-[150px]">
             <div className="flex items-center">
               <div className="p-2 rounded-full bg-red-100 text-red-600">
@@ -373,7 +462,6 @@ const LeaveApprovals = () => {
             </div>
           </div>
 
-          {/* Total */}
           <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-4 min-w-[150px]">
             <div className="flex items-center">
               <div className="p-2 rounded-full bg-gray-100 text-gray-600">
@@ -395,7 +483,6 @@ const LeaveApprovals = () => {
       {/* Search and Filters */}
       <div className="bg-white shadow-xs rounded-xl border border-gray-200 mb-6 sm:mb-8 p-4 sm:p-6">
         <div className="flex flex-col gap-4">
-          {/* Search */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
@@ -413,7 +500,6 @@ const LeaveApprovals = () => {
             />
           </div>
 
-          {/* Status Filter */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <FunnelIcon className="h-5 w-5 text-gray-400" />
@@ -460,7 +546,7 @@ const LeaveApprovals = () => {
             <p className="text-gray-500 mb-6">
               {searchTerm || filter !== "all"
                 ? "Try adjusting your search or filter"
-                : "No pending leave requests at this time"}
+                : "No leave requests to display at this time"}
             </p>
             <div className="flex justify-center space-x-3">
               <button
@@ -526,6 +612,18 @@ const LeaveApprovals = () => {
                           {leave.user?.department || "Unknown Dept"}
                           {leave.user?.position && ` • ${leave.user.position}`}
                         </div>
+                        {/* Show who actioned the leave in the main list view */}
+                        {leave.status !== "pending" && leave.actionedByUser && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {leave.status === "approved"
+                              ? "Approved"
+                              : "Rejected"}{" "}
+                            by:{" "}
+                            <span className="font-medium">
+                              {leave.actionedByUser.name}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 sm:space-x-4">
@@ -605,21 +703,15 @@ const LeaveApprovals = () => {
                                         type="button"
                                         className="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
                                         onClick={() => {
-                                          // --- FIX 1 START ---
-                                          // Construct the full URL for the file
                                           let fileUrl = doc.url;
-                                          // If the URL is relative (starts with '/'), prepend the API base URL without '/api'
                                           if (fileUrl.startsWith("/")) {
-                                            // Get the base URL from the environment variable
                                             const apiBaseUrl = import.meta.env
                                               .VITE_API;
-                                            // Remove the trailing '/api' to get the root domain
                                             const rootDomain =
                                               apiBaseUrl.replace(/\/api$/, "");
                                             fileUrl = `${rootDomain}${fileUrl}`;
                                           }
                                           window.open(fileUrl, "_blank");
-                                          // --- FIX 1 END ---
                                         }}
                                       >
                                         View
@@ -644,14 +736,21 @@ const LeaveApprovals = () => {
                                   {formatDateTime(leave.submittedAt)}
                                 </p>
                               </div>
-                              {leave.approvedAt && (
+
+                              {leave.status !== "pending" && (
                                 <div>
-                                  <p className="text-gray-500">Approved:</p>
+                                  <p className="text-gray-500">
+                                    {leave.status === "approved"
+                                      ? "Approved"
+                                      : "Rejected"}
+                                    :
+                                  </p>
                                   <p className="font-medium text-gray-900">
-                                    {formatDateTime(leave.approvedAt)}
+                                    {formatDateTime(leave.submittedAt)}
                                   </p>
                                 </div>
                               )}
+
                               {leave.rejectionReason && (
                                 <div>
                                   <p className="text-gray-500">
@@ -662,6 +761,7 @@ const LeaveApprovals = () => {
                                   </p>
                                 </div>
                               )}
+
                               <div>
                                 <p className="text-gray-500">Dates:</p>
                                 <p className="font-medium text-gray-900">
@@ -670,6 +770,7 @@ const LeaveApprovals = () => {
                                   {leave.days !== 1 ? "s" : ""})
                                 </p>
                               </div>
+
                               {leave.emergencyContact && (
                                 <div>
                                   <p className="text-gray-500">
@@ -680,6 +781,7 @@ const LeaveApprovals = () => {
                                   </p>
                                 </div>
                               )}
+
                               {leave.emergencyPhone && (
                                 <div>
                                   <p className="text-gray-500">
@@ -691,6 +793,9 @@ const LeaveApprovals = () => {
                                 </div>
                               )}
                             </div>
+
+                            {/* Render actioned by information */}
+                            {renderActionedByInfo(leave)}
                           </div>
 
                           {leave.status === "pending" && (

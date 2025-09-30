@@ -14,6 +14,7 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   TrashIcon,
+  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../contexts/AuthContext";
 import { format, isAfter, subDays } from "date-fns";
@@ -84,6 +85,8 @@ const LeaveHistory = () => {
           ...leave,
           leaveType:
             reverseLeaveTypeMapping[leave.leaveType] || leave.leaveType,
+          // The backend now properly includes actionedByUser
+          actionedByUser: leave.actionedByUser || null,
         }));
         setLeaveHistory(processedLeaves);
         setFilteredLeaves(processedLeaves);
@@ -112,7 +115,9 @@ const LeaveHistory = () => {
         (leave) =>
           (leave.leaveType && leave.leaveType.toLowerCase().includes(term)) ||
           (leave.reason && leave.reason.toLowerCase().includes(term)) ||
-          (leave.user?.name && leave.user.name.toLowerCase().includes(term))
+          (leave.user?.name && leave.user.name.toLowerCase().includes(term)) ||
+          (leave.actionedByUser?.name &&
+            leave.actionedByUser.name.toLowerCase().includes(term))
       );
     }
     if (filter !== "all") {
@@ -244,6 +249,8 @@ const LeaveHistory = () => {
         leaveType:
           reverseLeaveTypeMapping[response.data.leaveType] ||
           response.data.leaveType,
+        // The backend now properly includes actionedByUser
+        actionedByUser: response.data.actionedByUser || null,
       };
       setLeaveHistory((prev) =>
         prev.map((l) =>
@@ -412,11 +419,72 @@ const LeaveHistory = () => {
     }
   };
 
+  // Render actioned-by user information with better UI
+  const renderActionedByInfo = (leave) => {
+    if (leave.status === "pending" || leave.status === "cancelled") {
+      return null;
+    }
+
+    const actionedBy = leave.actionedByUser;
+    const actionText =
+      leave.status === "approved" ? "Approved by" : "Rejected by";
+
+    return (
+      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center text-sm text-blue-800">
+          <UserCircleIcon className="h-5 w-5 mr-2 text-blue-600" />
+          <span className="font-semibold">{actionText}: </span>
+          {actionedBy ? (
+            <div className="ml-2 flex items-center">
+              {actionedBy.avatar ? (
+                <img
+                  className="h-6 w-6 rounded-full mr-2 object-cover border border-blue-200"
+                  src={actionedBy.avatar}
+                  alt={actionedBy.name}
+                  onError={(e) => {
+                    e.target.src = "https://via.placeholder.com/24?text=U";
+                  }}
+                />
+              ) : (
+                <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold mr-2">
+                  {actionedBy.name?.charAt(0) || "A"}
+                </div>
+              )}
+              <div>
+                <span className="font-medium text-blue-900 block">
+                  {actionedBy.name}
+                </span>
+                {(actionedBy.position || actionedBy.department) && (
+                  <span className="text-blue-700 text-xs">
+                    {actionedBy.position}
+                    {actionedBy.position && actionedBy.department && " • "}
+                    {actionedBy.department}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <span className="ml-2 text-blue-700">System Administrator</span>
+          )}
+        </div>
+        {leave.status === "rejected" && leave.rejectionReason && (
+          <div className="mt-2 text-sm">
+            <span className="font-medium text-blue-800">Reason: </span>
+            <span className="text-red-700 bg-red-50 px-2 py-1 rounded text-sm">
+              {leave.rejectionReason}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-center items-center h-64">
-          <p className="text-gray-600">Loading leave history...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+          <p className="text-gray-600 ml-4">Loading leave history...</p>
         </div>
       </div>
     );
@@ -425,13 +493,20 @@ const LeaveHistory = () => {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+        <div className="bg-red-50 border-l-4 border-red-400 p-6 rounded-lg">
           <div className="flex">
             <div className="flex-shrink-0">
-              <XMarkIcon className="h-5 w-5 text-red-400" aria-hidden="true" />
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-400" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm font-medium text-red-800">Error</p>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-3 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                Retry
+              </button>
             </div>
           </div>
         </div>
@@ -497,7 +572,7 @@ const LeaveHistory = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Search by type, reason, or date..."
+              placeholder="Search by type, reason, approver, or date..."
             />
           </div>
           {/* Status Filter */}
@@ -577,6 +652,18 @@ const LeaveHistory = () => {
                           {formatDate(leave.startDate)} to{" "}
                           {formatDate(leave.endDate)}
                         </div>
+                        {/* Show who actioned the leave in the main list view */}
+                        {leave.status !== "pending" && leave.actionedByUser && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {leave.status === "approved"
+                              ? "Approved"
+                              : "Rejected"}{" "}
+                            by:{" "}
+                            <span className="font-medium">
+                              {leave.actionedByUser.name}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="ml-2 flex-shrink-0 flex">
@@ -603,12 +690,14 @@ const LeaveHistory = () => {
                       </button>
                     </div>
                   </div>
+
                   {expandedRequest === leave.id && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <div className="text-sm text-gray-700 mb-4">
                         <p className="font-medium">Reason:</p>
                         <p className="mt-1">{leave.reason}</p>
                       </div>
+
                       {leave.attachments && leave.attachments.length > 0 && (
                         <div className="mb-4">
                           <p className="text-sm font-medium text-gray-700">
@@ -638,20 +727,15 @@ const LeaveHistory = () => {
                                     className="font-medium text-indigo-600 hover:text-indigo-500"
                                     onClick={() => {
                                       let fileUrl = doc.url;
-                                      // Check if the URL is relative (starts with '/')
                                       if (fileUrl.startsWith("/")) {
-                                        // Get the base API URL from the environment
                                         const apiBaseUrl = import.meta.env
                                           .VITE_API;
-                                        // Remove the trailing '/api' to get the root domain
-                                        // This is the CRITICAL FIX: We remove '/api' to avoid double /api in the path
                                         const rootDomain = apiBaseUrl.replace(
                                           /\/api$/,
                                           ""
                                         );
                                         fileUrl = `${rootDomain}${fileUrl}`;
                                       }
-                                      // Open the corrected URL
                                       window.open(fileUrl, "_blank");
                                     }}
                                   >
@@ -663,23 +747,14 @@ const LeaveHistory = () => {
                           </ul>
                         </div>
                       )}
+
                       <div className="text-xs text-gray-500 mb-4">
                         <p>Submitted: {formatDateTime(leave.submittedAt)}</p>
-                        {leave.approvedAt && (
-                          <p>
-                            Approved: {formatDateTime(leave.approvedAt)} by{" "}
-                            {leave.approvedBy || "System"}
-                          </p>
-                        )}
-                        {leave.rejectionReason && (
-                          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                            <strong className="text-red-800">
-                              Rejection Reason:
-                            </strong>{" "}
-                            {leave.rejectionReason}
-                          </div>
-                        )}
                       </div>
+
+                      {/* Render actioned by information */}
+                      {renderActionedByInfo(leave)}
+
                       <div className="flex space-x-3">
                         {leave.status === "pending" && (
                           <>

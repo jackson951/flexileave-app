@@ -148,12 +148,6 @@ router.post(
 );
 
 // Remove a single uploaded file
-// MODIFIED: This endpoint now allows deletion of ANY file by its ID.
-// It will:
-// 1. Detach it from its leave (if any) by setting leaveId to null.
-// 2. Delete the physical file from the filesystem.
-// 3. Delete the file record from the database.
-// This implements the "permanent delete" functionality requested.
 router.delete("/file/:fileId", authenticateToken, async (req, res) => {
   try {
     const fileId = parseInt(req.params.fileId);
@@ -170,14 +164,12 @@ router.delete("/file/:fileId", authenticateToken, async (req, res) => {
       return res.status(404).json({ message: "File not found" });
     }
 
-    // MODIFICATION START
     // Instead of blocking deletion, we proceed to delete it regardless of leaveId.
     // First, detach it from any leave it might be attached to.
     await prisma.file.update({
       where: { id: fileId },
       data: { leaveId: null }, // Detach from leave
     });
-    // MODIFICATION END
 
     // Delete file from filesystem
     const filePath = path.join(__dirname, "..", file.url);
@@ -328,7 +320,7 @@ router.post(
   }
 );
 
-// Get all leaves (admin/manager)
+// Get all leaves (admin/manager) - FIXED: Include actionedByUser
 router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
   try {
     const { status, userId, leaveType } = req.query;
@@ -350,6 +342,16 @@ router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
             avatar: true,
           },
         },
+        actionedByUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            position: true,
+            department: true,
+          },
+        },
         attachments: true,
       },
       orderBy: { submittedAt: "desc" },
@@ -362,7 +364,7 @@ router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
   }
 });
 
-// Get my leaves
+// Get my leaves - FIXED: Include actionedByUser
 router.get("/my", authenticateToken, async (req, res) => {
   try {
     const { status } = req.query;
@@ -371,7 +373,19 @@ router.get("/my", authenticateToken, async (req, res) => {
 
     const leaves = await prisma.leave.findMany({
       where: whereClause,
-      include: { attachments: true },
+      include: {
+        attachments: true,
+        actionedByUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            position: true,
+            department: true,
+          },
+        },
+      },
       orderBy: { submittedAt: "desc" },
     });
 
@@ -382,7 +396,7 @@ router.get("/my", authenticateToken, async (req, res) => {
   }
 });
 
-// Get leave by ID
+// Get leave by ID - FIXED: Include actionedByUser
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
@@ -394,6 +408,16 @@ router.get("/:id", authenticateToken, async (req, res) => {
       where: { id: leaveId },
       include: {
         user: { select: { id: true, name: true, email: true } },
+        actionedByUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            position: true,
+            department: true,
+          },
+        },
         attachments: true,
       },
     });
@@ -418,10 +442,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// Update leave
-// MODIFIED: The update logic now properly handles the `removeFileIds` array.
-// Files listed in `removeFileIds` will have their `leaveId` set to `null`,
-// effectively detaching them from the current leave request.
+// Update leave - FIXED: Include actionedByUser in response
 router.put(
   "/:id",
   authenticateToken,
@@ -563,13 +584,10 @@ router.put(
       // Start transaction to ensure data consistency
       const updatedLeave = await prisma.$transaction(async (tx) => {
         // First, detach files if requested
-        // MODIFICATION: This is the key change. We update `leaveId` to `null` for files to be removed.
         if (removeFileIds && removeFileIds.length > 0) {
           await tx.file.updateMany({
             where: {
               id: { in: removeFileIds },
-              // Optionally, you can add `leaveId: leaveId` here to ensure you're only detaching from this specific leave.
-              // It's generally safe without it, as the file ID should be unique.
             },
             data: {
               leaveId: null,
@@ -596,6 +614,16 @@ router.put(
           data: updateData,
           include: {
             user: { select: { id: true, name: true, email: true } },
+            actionedByUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                avatar: true,
+                position: true,
+                department: true,
+              },
+            },
             attachments: true,
           },
         });
@@ -609,7 +637,8 @@ router.put(
   }
 );
 
-// Approve leave and deduct leave days from specific leave type
+// Approve leave and deduct leave days from specific leave type - FIXED: Include actionedByUser and set actionedBy
+// Approve leave and deduct leave days from specific leave type - FIXED VERSION
 router.put(
   "/:id/approve",
   authenticateToken,
@@ -624,7 +653,10 @@ router.put(
       // Fetch leave with user info
       const leave = await prisma.leave.findUnique({
         where: { id: leaveId },
-        include: { user: true },
+        include: { 
+          user: true,
+          attachments: true 
+        },
       });
 
       if (!leave) {
@@ -643,17 +675,20 @@ router.put(
         leave.leaveType
       );
 
-      if (currentBalance < leave.days) {
+      if (currentBalance < leave.days && leave.leaveType !== "UnpaidLeave") {
         return res.status(400).json({
           message: `User does not have enough ${leave.leaveType} balance. Available: ${currentBalance}, Requested: ${leave.days}`,
         });
       }
 
-      // Update leaveBalances for the specific leave type
-      const updatedLeaveBalances = {
-        ...leave.user.leaveBalances,
-        [leave.leaveType]: currentBalance - leave.days,
-      };
+      // Update leaveBalances for the specific leave type (skip for unpaid leave)
+      let updatedLeaveBalances = { ...leave.user.leaveBalances };
+      if (leave.leaveType !== "UnpaidLeave") {
+        updatedLeaveBalances = {
+          ...leave.user.leaveBalances,
+          [leave.leaveType]: currentBalance - leave.days,
+        };
+      }
 
       // Deduct leave days and update leave status
       const updatedLeave = await prisma.leave.update({
@@ -661,32 +696,64 @@ router.put(
         data: {
           status: "approved",
           rejectionReason: null,
-          user: {
-            update: {
-              leaveBalances: updatedLeaveBalances,
+          actionedBy: req.user.userId,
+          ...(leave.leaveType !== "UnpaidLeave" && {
+            user: {
+              update: {
+                leaveBalances: updatedLeaveBalances,
+              },
             },
-          },
+          }),
         },
         include: {
           user: {
-            select: { id: true, name: true, email: true, leaveBalances: true },
+            select: { 
+              id: true, 
+              name: true, 
+              email: true, 
+              leaveBalances: true,
+              avatar: true,
+              position: true,
+              department: true 
+            },
+          },
+          actionedByUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatar: true,
+              position: true,
+              department: true,
+            },
           },
           attachments: true,
         },
       });
 
       res.json({
-        message: `Leave approved and ${leave.days} days deducted from ${leave.leaveType} balance`,
+        message: leave.leaveType === "UnpaidLeave" 
+          ? "Unpaid leave approved successfully" 
+          : `Leave approved and ${leave.days} days deducted from ${leave.leaveType} balance`,
         leave: updatedLeave,
       });
     } catch (error) {
       console.error("Error approving leave:", error);
-      res.status(500).json({ message: "Internal server error" });
+      
+      // More detailed error logging
+      if (error.code) {
+        console.error("Prisma error code:", error.code);
+        console.error("Prisma error meta:", error.meta);
+      }
+      
+      res.status(500).json({ 
+        message: "Internal server error",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   }
 );
-
-// Reject leave
+// Reject leave - FIXED: Include actionedByUser and set actionedBy
 router.put(
   "/:id/reject",
   authenticateToken,
@@ -710,9 +777,20 @@ router.put(
         data: {
           status: "rejected",
           rejectionReason: rejectionReason.trim(),
+          actionedBy: req.user.userId, // Set the current user as the rejecter
         },
         include: {
           user: { select: { email: true, name: true } },
+          actionedByUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatar: true,
+              position: true,
+              department: true,
+            },
+          },
           attachments: true,
         },
       });
@@ -725,7 +803,7 @@ router.put(
   }
 );
 
-// Cancel leave
+// Cancel leave - FIXED: Include actionedByUser
 router.put("/:id/cancel", authenticateToken, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
@@ -751,7 +829,19 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
     const cancelledLeave = await prisma.leave.update({
       where: { id: leaveId },
       data: { status: "cancelled" },
-      include: { attachments: true },
+      include: {
+        attachments: true,
+        actionedByUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            position: true,
+            department: true,
+          },
+        },
+      },
     });
 
     res.json(cancelledLeave);
@@ -761,7 +851,7 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
   }
 });
 
-// Delete leave (admin/manager only)
+// Delete leave (admin/manager only) - FIXED: Include actionedByUser
 router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
@@ -771,7 +861,10 @@ router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
 
     const leave = await prisma.leave.findUnique({
       where: { id: leaveId },
-      include: { attachments: true },
+      include: {
+        attachments: true,
+        actionedByUser: true,
+      },
     });
 
     if (!leave) {
