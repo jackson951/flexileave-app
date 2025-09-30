@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { DateRangePicker } from "react-date-range";
-import "react-date-range/dist/styles.css";
-import "react-date-range/dist/theme/default.css";
 import {
   DocumentTextIcon,
   CalendarDaysIcon,
@@ -29,16 +26,12 @@ const NewLeaveRequest = () => {
     emergencyContact: "",
     emergencyPhone: "",
   });
-  const [dateRange, setDateRange] = useState([
-    {
-      startDate: new Date(),
-      endDate: new Date(),
-      key: "selection",
-    },
-  ]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [errors, setErrors] = useState({});
   const [fileUploading, setFileUploading] = useState(false);
   const [fileUploadError, setFileUploadError] = useState("");
+  const [fileDeleteError, setFileDeleteError] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -81,23 +74,38 @@ const NewLeaveRequest = () => {
     return user.leaveBalances[backendType] || 0;
   };
 
-  // Calculate total days in date range
+  // Calculate total days between dates
   const calculateDays = () => {
-    const diffTime = Math.abs(dateRange[0].endDate - dateRange[0].startDate);
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    if (!startDate || !endDate) return 0;
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Reset time part to avoid timezone issues
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+
+    return diffDays;
   };
 
   // Validate if requested days exceed available balance
   const hasSufficientLeaveBalance = (leaveType, requestedDays) => {
-    if (!leaveType) return true; // No type selected yet
+    if (!leaveType || leaveType === "Unpaid Leave") return true;
     const availableBalance = getLeaveBalance(leaveType);
     return requestedDays <= availableBalance;
+  };
+
+  // Get minimum end date (same as start date or later)
+  const getMinEndDate = () => {
+    return startDate || new Date().toISOString().split("T")[0];
   };
 
   // Validate Step 1
   const validateStep1 = () => {
     const newErrors = {};
-    const requestedDays = calculateDays();
 
     if (!formData.leaveType) {
       newErrors.leaveType = "Please select a leave type";
@@ -110,6 +118,18 @@ const NewLeaveRequest = () => {
 
     if (!formData.reason) {
       newErrors.reason = "Please provide a reason";
+    } else if (formData.reason.length < 10) {
+      newErrors.reason = "Reason must be at least 10 characters long";
+    }
+
+    // Validate emergency contact fields
+    if (formData.emergencyContact && !formData.emergencyPhone) {
+      newErrors.emergencyPhone =
+        "Emergency phone is required when contact name is provided";
+    }
+    if (formData.emergencyPhone && !formData.emergencyContact) {
+      newErrors.emergencyContact =
+        "Contact name is required when emergency phone is provided";
     }
 
     setErrors(newErrors);
@@ -118,34 +138,56 @@ const NewLeaveRequest = () => {
 
   // Validate Step 2
   const validateStep2 = () => {
+    const newErrors = {};
     const days = calculateDays();
-    const hasValidDates = days >= 1;
 
-    if (!hasValidDates) {
-      setErrors({ dates: "Please select valid dates (at least 1 day)" });
-      return false;
+    if (!startDate) {
+      newErrors.dates = "Please select a start date";
+    } else if (!endDate) {
+      newErrors.dates = "Please select an end date";
+    } else if (days < 1) {
+      newErrors.dates = "End date must be after start date";
+    } else if (days > 365) {
+      newErrors.dates = "Leave period cannot exceed 365 days";
     }
 
     // Skip balance check for unpaid leave
-    if (formData.leaveType !== "Unpaid Leave") {
-      if (!hasSufficientLeaveBalance(formData.leaveType, days)) {
-        const availableBalance = getLeaveBalance(formData.leaveType);
-        setErrors({
-          dates: `You only have ${availableBalance} ${formData.leaveType} days remaining, but you're requesting ${days} days`,
-        });
-        return false;
-      }
+    if (
+      formData.leaveType !== "Unpaid Leave" &&
+      !hasSufficientLeaveBalance(formData.leaveType, days)
+    ) {
+      const availableBalance = getLeaveBalance(formData.leaveType);
+      newErrors.dates = `You only have ${availableBalance} ${formData.leaveType} days remaining, but you're requesting ${days} days`;
     }
 
-    setErrors({});
-    return true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  // Handle date change
-  const handleDateChange = (ranges) => {
-    setDateRange([ranges.selection]);
+  // Handle date changes
+  const handleStartDateChange = (e) => {
+    const newStartDate = e.target.value;
+    setStartDate(newStartDate);
 
-    // Clear date-related errors when dates change
+    // If end date is before new start date, clear end date
+    if (endDate && new Date(endDate) < new Date(newStartDate)) {
+      setEndDate("");
+    }
+
+    // Clear date errors when dates change
+    if (errors.dates) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.dates;
+        return newErrors;
+      });
+    }
+  };
+
+  const handleEndDateChange = (e) => {
+    setEndDate(e.target.value);
+
+    // Clear date errors when dates change
     if (errors.dates) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -158,6 +200,8 @@ const NewLeaveRequest = () => {
   // Handle file upload
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
     if (files.length + formData.supportingDocs.length > 5) {
       setFileUploadError("You can upload a maximum of 5 files");
       return;
@@ -172,7 +216,6 @@ const NewLeaveRequest = () => {
         uploadFormData.append("files", file);
       });
 
-      // Use ApiService for file upload
       const response = await ApiService.post("/leaves/upload", uploadFormData, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -184,13 +227,12 @@ const NewLeaveRequest = () => {
         supportingDocs: [...prev.supportingDocs, ...response.data],
       }));
 
-      // Clear any previous upload error on success
       setFileUploadError("");
     } catch (err) {
       console.error("Error uploading files:", err);
       setFileUploadError(
         err.response?.data?.message ||
-          "Failed to upload files. Please check file size and type."
+          "Failed to upload files. Please check file size (max 10MB) and type (PDF, DOC, JPG, PNG)."
       );
     } finally {
       setFileUploading(false);
@@ -200,7 +242,6 @@ const NewLeaveRequest = () => {
   // Remove file
   const removeFile = async (fileId) => {
     try {
-      // Use ApiService for file deletion
       await ApiService.delete(`/leaves/file/${fileId}`);
 
       setFormData((prev) => ({
@@ -210,11 +251,10 @@ const NewLeaveRequest = () => {
         ),
       }));
 
-      // Clear any previous upload error on success
-      setFileUploadError("");
+      setFileDeleteError("");
     } catch (err) {
       console.error("Error deleting file:", err);
-      setFileUploadError(
+      setFileDeleteError(
         err.response?.data?.message ||
           "Failed to delete file. It may be attached to another request."
       );
@@ -258,19 +298,17 @@ const NewLeaveRequest = () => {
 
       try {
         const leaveData = {
-          leaveType: leaveTypeMapping[formData.leaveType], // Convert to backend format
+          leaveType: leaveTypeMapping[formData.leaveType],
           reason: formData.reason,
-          startDate: dateRange[0].startDate.toISOString(),
-          endDate: dateRange[0].endDate.toISOString(),
+          startDate: new Date(startDate).toISOString(),
+          endDate: new Date(endDate).toISOString(),
           days: requestedDays,
-          emergencyContact: formData.emergencyContact,
-          emergencyPhone: formData.emergencyPhone,
+          emergencyContact: formData.emergencyContact || null,
+          emergencyPhone: formData.emergencyPhone || null,
           fileIds: formData.supportingDocs.map((doc) => doc.id),
         };
 
-        // Use ApiService for leave submission
         await ApiService.post("/leaves", leaveData);
-
         setIsSubmitted(true);
       } catch (err) {
         console.error("Error submitting leave request:", err);
@@ -282,6 +320,17 @@ const NewLeaveRequest = () => {
         setIsSubmitting(false);
       }
     }
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   };
 
   // Step Indicator Component
@@ -329,13 +378,32 @@ const NewLeaveRequest = () => {
           <p className="mt-1 text-sm text-gray-500">
             You will be notified via email once a decision is made.
           </p>
-          <div className="mt-8">
+          <div className="mt-8 space-x-4">
             <button
               onClick={() => navigate("/dashboard/leave", { replace: true })}
               className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out"
             >
               <HomeIcon className="-ml-1 mr-2 h-5 w-5" />
               Return to Dashboard
+            </button>
+            <button
+              onClick={() => {
+                setIsSubmitted(false);
+                setStep(1);
+                setFormData({
+                  leaveType: "",
+                  reason: "",
+                  supportingDocs: [],
+                  emergencyContact: "",
+                  emergencyPhone: "",
+                });
+                setStartDate("");
+                setEndDate("");
+                setErrors({});
+              }}
+              className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Submit Another Request
             </button>
           </div>
         </div>
@@ -372,8 +440,7 @@ const NewLeaveRequest = () => {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">New Leave Request</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Fill in the details below to submit a new leave request. You can save
-          your progress and come back later.
+          Fill in the details below to submit a new leave request.
         </p>
       </div>
 
@@ -400,12 +467,15 @@ const NewLeaveRequest = () => {
         </nav>
       </div>
 
-      {/* Submit Error Banner */}
+      {/* Error Banners */}
       {submitError && (
         <div className="mb-6 rounded-md bg-red-50 p-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <XMarkIcon className="h-5 w-5 text-red-400" aria-hidden="true" />
+              <ExclamationTriangleIcon
+                className="h-5 w-5 text-red-400"
+                aria-hidden="true"
+              />
             </div>
             <div className="ml-3">
               <h3 className="text-sm font-medium text-red-800">
@@ -419,8 +489,7 @@ const NewLeaveRequest = () => {
         </div>
       )}
 
-      {/* File Upload Error Banner */}
-      {fileUploadError && (
+      {(fileUploadError || fileDeleteError) && (
         <div className="mb-6 rounded-md bg-yellow-50 p-4">
           <div className="flex">
             <div className="flex-shrink-0">
@@ -431,10 +500,10 @@ const NewLeaveRequest = () => {
             </div>
             <div className="ml-3">
               <h3 className="text-sm font-medium text-yellow-800">
-                File Upload Issue
+                File Operation Issue
               </h3>
               <div className="mt-2 text-sm text-yellow-700">
-                <p>{fileUploadError}</p>
+                <p>{fileUploadError || fileDeleteError}</p>
               </div>
             </div>
           </div>
@@ -504,11 +573,14 @@ const NewLeaveRequest = () => {
                 className={`mt-1 block w-full rounded-md border ${
                   errors.reason ? "border-red-300" : "border-gray-300"
                 } shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm`}
-                placeholder="Please provide a detailed reason for your leave request"
+                placeholder="Please provide a detailed reason for your leave request (minimum 10 characters)"
               />
               {errors.reason && (
                 <p className="mt-2 text-sm text-red-600">{errors.reason}</p>
               )}
+              <p className="mt-1 text-xs text-gray-500">
+                {formData.reason.length}/10 characters minimum
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -529,8 +601,17 @@ const NewLeaveRequest = () => {
                       emergencyContact: e.target.value,
                     })
                   }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  className={`mt-1 block w-full rounded-md border ${
+                    errors.emergencyContact
+                      ? "border-red-300"
+                      : "border-gray-300"
+                  } shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm`}
                 />
+                {errors.emergencyContact && (
+                  <p className="mt-2 text-sm text-red-600">
+                    {errors.emergencyContact}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -547,8 +628,15 @@ const NewLeaveRequest = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, emergencyPhone: e.target.value })
                   }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  className={`mt-1 block w-full rounded-md border ${
+                    errors.emergencyPhone ? "border-red-300" : "border-gray-300"
+                  } shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm`}
                 />
+                {errors.emergencyPhone && (
+                  <p className="mt-2 text-sm text-red-600">
+                    {errors.emergencyPhone}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -558,58 +646,131 @@ const NewLeaveRequest = () => {
         {step === 2 && (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-4">
                 Select Leave Dates <span className="text-red-500">*</span>
               </label>
-              <div className="border border-gray-300 rounded-lg shadow-sm p-2 sm:p-4 bg-white overflow-x-auto">
-                <DateRangePicker
-                  onChange={handleDateChange}
-                  ranges={dateRange}
-                  months={isMobile ? 1 : 2}
-                  direction={isMobile ? "vertical" : "horizontal"}
-                  minDate={new Date()}
-                  rangeColors={["#4F46E5"]}
-                />
-              </div>
-              <div className="mt-4 text-sm text-gray-600">
-                <p>
-                  Selected:{" "}
-                  <span className="font-medium">
-                    {dateRange[0].startDate.toLocaleDateString()}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-medium">
-                    {dateRange[0].endDate.toLocaleDateString()}
-                  </span>
-                </p>
-                <p className="font-medium">Total Days: {calculateDays()}</p>
 
-                {/* Display balance warning if applicable */}
-                {formData.leaveType !== "Unpaid Leave" &&
-                  !hasSufficientLeaveBalance(
-                    formData.leaveType,
-                    calculateDays()
-                  ) && (
-                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="startDate"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    id="startDate"
+                    value={startDate}
+                    onChange={handleStartDateChange}
+                    min={new Date().toISOString().split("T")[0]}
+                    className={`block w-full rounded-md border ${
+                      errors.dates ? "border-red-300" : "border-gray-300"
+                    } shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2`}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="endDate"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    id="endDate"
+                    value={endDate}
+                    onChange={handleEndDateChange}
+                    min={getMinEndDate()}
+                    className={`block w-full rounded-md border ${
+                      errors.dates ? "border-red-300" : "border-gray-300"
+                    } shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2`}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Start Date:
+                    </span>
+                    <p className="text-gray-900">
+                      {startDate ? formatDate(startDate) : "Not selected"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">End Date:</span>
+                    <p className="text-gray-900">
+                      {endDate ? formatDate(endDate) : "Not selected"}
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="font-medium text-gray-700">
+                      Total Days:
+                    </span>
+                    <p className="text-lg font-bold text-indigo-600">
+                      {calculateDays()} day{calculateDays() !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Balance warning */}
+                {formData.leaveType &&
+                  formData.leaveType !== "Unpaid Leave" && (
+                    <div
+                      className={`mt-3 p-3 rounded-md ${
+                        hasSufficientLeaveBalance(
+                          formData.leaveType,
+                          calculateDays()
+                        )
+                          ? "bg-green-50 border border-green-200"
+                          : "bg-red-50 border border-red-200"
+                      }`}
+                    >
                       <div className="flex items-start">
-                        <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" />
-                        <p className="text-sm text-red-700">
-                          Insufficient {formData.leaveType} balance: You only
-                          have {getLeaveBalance(formData.leaveType)} day
-                          {getLeaveBalance(formData.leaveType) !== 1
-                            ? "s"
-                            : ""}{" "}
-                          remaining, but you're requesting {calculateDays()} day
-                          {calculateDays() !== 1 ? "s" : ""}.
+                        {hasSufficientLeaveBalance(
+                          formData.leaveType,
+                          calculateDays()
+                        ) ? (
+                          <CheckCircleIcon className="h-5 w-5 text-green-400 mt-0.5 mr-2 flex-shrink-0" />
+                        ) : (
+                          <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" />
+                        )}
+                        <p
+                          className={`text-sm ${
+                            hasSufficientLeaveBalance(
+                              formData.leaveType,
+                              calculateDays()
+                            )
+                              ? "text-green-700"
+                              : "text-red-700"
+                          }`}
+                        >
+                          {hasSufficientLeaveBalance(
+                            formData.leaveType,
+                            calculateDays()
+                          )
+                            ? `You have sufficient ${
+                                formData.leaveType
+                              } balance (${getLeaveBalance(
+                                formData.leaveType
+                              )} days remaining)`
+                            : `Insufficient ${
+                                formData.leaveType
+                              } balance: ${getLeaveBalance(
+                                formData.leaveType
+                              )} days remaining but requesting ${calculateDays()} days`}
                         </p>
                       </div>
                     </div>
                   )}
-
-                {errors.dates && (
-                  <p className="mt-2 text-sm text-red-600">{errors.dates}</p>
-                )}
               </div>
+
+              {errors.dates && (
+                <p className="mt-2 text-sm text-red-600">{errors.dates}</p>
+              )}
             </div>
 
             <div>
@@ -701,10 +862,6 @@ const NewLeaveRequest = () => {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-xs text-gray-500">
-                    Click the X button to delete a file permanently from the
-                    system.
-                  </p>
                 </div>
               )}
             </div>
@@ -731,20 +888,40 @@ const NewLeaveRequest = () => {
                       Leave Type
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900 font-medium">
-                      {formData.leaveType} (
-                      {getLeaveBalance(formData.leaveType)} day
-                      {getLeaveBalance(formData.leaveType) !== 1
-                        ? "s"
-                        : ""}{" "}
-                      remaining)
+                      {formData.leaveType}
                     </dd>
                   </div>
                   <div className="sm:col-span-1">
-                    <dt className="text-sm font-medium text-gray-500">Dates</dt>
+                    <dt className="text-sm font-medium text-gray-500">
+                      Available Balance
+                    </dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {getLeaveBalance(formData.leaveType)} day
+                      {getLeaveBalance(formData.leaveType) !== 1 ? "s" : ""}
+                    </dd>
+                  </div>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">
+                      Start Date
+                    </dt>
                     <dd className="mt-1 text-sm text-gray-900 font-medium">
-                      {dateRange[0].startDate.toLocaleDateString()} to{" "}
-                      {dateRange[0].endDate.toLocaleDateString()} (
-                      {calculateDays()} day{calculateDays() !== 1 ? "s" : ""})
+                      {formatDate(startDate)}
+                    </dd>
+                  </div>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">
+                      End Date
+                    </dt>
+                    <dd className="mt-1 text-sm text-gray-900 font-medium">
+                      {formatDate(endDate)}
+                    </dd>
+                  </div>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">
+                      Total Days
+                    </dt>
+                    <dd className="mt-1 text-sm text-gray-900 font-bold">
+                      {calculateDays()} day{calculateDays() !== 1 ? "s" : ""}
                     </dd>
                   </div>
                   <div className="sm:col-span-2">
@@ -794,14 +971,6 @@ const NewLeaveRequest = () => {
                                   </p>
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => removeFile(file.id)}
-                                className="ml-2 flex-shrink-0 inline-flex items-center p-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                                title="Remove this file"
-                              >
-                                <XMarkIcon className="h-4 w-4" />
-                              </button>
                             </li>
                           ))}
                         </ul>
@@ -814,59 +983,72 @@ const NewLeaveRequest = () => {
                   </div>
                 </dl>
 
-                {/* Balance Warning in Review Step */}
-                {formData.leaveType !== "Unpaid Leave" &&
-                  !hasSufficientLeaveBalance(
-                    formData.leaveType,
-                    calculateDays()
-                  ) && (
-                    <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md">
-                      <div className="flex items-start">
-                        <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" />
-                        <div>
-                          <h3 className="text-sm font-medium text-red-800">
-                            Insufficient Leave Balance
-                          </h3>
-                          <p className="mt-1 text-sm text-red-700">
-                            You are requesting {calculateDays()} day
-                            {calculateDays() !== 1 ? "s" : ""} of{" "}
-                            {formData.leaveType}, but you only have{" "}
-                            {getLeaveBalance(formData.leaveType)} day
-                            {getLeaveBalance(formData.leaveType) !== 1
-                              ? "s"
-                              : ""}{" "}
-                            remaining.
-                          </p>
-                          <p className="mt-1 text-sm text-red-700">
-                            Please go back to adjust your dates or choose a
-                            different leave type.
-                          </p>
-                        </div>
-                      </div>
+                {/* Balance Status in Review Step */}
+                <div
+                  className={`mt-6 p-4 rounded-md ${
+                    formData.leaveType === "Unpaid Leave"
+                      ? "bg-blue-50 border border-blue-200"
+                      : hasSufficientLeaveBalance(
+                          formData.leaveType,
+                          calculateDays()
+                        )
+                      ? "bg-green-50 border border-green-200"
+                      : "bg-red-50 border border-red-200"
+                  }`}
+                >
+                  <div className="flex items-start">
+                    {formData.leaveType === "Unpaid Leave" ? (
+                      <InformationCircleIcon className="h-5 w-5 text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
+                    ) : hasSufficientLeaveBalance(
+                        formData.leaveType,
+                        calculateDays()
+                      ) ? (
+                      <CheckCircleIcon className="h-5 w-5 text-green-400 mt-0.5 mr-2 flex-shrink-0" />
+                    ) : (
+                      <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" />
+                    )}
+                    <div>
+                      <h3 className="text-sm font-medium">
+                        {formData.leaveType === "Unpaid Leave"
+                          ? "Unpaid Leave Request"
+                          : hasSufficientLeaveBalance(
+                              formData.leaveType,
+                              calculateDays()
+                            )
+                          ? "Leave Balance OK"
+                          : "Insufficient Leave Balance"}
+                      </h3>
+                      <p
+                        className={`mt-1 text-sm ${
+                          formData.leaveType === "Unpaid Leave"
+                            ? "text-blue-700"
+                            : hasSufficientLeaveBalance(
+                                formData.leaveType,
+                                calculateDays()
+                              )
+                            ? "text-green-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        {formData.leaveType === "Unpaid Leave"
+                          ? "This is an unpaid leave request. No leave balance will be deducted."
+                          : hasSufficientLeaveBalance(
+                              formData.leaveType,
+                              calculateDays()
+                            )
+                          ? `You have sufficient ${
+                              formData.leaveType
+                            } balance for this request. ${
+                              getLeaveBalance(formData.leaveType) -
+                              calculateDays()
+                            } days will remain after approval.`
+                          : `You are requesting ${calculateDays()} days but only have ${getLeaveBalance(
+                              formData.leaveType
+                            )} days remaining. Please adjust your request.`}
+                      </p>
                     </div>
-                  )}
-
-                {/* Success Message if Balance is OK */}
-                {formData.leaveType !== "Unpaid Leave" &&
-                  hasSufficientLeaveBalance(
-                    formData.leaveType,
-                    calculateDays()
-                  ) && (
-                    <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-md">
-                      <div className="flex items-start">
-                        <CheckCircleIcon className="h-5 w-5 text-green-400 mt-0.5 mr-2 flex-shrink-0" />
-                        <div>
-                          <h3 className="text-sm font-medium text-green-800">
-                            Leave Balance OK
-                          </h3>
-                          <p className="mt-1 text-sm text-green-700">
-                            You have sufficient {formData.leaveType} balance for
-                            this request.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -874,34 +1056,35 @@ const NewLeaveRequest = () => {
 
         {/* Navigation buttons */}
         <div className="flex justify-between pt-6">
-          {step > 1 && (
+          {step > 1 ? (
             <button
               type="button"
               onClick={() => setStep(step - 1)}
               className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
             >
               <ChevronLeftIcon className="-ml-1 mr-2 h-5 w-5 text-gray-500" />
-              <span className="hidden sm:inline">Back</span>
+              Back
             </button>
+          ) : (
+            <div></div> // Empty div to maintain flex layout
           )}
+
           <div className="ml-auto">
             {step < 3 ? (
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={
-                  (step === 1 && !formData.leaveType) ||
+                  (step === 1 &&
+                    (!formData.leaveType ||
+                      !formData.reason ||
+                      formData.reason.length < 10)) ||
                   (step === 2 &&
-                    (calculateDays() < 1 ||
-                      (formData.leaveType !== "Unpaid Leave" &&
-                        !hasSufficientLeaveBalance(
-                          formData.leaveType,
-                          calculateDays()
-                        ))))
+                    (!startDate || !endDate || calculateDays() < 1))
                 }
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
               >
-                <span className="hidden sm:inline">Next</span>
+                Next
                 <ChevronRightIcon className="ml-2 -mr-1 h-5 w-5" />
               </button>
             ) : (
