@@ -636,9 +636,7 @@ router.put(
     }
   }
 );
-
-// Approve leave and deduct leave days from specific leave type - FIXED: Include actionedByUser and set actionedBy
-// Approve leave and deduct leave days from specific leave type - FIXED VERSION
+// Approve leave and deduct leave days from specific leave type
 router.put(
   "/:id/approve",
   authenticateToken,
@@ -653,10 +651,7 @@ router.put(
       // Fetch leave with user info
       const leave = await prisma.leave.findUnique({
         where: { id: leaveId },
-        include: { 
-          user: true,
-          attachments: true 
-        },
+        include: { user: true, attachments: true },
       });
 
       if (!leave) {
@@ -675,46 +670,42 @@ router.put(
         leave.leaveType
       );
 
-      if (currentBalance < leave.days && leave.leaveType !== "UnpaidLeave") {
+      if (leave.leaveType !== "UnpaidLeave" && currentBalance < leave.days) {
         return res.status(400).json({
           message: `User does not have enough ${leave.leaveType} balance. Available: ${currentBalance}, Requested: ${leave.days}`,
         });
       }
 
-      // Update leaveBalances for the specific leave type (skip for unpaid leave)
-      let updatedLeaveBalances = { ...leave.user.leaveBalances };
-      if (leave.leaveType !== "UnpaidLeave") {
-        updatedLeaveBalances = {
-          ...leave.user.leaveBalances,
-          [leave.leaveType]: currentBalance - leave.days,
-        };
-      }
+      // Deduct leave days for non-unpaid leave AND UNPAID LEAVES
 
-      // Deduct leave days and update leave status
+      const updatedLeaveBalances = {
+        ...leave.user.leaveBalances,
+        [leave.leaveType]: currentBalance - leave.days,
+      };
+
+      await prisma.user.update({
+        where: { id: leave.userId },
+        data: { leaveBalances: updatedLeaveBalances },
+      });
+
+      // Update leave status to approved
       const updatedLeave = await prisma.leave.update({
         where: { id: leaveId },
         data: {
           status: "approved",
           rejectionReason: null,
           actionedBy: req.user.userId,
-          ...(leave.leaveType !== "UnpaidLeave" && {
-            user: {
-              update: {
-                leaveBalances: updatedLeaveBalances,
-              },
-            },
-          }),
         },
         include: {
           user: {
-            select: { 
-              id: true, 
-              name: true, 
-              email: true, 
+            select: {
+              id: true,
+              name: true,
+              email: true,
               leaveBalances: true,
               avatar: true,
               position: true,
-              department: true 
+              department: true,
             },
           },
           actionedByUser: {
@@ -732,27 +723,27 @@ router.put(
       });
 
       res.json({
-        message: leave.leaveType === "UnpaidLeave" 
-          ? "Unpaid leave approved successfully" 
-          : `Leave approved and ${leave.days} days deducted from ${leave.leaveType} balance`,
+        message:
+          leave.leaveType === "UnpaidLeave"
+            ? "Unpaid leave approved successfully"
+            : `Leave approved and ${leave.days} days deducted from ${leave.leaveType} balance`,
         leave: updatedLeave,
       });
     } catch (error) {
       console.error("Error approving leave:", error);
-      
-      // More detailed error logging
       if (error.code) {
         console.error("Prisma error code:", error.code);
         console.error("Prisma error meta:", error.meta);
       }
-      
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Internal server error",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
 );
+
 // Reject leave - FIXED: Include actionedByUser and set actionedBy
 router.put(
   "/:id/reject",
