@@ -21,7 +21,10 @@ model User {
   password      String
   createdAt     DateTime @default(now())
   refreshToken  String?
-  leaves        Leave[]  // REMOVED onDelete from here
+
+  // Relations
+  leaves        Leave[]                     // leaves submitted by the user
+  actionedLeaves Leave[] @relation("LeaveActionedBy") // leaves this user approved/rejected
 
   @@map("users")
 }
@@ -39,9 +42,15 @@ model Leave {
   emergencyContact String?
   emergencyPhone   String?
 
-  userId  Int
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade) // KEEP onDelete here
-  attachments File[]  // REMOVED onDelete from here
+  // Who submitted the leave
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Who actioned (approved/rejected) the leave
+  actionedBy     Int?
+  actionedByUser User? @relation("LeaveActionedBy", fields: [actionedBy], references: [id])
+
+  attachments File[]
 
   @@map("leaves")
 }
@@ -55,7 +64,7 @@ model File {
   uploadedAt DateTime @default(now())
 
   leaveId   Int?
-  leave     Leave?   @relation(fields: [leaveId], references: [id], onDelete: Cascade) // KEEP onDelete here
+  leave     Leave?   @relation(fields: [leaveId], references: [id], onDelete: Cascade)
 
   @@map("files")
 }
