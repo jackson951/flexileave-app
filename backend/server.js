@@ -60,10 +60,12 @@ app.use(express.static(path.join(__dirname, "../frontend/dist")));
 const userRoutes = require("./routes/userRoutes");
 const authRoutes = require("./routes/auth");
 const leaveRoutes = require("./routes/leaveRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leaves", leaveRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

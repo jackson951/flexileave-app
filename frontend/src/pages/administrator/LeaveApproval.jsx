@@ -18,6 +18,7 @@ import {
 import LeaveHistory from "../leave/LeaveHistory";
 import { useAuth } from "../../contexts/AuthContext";
 import { ApiService, useApiInterceptors } from "../../api/web-api-service";
+import { formatDistanceToNow } from "date-fns";
 
 const LeaveApprovals = () => {
   const [currentView, setCurrentView] = useState("approvals");
@@ -96,6 +97,20 @@ const LeaveApprovals = () => {
     }
   };
 
+  const createNotification = async (leaveId, userId, type, message, title) => {
+    try {
+      await ApiService.post("/notifications", {
+        userId,
+        type,
+        message,
+        title, // Add the title field
+        leaveId,
+      });
+    } catch (error) {
+      console.error("Error creating notification:", error);
+    }
+  };
+
   useEffect(() => {
     if (currentView === "approvals") {
       fetchLeaves();
@@ -141,6 +156,7 @@ const LeaveApprovals = () => {
     setExpandedRequest(expandedRequest === id ? null : id);
   };
 
+  // In the handleApprove function:
   const handleApprove = async (id) => {
     if (!window.confirm("Approve this leave request?")) return;
 
@@ -156,6 +172,21 @@ const LeaveApprovals = () => {
       setLeaves((prev) =>
         prev.map((leave) => (leave.id === id ? processedLeave : leave))
       );
+
+      // Create approval notification for the requester
+      const leave = leaves.find((l) => l.id === id);
+      if (leave) {
+        await createNotification(
+          id,
+          leave.userId,
+          "leave_approved",
+          `Your leave request for ${formatDate(
+            leave.startDate
+          )} to ${formatDate(leave.endDate)} has been approved`,
+          "Leave Request Approved" // Add title here
+        );
+      }
+
       alert("Leave request approved successfully!");
     } catch (err) {
       console.error("Error approving leave:", err);
@@ -190,6 +221,23 @@ const LeaveApprovals = () => {
       setLeaves((prev) =>
         prev.map((leave) => (leave.id === id ? processedLeave : leave))
       );
+
+      // Create rejection notification for the requester
+      const leave = leaves.find((l) => l.id === id);
+      if (leave) {
+        await createNotification(
+          id,
+          leave.userId,
+          "leave_rejected",
+          `Your leave request for ${formatDate(
+            leave.startDate
+          )} to ${formatDate(
+            leave.endDate
+          )} has been rejected. Reason: ${reason}`,
+          "Leave Request Rejected"
+        );
+      }
+
       alert("Leave request rejected successfully!");
     } catch (err) {
       console.error("Error rejecting leave:", err);
@@ -256,7 +304,6 @@ const LeaveApprovals = () => {
     fetchLeaves();
   };
 
-  // Helper to check if the leave belongs to the current user
   const isOwnRequest = (leave) => {
     return leave.userId === user?.id;
   };

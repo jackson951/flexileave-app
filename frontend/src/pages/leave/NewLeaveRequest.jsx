@@ -36,6 +36,7 @@ const NewLeaveRequest = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [admins, setAdmins] = useState([]);
 
   // Initialize interceptors
   useApiInterceptors();
@@ -50,6 +51,59 @@ const NewLeaveRequest = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Fetch admins for notifications
+  // Fetch admins for notifications
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const response = await ApiService.get("/users/admins/list");
+        console.log("Full API response:", response);
+
+        // Handle different response structures
+        let users = [];
+        if (Array.isArray(response.data)) {
+          users = response.data;
+        } else if (response.data && Array.isArray(response.data.data)) {
+          users = response.data.data; // If nested under data property
+        } else if (response.data && Array.isArray(response.data.users)) {
+          users = response.data.users; // If nested under users property
+        }
+
+        console.log("Extracted users:", users);
+
+        // Filter for admins
+        const allAdmins = users;
+        console.log("All admins found:", allAdmins);
+
+        // Get current user ID for comparison
+        const currentUserId = user?.id;
+        console.log("Current user ID for filtering:", currentUserId);
+
+        // Filter out current user
+        const otherAdmins = allAdmins.filter((admin) => {
+          const isDifferentUser = admin.id !== currentUserId;
+          console.log(
+            `Admin ${admin.id} vs current ${currentUserId}: ${isDifferentUser}`
+          );
+          return isDifferentUser;
+        });
+
+        console.log("Final admins to notify:", otherAdmins);
+        setAdmins(otherAdmins);
+      } catch (error) {
+        console.error("Error fetching admins:", error);
+        console.error("Error details:", error.response?.data);
+        setAdmins([]);
+      }
+    };
+
+    // Only fetch if user is loaded
+    if (user && user.id) {
+      fetchAdmins();
+    } else {
+      console.log("User not loaded yet, skipping admin fetch");
+    }
+  }, [user, user?.id]); // Depend on entire user object and user.id
   // Map display names to backend values
   const leaveTypeMapping = {
     "Annual Leave": "AnnualLeave",
@@ -261,6 +315,34 @@ const NewLeaveRequest = () => {
     }
   };
 
+  // Create notifications for admins
+  const createAdminNotifications = async (leaveId, leaveData) => {
+    try {
+      // Create notifications for each admin
+      const notificationPromises = admins.map(async (admin) => {
+        const notificationData = {
+          userId: admin.id,
+          type: "leave_submitted",
+          title: "New Leave Request Submitted",
+          message: `${user.name} has submitted a new ${
+            formData.leaveType
+          } request for ${calculateDays()} day${
+            calculateDays() !== 1 ? "s" : ""
+          } (${formatDate(startDate)} - ${formatDate(endDate)})`,
+          leaveId: leaveId,
+        };
+
+        return ApiService.post("/notifications", notificationData);
+      });
+
+      await Promise.all(notificationPromises);
+      console.log(`Created notifications for ${admins.length} admins`);
+    } catch (error) {
+      console.error("Error creating admin notifications:", error);
+      // Don't throw error here - the leave request was already created successfully
+    }
+  };
+
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -308,7 +390,15 @@ const NewLeaveRequest = () => {
           fileIds: formData.supportingDocs.map((doc) => doc.id),
         };
 
-        await ApiService.post("/leaves", leaveData);
+        // Create the leave request
+        const response = await ApiService.post("/leaves", leaveData);
+        const createdLeave = response.data;
+
+        // Create notifications for admins
+        if (admins.length > 0) {
+          await createAdminNotifications(createdLeave.id, leaveData);
+        }
+
         setIsSubmitted(true);
       } catch (err) {
         console.error("Error submitting leave request:", err);
@@ -376,7 +466,11 @@ const NewLeaveRequest = () => {
             Your leave request has been successfully submitted for approval.
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            You will be notified via email once a decision is made.
+            {admins.length > 0
+              ? `Notification has been sent to ${admins.length} admin${
+                  admins.length !== 1 ? "s" : ""
+                } for review.`
+              : "Your request is pending admin review."}
           </p>
           <div className="mt-8 space-x-4">
             <button
