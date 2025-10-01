@@ -16,16 +16,17 @@ import {
   ChevronDownIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  MagnifyingGlassIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../contexts/AuthContext";
 import digititanLogo from "../assets/digititan-logo.jpeg";
+import { ApiService, useApiInterceptors } from "../api/web-api-service";
+import { formatDistanceToNow } from "date-fns";
 
 const DashboardLayout = () => {
   const { user: authUser, logout, logoutLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
-    // Check if dark mode is preferred or previously set
     return (
       localStorage.getItem("darkMode") === "true" ||
       window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -33,36 +34,84 @@ const DashboardLayout = () => {
   });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Mock notifications data
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Leave Request Approved",
-      message: "Your leave request for September 15-20 has been approved",
-      time: "2 hours ago",
-      read: false,
-      type: "success",
-    },
-    {
-      id: 2,
-      title: "New Message",
-      message: "You have a new message from HR department",
-      time: "5 hours ago",
-      read: false,
-      type: "info",
-    },
-    {
-      id: 3,
-      title: "Upcoming Deadline",
-      message: "Quarterly reports are due next Friday",
-      time: "1 day ago",
-      read: true,
-      type: "warning",
-    },
-  ]);
+  // Initialize API interceptors
+  useApiInterceptors();
+
+  // Fetch notifications from API
+  const fetchNotifications = async () => {
+    try {
+      setLoadingNotifications(true);
+      const response = await ApiService.get("/notifications");
+      setNotifications(response.data.data);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  // Fetch unread count from API
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await ApiService.get("/notifications/unread-count");
+      setUnreadCount(response.data.data.count);
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationAsRead = async (id) => {
+    try {
+      await ApiService.put(`/notifications/${id}/read`);
+      setNotifications(
+        notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+      setUnreadCount(Math.max(0, unreadCount - 1));
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+
+  // Mark all notifications as read
+  const markAllNotificationsAsRead = async () => {
+    try {
+      await ApiService.put("/notifications/mark-all-read");
+      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+    }
+  };
+
+  // Delete notification
+  const deleteNotification = async (id) => {
+    try {
+      await ApiService.delete(`/notifications/${id}`);
+      setNotifications(notifications.filter((n) => n.id !== id));
+      if (!notifications.find((n) => n.id === id)?.isRead) {
+        setUnreadCount(Math.max(0, unreadCount - 1));
+      }
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+    }
+  };
+
+  // Delete all read notifications
+  const deleteAllReadNotifications = async () => {
+    try {
+      await ApiService.delete("/notifications/read/all");
+      setNotifications(notifications.filter((n) => !n.isRead));
+    } catch (error) {
+      console.error("Error deleting read notifications:", error);
+    }
+  };
 
   // Toggle dark mode and update document class
   useEffect(() => {
@@ -93,6 +142,12 @@ const DashboardLayout = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [notificationsOpen, profileDropdownOpen]);
 
+  // Fetch notifications and unread count on mount
+  useEffect(() => {
+    fetchNotifications();
+    fetchUnreadCount();
+  }, []);
+
   const navigation = [
     {
       name: "Leave Requests",
@@ -110,19 +165,19 @@ const DashboardLayout = () => {
       name: "Team Calendar",
       href: "/dashboard/calendar",
       icon: CalendarDaysIcon,
-      show: authUser?.role === "admin",
+      show: authUser?.role === "admin" || authUser?.role === "manager",
     },
     {
       name: "Reports",
       href: "/dashboard/reports",
       icon: ChartBarIcon,
-      show: authUser?.role === "admin",
+      show: authUser?.role === "admin" || authUser?.role === "manager",
     },
     {
       name: "Employees",
       href: "/dashboard/users",
       icon: UserGroupIcon,
-      show: authUser?.role === "admin",
+      show: authUser?.role === "admin" || authUser?.role === "manager",
     },
     {
       name: "Profile Settings",
@@ -140,24 +195,40 @@ const DashboardLayout = () => {
     setSidebarOpen(false);
   };
 
-  const markNotificationAsRead = (id) => {
-    setNotifications(
-      notifications.map((notification) =>
-        notification.id === id ? { ...notification, read: true } : notification
-      )
-    );
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case "leave_approved":
+        return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+      case "leave_rejected":
+        return <XMarkIcon className="h-5 w-5 text-red-500" />;
+      case "leave_submitted":
+        return <DocumentTextIcon className="h-5 w-5 text-blue-500" />;
+      default:
+        return <BellIcon className="h-5 w-5 text-indigo-500" />;
+    }
   };
 
-  const markAllNotificationsAsRead = () => {
-    setNotifications(
-      notifications.map((notification) => ({
-        ...notification,
-        read: true,
-      }))
-    );
+  const getNotificationTitle = (notification) => {
+    switch (notification.type) {
+      case "leave_approved":
+        return "Leave Approved";
+      case "leave_rejected":
+        return "Leave Rejected";
+      case "leave_submitted":
+        return "New Leave Request";
+      case "system":
+        return "System Notification";
+      default:
+        return "Notification";
+    }
   };
 
-  const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
+  const handleNotificationClick = async (id) => {
+    await markNotificationAsRead(id);
+    // Optionally navigate based on notification type
+    const notification = notifications.find((n) => n.id === id);
+    setNotificationsOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
@@ -178,7 +249,7 @@ const DashboardLayout = () => {
                 >
                   <span className="sr-only">Close sidebar</span>
                   <XMarkIcon
-                    className="h-6 w-6 text-white"
+                    className="h-6 w-6 text-white dark:text-gray-200"
                     aria-hidden="true"
                   />
                 </button>
@@ -213,7 +284,7 @@ const DashboardLayout = () => {
                           onClick={() => handleNavigationClick(item.href)}
                           className={`${
                             item.current
-                              ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-200"
+                              ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200"
                               : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                           } group flex items-center px-2 py-2 text-base font-medium rounded-md w-full`}
                         >
@@ -258,7 +329,7 @@ const DashboardLayout = () => {
                     className="ml-auto flex-shrink-0 bg-white dark:bg-gray-800 p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 disabled:opacity-50"
                   >
                     {logoutLoading ? (
-                      <div className="h-6 w-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="h-6 w-6 border-2 border-gray-400 dark:border-gray-300 border-t-transparent rounded-full animate-spin"></div>
                     ) : (
                       <ArrowRightOnRectangleIcon
                         className="h-6 w-6"
@@ -306,7 +377,7 @@ const DashboardLayout = () => {
                     onClick={() => handleNavigationClick(item.href)}
                     className={`${
                       item.current
-                        ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-200"
+                        ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-200"
                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                     } group flex items-center px-2 py-2 text-sm font-medium rounded-md w-full`}
                   >
@@ -350,7 +421,7 @@ const DashboardLayout = () => {
                 className="ml-auto flex-shrink-0 bg-white dark:bg-gray-800 p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 disabled:opacity-50"
               >
                 {logoutLoading ? (
-                  <div className="h-6 w-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="h-6 w-6 border-2 border-gray-400 dark:border-gray-300 border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <ArrowRightOnRectangleIcon
                     className="h-6 w-6"
@@ -417,20 +488,20 @@ const DashboardLayout = () => {
                 >
                   <span className="sr-only">View notifications</span>
                   <BellIcon className="h-6 w-6" aria-hidden="true" />
-                  {unreadNotificationsCount > 0 && (
+                  {unreadCount > 0 && (
                     <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                      {unreadNotificationsCount}
+                      {unreadCount}
                     </span>
                   )}
                 </button>
 
                 {notificationsOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                  <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                       <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                         Notifications
                       </h3>
-                      {unreadNotificationsCount > 0 && (
+                      {unreadCount > 0 && (
                         <button
                           onClick={markAllNotificationsAsRead}
                           className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
@@ -440,38 +511,39 @@ const DashboardLayout = () => {
                       )}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {notifications.length > 0 ? (
+                      {loadingNotifications ? (
+                        <div className="flex justify-center items-center py-4">
+                          <div className="h-6 w-6 border-2 border-gray-400 dark:border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : notifications.length > 0 ? (
                         notifications.map((notification) => (
                           <div
                             key={notification.id}
                             className={`px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
-                              !notification.read
+                              !notification.isRead
                                 ? "bg-indigo-50 dark:bg-indigo-900/20"
                                 : ""
                             }`}
                             onClick={() =>
-                              markNotificationAsRead(notification.id)
+                              handleNotificationClick(notification.id)
                             }
                           >
                             <div className="flex items-start">
                               <div className="flex-shrink-0 pt-0.5">
-                                {notification.type === "success" ? (
-                                  <CheckCircleIcon className="h-5 w-5 text-green-500" />
-                                ) : notification.type === "warning" ? (
-                                  <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500" />
-                                ) : (
-                                  <BellIcon className="h-5 w-5 text-blue-500" />
-                                )}
+                                {getNotificationIcon(notification.type)}
                               </div>
                               <div className="ml-3 w-0 flex-1">
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {notification.title}
+                                  {getNotificationTitle(notification)}
                                 </p>
                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                   {notification.message}
                                 </p>
                                 <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                                  {notification.time}
+                                  {formatDistanceToNow(
+                                    new Date(notification.createdAt),
+                                    { addSuffix: true }
+                                  )}
                                 </p>
                               </div>
                             </div>
@@ -484,8 +556,11 @@ const DashboardLayout = () => {
                       )}
                     </div>
                     <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2">
-                      <button className="block text-center text-sm font-medium text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 w-full">
-                        View all
+                      <button
+                        onClick={deleteAllReadNotifications}
+                        className="block text-center text-sm font-medium text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 w-full"
+                      >
+                        Clear read notifications
                       </button>
                     </div>
                   </div>
@@ -499,7 +574,7 @@ const DashboardLayout = () => {
                 disabled={logoutLoading}
               >
                 {logoutLoading ? (
-                  <div className="h-6 w-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="h-6 w-6 border-2 border-gray-400 dark:border-gray-300 border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <ArrowRightOnRectangleIcon
                     className="h-6 w-6"
@@ -546,20 +621,20 @@ const DashboardLayout = () => {
                 >
                   <span className="sr-only">View notifications</span>
                   <BellIcon className="h-6 w-6" aria-hidden="true" />
-                  {unreadNotificationsCount > 0 && (
+                  {unreadCount > 0 && (
                     <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                      {unreadNotificationsCount}
+                      {unreadCount}
                     </span>
                   )}
                 </button>
 
                 {notificationsOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                  <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                       <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                         Notifications
                       </h3>
-                      {unreadNotificationsCount > 0 && (
+                      {unreadCount > 0 && (
                         <button
                           onClick={markAllNotificationsAsRead}
                           className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
@@ -569,38 +644,39 @@ const DashboardLayout = () => {
                       )}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {notifications.length > 0 ? (
+                      {loadingNotifications ? (
+                        <div className="flex justify-center items-center py-4">
+                          <div className="h-6 w-6 border-2 border-gray-400 dark:border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : notifications.length > 0 ? (
                         notifications.map((notification) => (
                           <div
                             key={notification.id}
                             className={`px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
-                              !notification.read
+                              !notification.isRead
                                 ? "bg-indigo-50 dark:bg-indigo-900/20"
                                 : ""
                             }`}
                             onClick={() =>
-                              markNotificationAsRead(notification.id)
+                              handleNotificationClick(notification.id)
                             }
                           >
                             <div className="flex items-start">
                               <div className="flex-shrink-0 pt-0.5">
-                                {notification.type === "success" ? (
-                                  <CheckCircleIcon className="h-5 w-5 text-green-500" />
-                                ) : notification.type === "warning" ? (
-                                  <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500" />
-                                ) : (
-                                  <BellIcon className="h-5 w-5 text-blue-500" />
-                                )}
+                                {getNotificationIcon(notification.type)}
                               </div>
                               <div className="ml-3 w-0 flex-1">
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {notification.title}
+                                  {getNotificationTitle(notification)}
                                 </p>
                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                   {notification.message}
                                 </p>
                                 <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                                  {notification.time}
+                                  {formatDistanceToNow(
+                                    new Date(notification.createdAt),
+                                    { addSuffix: true }
+                                  )}
                                 </p>
                               </div>
                             </div>
@@ -613,8 +689,11 @@ const DashboardLayout = () => {
                       )}
                     </div>
                     <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2">
-                      <button className="block text-center text-sm font-medium text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 w-full">
-                        View all
+                      <button
+                        onClick={deleteAllReadNotifications}
+                        className="block text-center text-sm font-medium text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 w-full"
+                      >
+                        Clear read notifications
                       </button>
                     </div>
                   </div>
@@ -651,7 +730,7 @@ const DashboardLayout = () => {
                 </div>
 
                 {profileDropdownOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <button
                       onClick={() => {
                         navigate("/dashboard/profile");
@@ -678,7 +757,7 @@ const DashboardLayout = () => {
                     >
                       {logoutLoading ? (
                         <>
-                          <div className="h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                          <div className="h-4 w-4 border-2 border-gray-400 dark:border-gray-300 border-t-transparent rounded-full animate-spin mr-2"></div>
                           Signing out...
                         </>
                       ) : (
@@ -693,7 +772,7 @@ const DashboardLayout = () => {
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6 transition-colors duration-200">
           <Outlet />
         </main>
       </div>
