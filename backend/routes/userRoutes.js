@@ -308,4 +308,32 @@ router.delete("/:id", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+// GET all admins (protected - any authenticated user can access)
+router.get("/admins/list", authenticateToken, async (req, res) => {
+  try {
+    const admins = await prisma.user.findMany({
+      where: {
+        role: "admin",
+        // Optionally exclude the current user if needed
+        // id: { not: req.user.userId }
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        department: true,
+        position: true,
+        role: true,
+        avatar: true,
+      },
+    });
+
+    res.json(admins);
+  } catch (error) {
+    console.error("Error fetching admins:", error);
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
+
 module.exports = router;
