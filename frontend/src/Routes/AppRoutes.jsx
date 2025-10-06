@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import LoginPage from "../pages/Login";
 import DashboardLayout from "../components/DashboardLayout";
-import NewLeaveRequest from "../pages/leave/NewLeaveRequest";
 import LeaveHistory from "../pages/leave/LeaveHistory";
 import LeaveApprovals from "../pages/administrator/LeaveApproval";
 import UserManagement from "../pages/administrator/UserManagement";
@@ -12,6 +11,7 @@ import NotFoundPage from "../pages/NotFoundPage";
 import TeamCalender from "../pages/administrator/TeamCalender";
 import ForgotPasswordPage from "../pages/ForgotPassword";
 import { useApiInterceptors } from "../api/web-api-service";
+import NewLeaveRequest from "../components/NewLeaveRequest";
 
 // Loading spinner component
 const LoadingSpinner = () => (
