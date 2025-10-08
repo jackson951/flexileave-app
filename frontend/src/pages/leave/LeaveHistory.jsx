@@ -721,26 +721,27 @@ const LeaveHistory = () => {
                                     {(doc.size / (1024 * 1024)).toFixed(2)} MB
                                   </span>
                                 </div>
-                                <div className="ml-4 flex-shrink-0">
+
+                                <div className="ml-4 flex-shrink-0 space-x-3">
+                                  {/* View Button */}
                                   <button
                                     type="button"
                                     className="font-medium text-indigo-600 hover:text-indigo-500"
-                                    onClick={() => {
-                                      let fileUrl = doc.url;
-                                      if (fileUrl.startsWith("/")) {
-                                        const apiBaseUrl = import.meta.env
-                                          .VITE_API;
-                                        const rootDomain = apiBaseUrl.replace(
-                                          /\/api$/,
-                                          ""
-                                        );
-                                        fileUrl = `${rootDomain}${fileUrl}`;
-                                      }
-                                      window.open(fileUrl, "_blank");
-                                    }}
+                                    onClick={() =>
+                                      window.open(doc.url, "_blank")
+                                    }
                                   >
                                     View
                                   </button>
+
+                                  {/* Optional Download Button */}
+                                  <a
+                                    href={doc.url}
+                                    download
+                                    className="font-medium text-gray-600 hover:text-gray-800"
+                                  >
+                                    Download
+                                  </a>
                                 </div>
                               </li>
                             ))}
