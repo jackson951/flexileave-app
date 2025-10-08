@@ -355,14 +355,6 @@ const LeaveApprovals = () => {
             <span className="ml-2 text-blue-700">System Administrator</span>
           )}
         </div>
-        {leave.status === "rejected" && leave.rejectionReason && (
-          <div className="mt-2 text-sm">
-            <span className="font-medium text-blue-800">Reason: </span>
-            <span className="text-red-700 bg-red-50 px-2 py-1 rounded text-sm">
-              {leave.rejectionReason}
-            </span>
-          </div>
-        )}
       </div>
     );
   };
