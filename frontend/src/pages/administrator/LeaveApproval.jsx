@@ -738,21 +738,14 @@ const LeaveApprovals = () => {
                                         </p>
                                       </div>
                                     </div>
+
                                     <div className="ml-2 flex-shrink-0">
                                       <button
                                         type="button"
                                         className="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-                                        onClick={() => {
-                                          let fileUrl = doc.url;
-                                          if (fileUrl.startsWith("/")) {
-                                            const apiBaseUrl = import.meta.env
-                                              .VITE_API;
-                                            const rootDomain =
-                                              apiBaseUrl.replace(/\/api$/, "");
-                                            fileUrl = `${rootDomain}${fileUrl}`;
-                                          }
-                                          window.open(fileUrl, "_blank");
-                                        }}
+                                        onClick={() =>
+                                          window.open(doc.url, "_blank")
+                                        }
                                       >
                                         View
                                       </button>

@@ -4,26 +4,18 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const { body, validationResult } = require("express-validator");
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 const jwt = require("jsonwebtoken");
+const cloudinary = require("cloudinary").v2;
 
-// -------------------- MULTER CONFIG -------------------- //
-const uploadDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
+// -------------------- CLOUDINARY CONFIG -------------------- //
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// -------------------- MULTER CONFIG (Memory Storage) -------------------- //
+const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
@@ -32,6 +24,7 @@ const upload = multer({
       "image/jpeg",
       "image/png",
       "image/gif",
+      "image/webp",
       "application/pdf",
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -72,46 +65,139 @@ const getLeaveBalance = (leaveBalances, leaveType) => {
   return leaveBalances[leaveType] || 0;
 };
 
-// Helper: Cleanup orphaned files (files not linked to any leave)
+// ✅ FIXED: Robust Cloudinary upload with correct resource_type
+const uploadToCloudinary = (
+  fileBuffer,
+  fileName,
+  folder = "leave_attachments"
+) => {
+  return new Promise((resolve, reject) => {
+    // Normalize and extract extension
+    const cleanName = fileName.trim();
+    const lowerName = cleanName.toLowerCase();
+    const lastDot = lowerName.lastIndexOf(".");
+    const ext = lastDot === -1 ? "" : lowerName.slice(lastDot + 1);
+
+    // Define image extensions
+    const imageExts = new Set([
+      "jpg",
+      "jpeg",
+      "jpe",
+      "jif",
+      "jfif",
+      "jfi",
+      "png",
+      "gif",
+      "webp",
+      "bmp",
+      "dib",
+      "tiff",
+      "tif",
+      "svg",
+      "ico",
+    ]);
+
+    // Determine resource type
+    const resource_type = imageExts.has(ext) ? "image" : "raw";
+
+    // Safe and unique public_id
+    const baseName = cleanName.replace(/^.*[\\/]/, "").replace(/\.[^/.]+$/, "");
+    const public_id = `leave_${Date.now()}_${baseName}`;
+
+    // Upload options — this fixes PDFs and DOCX not opening correctly
+    const uploadOptions = {
+      folder,
+      resource_type,
+      public_id,
+      overwrite: false,
+      invalidate: true,
+    };
+
+    // ✅ Add file format for non-images
+    if (!imageExts.has(ext) && ext) {
+      uploadOptions.format = ext;
+    }
+
+    // Upload stream
+    const uploadStream = cloudinary.uploader.upload_stream(
+      uploadOptions,
+      (error, result) => {
+        if (error) {
+          console.error("❌ Cloudinary upload error:", error.message);
+          reject(new Error(`Upload failed: ${error.message}`));
+        } else {
+          console.log("✅ Uploaded to Cloudinary:", result.secure_url);
+          resolve(result);
+        }
+      }
+    );
+
+    // End stream with file buffer
+    uploadStream.end(fileBuffer);
+  });
+};
+
+// ✅ FIXED: Reliable deletion using regex-based public_id extraction
+const deleteFromCloudinary = async (fileUrl) => {
+  try {
+    // Extract public_id from secure_url (handles versioned URLs like /v12345/)
+    const match = fileUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z0-9]+$/);
+    if (!match) {
+      throw new Error("Could not parse public_id from URL");
+    }
+    const publicId = match[1]; // e.g., "leave_attachments/leave_1712345678_report"
+    const resource_type = fileUrl.includes("/raw/upload/") ? "raw" : "image";
+
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type,
+    });
+    console.log(
+      "🗑️ Deleted from Cloudinary:",
+      publicId,
+      "| Result:",
+      result.result
+    );
+    return result;
+  } catch (error) {
+    console.error("❌ Cloudinary delete error:", error.message);
+    throw error;
+  }
+};
+
+// Helper: Cleanup orphaned files
 const cleanupOrphanedFiles = async () => {
   try {
-    // Find all files that are not associated with any leave
     const orphanedFiles = await prisma.file.findMany({
       where: { leaveId: null },
     });
 
     for (const file of orphanedFiles) {
-      const filePath = path.join(__dirname, "..", file.url);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log(`Deleted orphaned file: ${file.name}`);
+      try {
+        await deleteFromCloudinary(file.url);
+        await prisma.file.delete({ where: { id: file.id } });
+      } catch (error) {
+        console.error(`Failed to delete orphaned file ${file.id}:`, error);
       }
-      // Delete from database
-      await prisma.file.delete({ where: { id: file.id } });
     }
-
     return orphanedFiles.length;
   } catch (error) {
-    console.error("Error cleaning up orphaned files:", error);
+    console.error("Orphan cleanup error:", error);
     throw error;
   }
 };
 
-// Schedule cleanup every hour (optional, you can trigger manually too)
+// Schedule cleanup every hour
 setInterval(async () => {
   try {
-    const count = await cleanupOrphanedFiles();
-    if (count > 0) {
-      console.log(`Cleaned up ${count} orphaned files.`);
-    }
+    await cleanupOrphanedFiles();
   } catch (error) {
-    console.error("Scheduled cleanup failed:", error);
+    // Silent fail
   }
-}, 60 * 60 * 1000); // Every hour
+}, 60 * 60 * 1000);
 
 // -------------------- ROUTES -------------------- //
 
-// Upload files (temporary - not linked to leave yet)
+// Upload files to Cloudinary
 router.post(
   "/upload",
   authenticateToken,
@@ -122,26 +208,39 @@ router.post(
         return res.status(400).json({ message: "No files uploaded" });
       }
 
-      const uploadedFiles = await Promise.all(
-        req.files.map((file) =>
-          prisma.file.create({
+      const uploadedFiles = [];
+      for (const file of req.files) {
+        try {
+          const cloudinaryResult = await uploadToCloudinary(
+            file.buffer,
+            file.originalname
+          );
+
+          const dbFile = await prisma.file.create({
             data: {
               name: file.originalname,
-              url: `/uploads/${file.filename}`,
+              url: cloudinaryResult.secure_url, // ✅ ALWAYS use secure_url
               size: file.size,
               type: file.mimetype,
-              // leaveId is null by default - will be linked when leave is created/updated
             },
-          })
-        )
-      );
+          });
+          uploadedFiles.push(dbFile);
+        } catch (uploadError) {
+          console.error("File upload failed:", uploadError.message);
+          continue;
+        }
+      }
+
+      if (uploadedFiles.length === 0) {
+        return res.status(500).json({ message: "All file uploads failed" });
+      }
 
       res.status(201).json(uploadedFiles);
     } catch (error) {
-      console.error("Error uploading files:", error);
       if (error.message && error.message.includes("File type not supported")) {
         return res.status(400).json({ message: error.message });
       }
+      console.error("Upload route error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
@@ -155,36 +254,21 @@ router.delete("/file/:fileId", authenticateToken, async (req, res) => {
       return res.status(400).json({ message: "Invalid file ID" });
     }
 
-    // Find the file
-    const file = await prisma.file.findUnique({
-      where: { id: fileId },
-    });
-
+    const file = await prisma.file.findUnique({ where: { id: fileId } });
     if (!file) {
       return res.status(404).json({ message: "File not found" });
     }
 
-    // Instead of blocking deletion, we proceed to delete it regardless of leaveId.
-    // First, detach it from any leave it might be attached to.
     await prisma.file.update({
       where: { id: fileId },
-      data: { leaveId: null }, // Detach from leave
+      data: { leaveId: null },
     });
-
-    // Delete file from filesystem
-    const filePath = path.join(__dirname, "..", file.url);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-
-    // Delete from database
-    await prisma.file.delete({
-      where: { id: fileId },
-    });
+    await deleteFromCloudinary(file.url);
+    await prisma.file.delete({ where: { id: fileId } });
 
     res.json({ message: "File deleted successfully" });
   } catch (error) {
-    console.error("Error deleting file:", error);
+    console.error("Delete file error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -239,16 +323,13 @@ router.post(
       const end = new Date(endDate);
       const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-      // Fetch the user to get leaveBalances
       const user = await prisma.user.findUnique({
         where: { id: req.user.userId },
       });
-
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Check leave balance for the specific leave type
       const available = getLeaveBalance(user.leaveBalances, leaveType);
       if (available < days) {
         return res.status(400).json({
@@ -256,12 +337,11 @@ router.post(
         });
       }
 
-      // Check for overlapping leaves
       const overlappingLeave = await prisma.leave.findFirst({
         where: {
           userId: req.user.userId,
           AND: [{ startDate: { lte: end } }, { endDate: { gte: start } }],
-          status: { not: "rejected" }, // ignore rejected leaves
+          status: { not: "rejected" },
         },
       });
 
@@ -273,15 +353,10 @@ router.post(
         });
       }
 
-      // Validate file IDs if provided
-      if (fileIds && fileIds.length > 0) {
+      if (fileIds?.length > 0) {
         const files = await prisma.file.findMany({
-          where: {
-            id: { in: fileIds },
-            leaveId: null, // Only allow files not already attached to a leave
-          },
+          where: { id: { in: fileIds }, leaveId: null },
         });
-
         if (files.length !== fileIds.length) {
           return res.status(400).json({
             message:
@@ -290,7 +365,6 @@ router.post(
         }
       }
 
-      // Create leave
       const newLeave = await prisma.leave.create({
         data: {
           leaveType,
@@ -314,13 +388,13 @@ router.post(
 
       res.status(201).json(newLeave);
     } catch (error) {
-      console.error("Error creating leave:", error);
+      console.error("Create leave error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
 );
 
-// Get all leaves (admin/manager) - FIXED: Include actionedByUser
+// Get all leaves (admin/manager)
 router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
   try {
     const { status, userId, leaveType } = req.query;
@@ -359,12 +433,12 @@ router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
 
     res.json(leaves);
   } catch (error) {
-    console.error("Error fetching leaves:", error);
+    console.error("Get all leaves error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// Get my leaves - FIXED: Include actionedByUser
+// Get my leaves
 router.get("/my", authenticateToken, async (req, res) => {
   try {
     const { status } = req.query;
@@ -391,12 +465,12 @@ router.get("/my", authenticateToken, async (req, res) => {
 
     res.json(leaves);
   } catch (error) {
-    console.error("Error fetching my leaves:", error);
+    console.error("Get my leaves error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// Get leave by ID - FIXED: Include actionedByUser
+// Get leave by ID
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
@@ -426,7 +500,6 @@ router.get("/:id", authenticateToken, async (req, res) => {
       return res.status(404).json({ message: "Leave not found" });
     }
 
-    // User can only view their own leave unless admin/manager
     if (
       leave.userId !== req.user.userId &&
       req.user.role !== "admin" &&
@@ -437,12 +510,12 @@ router.get("/:id", authenticateToken, async (req, res) => {
 
     res.json(leave);
   } catch (error) {
-    console.error("Error fetching leave:", error);
+    console.error("Get leave by ID error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// Update leave - FIXED: Include actionedByUser in response
+// Update leave
 router.put(
   "/:id",
   authenticateToken,
@@ -476,17 +549,14 @@ router.put(
         where: { id: leaveId },
         include: { attachments: true },
       });
-
       if (!leave) {
         return res.status(404).json({ message: "Leave not found" });
       }
 
-      // Check permissions
       if (leave.userId !== req.user.userId && req.user.role !== "admin") {
         return res.status(403).json({ message: "Unauthorized access" });
       }
 
-      // Only allow updates on pending leaves
       if (leave.status !== "pending") {
         return res
           .status(400)
@@ -500,18 +570,19 @@ router.put(
         reason,
         emergencyContact,
         emergencyPhone,
-        fileIds, // Array of file IDs to attach
-        removeFileIds, // Array of file IDs to detach
+        fileIds,
+        removeFileIds,
       } = req.body;
 
-      // Calculate days if dates changed
       let days = leave.days;
+      let newStart = leave.startDate;
+      let newEnd = leave.endDate;
+
       if (startDate || endDate) {
-        const newStart = startDate ? new Date(startDate) : leave.startDate;
-        const newEnd = endDate ? new Date(endDate) : leave.endDate;
+        newStart = startDate ? new Date(startDate) : leave.startDate;
+        newEnd = endDate ? new Date(endDate) : leave.endDate;
         days = Math.ceil((newEnd - newStart) / (1000 * 60 * 60 * 24)) + 1;
 
-        // Validate dates
         if (newStart < new Date()) {
           return res
             .status(400)
@@ -523,11 +594,10 @@ router.put(
             .json({ message: "End date cannot be before start date" });
         }
 
-        // Check for overlapping leaves (excluding current leave)
         const overlappingLeave = await prisma.leave.findFirst({
           where: {
             userId: req.user.userId,
-            id: { not: leaveId }, // exclude current leave
+            id: { not: leaveId },
             AND: [
               { startDate: { lte: newEnd } },
               { endDate: { gte: newStart } },
@@ -545,11 +615,10 @@ router.put(
         }
       }
 
-      // Handle file attachments
       const updateData = {
         leaveType: leaveType || leave.leaveType,
-        startDate: startDate ? new Date(startDate) : leave.startDate,
-        endDate: endDate ? new Date(endDate) : leave.endDate,
+        startDate: newStart,
+        endDate: newEnd,
         days,
         reason: reason || leave.reason,
         emergencyContact:
@@ -560,19 +629,13 @@ router.put(
           emergencyPhone !== undefined ? emergencyPhone : leave.emergencyPhone,
       };
 
-      // Process file attachments
-      if (fileIds && fileIds.length > 0) {
-        // Validate files exist and are not attached to other leaves (except this one)
+      if (fileIds?.length > 0) {
         const filesToAttach = await prisma.file.findMany({
           where: {
             id: { in: fileIds },
-            OR: [
-              { leaveId: null },
-              { leaveId: leaveId }, // Allow re-attaching files already on this leave
-            ],
+            OR: [{ leaveId: null }, { leaveId: leaveId }],
           },
         });
-
         if (filesToAttach.length !== fileIds.length) {
           return res.status(400).json({
             message:
@@ -581,34 +644,24 @@ router.put(
         }
       }
 
-      // Start transaction to ensure data consistency
       const updatedLeave = await prisma.$transaction(async (tx) => {
-        // First, detach files if requested
-        if (removeFileIds && removeFileIds.length > 0) {
+        if (removeFileIds?.length > 0) {
           await tx.file.updateMany({
-            where: {
-              id: { in: removeFileIds },
-            },
-            data: {
-              leaveId: null,
-            },
+            where: { id: { in: removeFileIds } },
+            data: { leaveId: null },
           });
         }
 
-        // Then attach new files
-        if (fileIds && fileIds.length > 0) {
+        if (fileIds?.length > 0) {
           await tx.file.updateMany({
             where: {
               id: { in: fileIds },
               OR: [{ leaveId: null }, { leaveId: leaveId }],
             },
-            data: {
-              leaveId: leaveId,
-            },
+            data: { leaveId: leaveId },
           });
         }
 
-        // Finally, update the leave
         return tx.leave.update({
           where: { id: leaveId },
           data: updateData,
@@ -631,12 +684,13 @@ router.put(
 
       res.json(updatedLeave);
     } catch (error) {
-      console.error("Error updating leave:", error);
+      console.error("Update leave error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
 );
-// Approve leave and deduct leave days from specific leave type
+
+// Approve leave
 router.put(
   "/:id/approve",
   authenticateToken,
@@ -648,12 +702,10 @@ router.put(
         return res.status(400).json({ message: "Invalid leave ID" });
       }
 
-      // Fetch leave with user info
       const leave = await prisma.leave.findUnique({
         where: { id: leaveId },
         include: { user: true, attachments: true },
       });
-
       if (!leave) {
         return res.status(404).json({ message: "Leave not found" });
       }
@@ -664,19 +716,15 @@ router.put(
           .json({ message: "Only pending leaves can be approved" });
       }
 
-      // Check if user has enough leave balance for the specific leave type
       const currentBalance = getLeaveBalance(
         leave.user.leaveBalances,
         leave.leaveType
       );
-
       if (leave.leaveType !== "UnpaidLeave" && currentBalance < leave.days) {
         return res.status(400).json({
           message: `User does not have enough ${leave.leaveType} balance. Available: ${currentBalance}, Requested: ${leave.days}`,
         });
       }
-
-      // Deduct leave days for non-unpaid leave AND UNPAID LEAVES
 
       const updatedLeaveBalances = {
         ...leave.user.leaveBalances,
@@ -688,7 +736,6 @@ router.put(
         data: { leaveBalances: updatedLeaveBalances },
       });
 
-      // Update leave status to approved
       const updatedLeave = await prisma.leave.update({
         where: { id: leaveId },
         data: {
@@ -730,21 +777,13 @@ router.put(
         leave: updatedLeave,
       });
     } catch (error) {
-      console.error("Error approving leave:", error);
-      if (error.code) {
-        console.error("Prisma error code:", error.code);
-        console.error("Prisma error meta:", error.meta);
-      }
-      res.status(500).json({
-        message: "Internal server error",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
-      });
+      console.error("Approve leave error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   }
 );
 
-// Reject leave - FIXED: Include actionedByUser and set actionedBy
+// Reject leave
 router.put(
   "/:id/reject",
   authenticateToken,
@@ -768,7 +807,7 @@ router.put(
         data: {
           status: "rejected",
           rejectionReason: rejectionReason.trim(),
-          actionedBy: req.user.userId, // Set the current user as the rejecter
+          actionedBy: req.user.userId,
         },
         include: {
           user: { select: { email: true, name: true } },
@@ -788,13 +827,13 @@ router.put(
 
       res.json(leave);
     } catch (error) {
-      console.error("Error rejecting leave:", error);
+      console.error("Reject leave error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
 );
 
-// Cancel leave - FIXED: Include actionedByUser
+// Cancel leave
 router.put("/:id/cancel", authenticateToken, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
@@ -837,12 +876,12 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
 
     res.json(cancelledLeave);
   } catch (error) {
-    console.error("Error cancelling leave:", error);
+    console.error("Cancel leave error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// Delete leave (admin/manager only) - FIXED: Include actionedByUser
+// Delete leave (admin/manager only)
 router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
@@ -852,33 +891,27 @@ router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
 
     const leave = await prisma.leave.findUnique({
       where: { id: leaveId },
-      include: {
-        attachments: true,
-        actionedByUser: true,
-      },
+      include: { attachments: true },
     });
 
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
     }
 
-    // If leave was approved, restore leave balance
+    // Restore leave balance if approved
     if (leave.status === "approved") {
       const user = await prisma.user.findUnique({
         where: { id: leave.userId },
       });
-
       if (user) {
         const currentBalance = getLeaveBalance(
           user.leaveBalances,
           leave.leaveType
         );
-
         const updatedLeaveBalances = {
           ...user.leaveBalances,
           [leave.leaveType]: currentBalance + leave.days,
         };
-
         await prisma.user.update({
           where: { id: leave.userId },
           data: { leaveBalances: updatedLeaveBalances },
@@ -886,32 +919,22 @@ router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
       }
     }
 
-    // Delete associated files from storage if they're only attached to this leave
+    // Delete files only if not used elsewhere
     for (const file of leave.attachments) {
-      // Check if file is attached to any other leave
-      const otherLeaves = await prisma.file.findFirst({
-        where: {
-          id: file.id,
-          leaveId: { not: leaveId },
-        },
+      const otherUsage = await prisma.file.findFirst({
+        where: { id: file.id, leaveId: { not: leaveId } },
       });
-
-      // Only delete file if not attached to any other leave
-      if (!otherLeaves) {
-        const filePath = path.join(__dirname, "..", file.url);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+      if (!otherUsage) {
+        await deleteFromCloudinary(file.url);
       }
     }
 
-    // Delete file records and leave record
     await prisma.file.deleteMany({ where: { leaveId } });
     await prisma.leave.delete({ where: { id: leaveId } });
 
     res.json({ message: "Leave and associated files deleted successfully" });
   } catch (error) {
-    console.error("Error deleting leave:", error);
+    console.error("Delete leave error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -926,24 +949,23 @@ router.post(
       const count = await cleanupOrphanedFiles();
       res.json({ message: `Cleaned up ${count} orphaned files` });
     } catch (error) {
-      console.error("Error in manual cleanup:", error);
+      console.error("Manual cleanup error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
 );
 
-// Get temporary/unattached files for user (optional - for UI to show what's available)
+// Get temporary/unattached files for user
 router.get("/temporary-files", authenticateToken, async (req, res) => {
   try {
     const files = await prisma.file.findMany({
       where: { leaveId: null },
       orderBy: { uploadedAt: "desc" },
-      take: 50, // Limit to prevent performance issues
+      take: 50,
     });
-
     res.json(files);
   } catch (error) {
-    console.error("Error fetching temporary files:", error);
+    console.error("Get temporary files error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
