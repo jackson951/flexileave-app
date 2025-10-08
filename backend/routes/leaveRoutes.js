@@ -341,7 +341,7 @@ router.post(
         where: {
           userId: req.user.userId,
           AND: [{ startDate: { lte: end } }, { endDate: { gte: start } }],
-          status: { not: "rejected" },
+          status: { notIn: ["rejected", "cancelled"] },
         },
       });
 
