@@ -116,33 +116,85 @@ const DatesAndDocumentsStep = () => {
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
+
+    // Validate total file count
     if (files.length + formData.supportingDocs.length > 5) {
       setFileUploadError("You can upload a maximum of 5 files");
+      e.target.value = ""; // Reset file input
       return;
     }
+
+    // Validate file sizes
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const invalidFiles = files.filter((file) => file.size > maxSize);
+    if (invalidFiles.length > 0) {
+      setFileUploadError(
+        `Some files exceed the 10MB limit: ${invalidFiles
+          .map((f) => f.name)
+          .join(", ")}`
+      );
+      e.target.value = ""; // Reset file input
+      return;
+    }
+
+    // Validate file types
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+    ];
+    const invalidTypes = files.filter(
+      (file) => !allowedTypes.includes(file.type)
+    );
+    if (invalidTypes.length > 0) {
+      setFileUploadError(
+        `Invalid file types: ${invalidTypes.map((f) => f.name).join(", ")}`
+      );
+      e.target.value = ""; // Reset file input
+      return;
+    }
+
     setFileUploading(true);
     setFileUploadError("");
+
     try {
       const uploadFormData = new FormData();
-      files.forEach((file) => uploadFormData.append("files", file));
-      const response = await ApiService.post("/leaves/upload", uploadFormData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      files.forEach((file) => {
+        uploadFormData.append("files", file);
       });
+
+      const response = await ApiService.post("/leaves/upload", uploadFormData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
       setFormData((prev) => ({
         ...prev,
         supportingDocs: [...prev.supportingDocs, ...response.data],
       }));
+
+      // Clear any previous errors
+      setFileUploadError("");
     } catch (err) {
-      setFileUploadError(
+      console.error("File upload error:", err);
+      const errorMessage =
         err.response?.data?.message ||
-          "Failed to upload files. Please check file size (max 10MB) and type (PDF, DOC, JPG, PNG)."
-      );
+        err.message ||
+        "Failed to upload files. Please check file size (max 10MB) and type.";
+      setFileUploadError(errorMessage);
     } finally {
       setFileUploading(false);
+      e.target.value = ""; // Reset file input
     }
   };
 
   const removeFile = async (fileId) => {
+    setFileDeleteError("");
     try {
       await ApiService.delete(`/leaves/file/${fileId}`);
       setFormData((prev) => ({
@@ -151,12 +203,13 @@ const DatesAndDocumentsStep = () => {
           (file) => file.id !== fileId
         ),
       }));
-      setFileDeleteError("");
     } catch (err) {
-      setFileDeleteError(
+      console.error("File delete error:", err);
+      const errorMessage =
         err.response?.data?.message ||
-          "Failed to delete file. It may be attached to another request."
-      );
+        err.message ||
+        "Failed to delete file. Please try again.";
+      setFileDeleteError(errorMessage);
     }
   };
 
@@ -304,7 +357,7 @@ const DatesAndDocumentsStep = () => {
             <div className="flex text-sm text-gray-600 justify-center flex-wrap">
               <label
                 htmlFor="file-upload"
-                className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500"
+                className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
               >
                 <span>Upload files</span>
                 <input
@@ -313,8 +366,10 @@ const DatesAndDocumentsStep = () => {
                   multiple
                   className="sr-only"
                   onChange={handleFileChange}
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  disabled={fileUploading}
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
+                  disabled={
+                    fileUploading || formData.supportingDocs.length >= 5
+                  }
                 />
               </label>
               <p className="pl-1">or drag and drop</p>
@@ -323,9 +378,9 @@ const DatesAndDocumentsStep = () => {
               PDF, DOC, JPG, PNG up to 10MB (max 5 files)
             </p>
             {fileUploading && (
-              <div className="flex items-center justify-center">
+              <div className="flex items-center justify-center mt-2">
                 <svg
-                  className="animate-spin h-4 w-4 mr-2 text-indigo-500"
+                  className="animate-spin h-5 w-5 mr-2 text-indigo-600"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -344,38 +399,61 @@ const DatesAndDocumentsStep = () => {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                <p className="text-xs text-indigo-500">Uploading...</p>
+                <p className="text-sm text-indigo-600 font-medium">
+                  Uploading to cloud...
+                </p>
               </div>
             )}
           </div>
         </div>
+
+        {/* Upload Error Message */}
+        {fileUploadError && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2 flex-shrink-0" />
+              <p className="text-sm text-red-700">{fileUploadError}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Error Message */}
+        {fileDeleteError && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2 flex-shrink-0" />
+              <p className="text-sm text-red-700">{fileDeleteError}</p>
+            </div>
+          </div>
+        )}
 
         {formData.supportingDocs.length > 0 && (
           <div className="mt-6">
             <h3 className="text-sm font-medium text-gray-700 mb-3">
               Uploaded Documents ({formData.supportingDocs.length}/5)
             </h3>
-            <ul className="border border-gray-200 rounded-md divide-y divide-gray-200 bg-gray-50">
+            <ul className="border border-gray-200 rounded-md divide-y divide-gray-200 bg-white shadow-sm">
               {formData.supportingDocs.map((file) => (
                 <li
                   key={file.id}
-                  className="pl-3 pr-3 py-3 flex items-center justify-between text-sm hover:bg-gray-100"
+                  className="pl-3 pr-3 py-3 flex items-center justify-between text-sm hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center flex-1 min-w-0">
-                    <DocumentTextIcon className="flex-shrink-0 h-5 w-5 text-gray-400 mr-3" />
+                    <DocumentTextIcon className="flex-shrink-0 h-5 w-5 text-indigo-500 mr-3" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {file.name}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {(file.size / (1024 * 1024)).toFixed(2)} MB
+                        {(file.size / (1024 * 1024)).toFixed(2)} MB • Stored in
+                        cloud
                       </p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => removeFile(file.id)}
-                    className="ml-2 flex-shrink-0 inline-flex items-center p-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700"
+                    className="ml-4 flex-shrink-0 inline-flex items-center p-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                     title="Remove this file"
                   >
                     <XMarkIcon className="h-4 w-4" />
@@ -385,13 +463,25 @@ const DatesAndDocumentsStep = () => {
             </ul>
           </div>
         )}
+
+        {formData.supportingDocs.length >= 5 && (
+          <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+            <div className="flex">
+              <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0" />
+              <p className="text-sm text-yellow-700">
+                Maximum file limit reached (5/5). Remove a file to upload
+                another.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between pt-6">
         <button
           type="button"
           onClick={() => setStep(1)}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
         >
           <svg
             className="-ml-1 mr-2 h-5 w-5 text-gray-500"
@@ -412,7 +502,7 @@ const DatesAndDocumentsStep = () => {
           type="button"
           onClick={handleNext}
           disabled={!startDate || !endDate || calculateDays() < 1}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Next
           <svg
