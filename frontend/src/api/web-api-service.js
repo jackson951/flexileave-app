@@ -1,4 +1,3 @@
-// src/services/api.js
 import axios from "axios";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -12,67 +11,19 @@ const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
 export const ApiService = axios.create({
   baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
-  withCredentials: true, // allows cookies (refresh token)
+  withCredentials: true, // allows cookies (both access and refresh tokens)
 });
-
-// Helper: Decode JWT to check expiration
-const decodeJwt = (token) => {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    return null;
-  }
-};
-
-// Helper: Check if token is expired
-const isTokenExpired = (token) => {
-  if (!token) return true;
-  const decoded = decodeJwt(token);
-  if (!decoded || !decoded.exp) return true;
-  const currentTime = Date.now() / 1000;
-  return decoded.exp < currentTime;
-};
-
-// Helper: Get token from storage (localStorage first, then sessionStorage)
-const getAuthToken = () => {
-  return (
-    localStorage.getItem("authToken") || sessionStorage.getItem("authToken")
-  );
-};
-
-// Helper: Clear all auth tokens
-const clearAuthTokens = () => {
-  localStorage.removeItem("authToken");
-  sessionStorage.removeItem("authToken");
-};
 
 // Custom hook to set up interceptors
 export const useApiInterceptors = () => {
-  const { logout, login } = useAuth(); // assuming logout clears user state
+  const { logout, login } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // ✅ REQUEST INTERCEPTOR — Attach token only if valid
+    // ✅ REQUEST INTERCEPTOR — No need to manually attach token, it's in cookies
     const requestInterceptor = ApiService.interceptors.request.use(
       (config) => {
-        const token = getAuthToken();
-
-        // Only attach token if it exists and is NOT expired
-        if (token && !isTokenExpired(token)) {
-          config.headers.Authorization = `Bearer ${token}`;
-        } else {
-          // If expired, don't attach — will trigger 401 → refresh flow
-          delete config.headers.Authorization;
-        }
-
+        // Cookies are automatically sent with withCredentials: true
         return config;
       },
       (error) => {
@@ -90,38 +41,31 @@ export const useApiInterceptors = () => {
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
-          !originalRequest.url.includes("/auth/refresh") // avoid refresh loop
+          !originalRequest.url.includes("/auth/refresh") &&
+          !originalRequest.url.includes("/auth/login") &&
+          !originalRequest.url.includes("/auth/logout")
         ) {
           originalRequest._retry = true;
 
           try {
-            // Attempt to refresh the token
-            const { data } = await axios.post(
-              `${BASE_URL}/auth/refresh`, // Fixed: added leading slash since BASE_URL no longer has trailing slash
+            // Attempt to refresh the tokens
+            const refreshResponse = await ApiService.post(
+              "/auth/refresh",
               {},
-              { withCredentials: true } // Send refresh token cookie
+              {
+                withCredentials: true,
+              }
             );
 
-            const newAccessToken = data.token;
-
-            if (!newAccessToken) {
-              throw new Error("No token returned from refresh");
+            if (refreshResponse.status === 200) {
+              // Tokens refreshed successfully, retry original request
+              return ApiService(originalRequest);
             }
-
-            // Save new token to localStorage
-            localStorage.setItem("authToken", newAccessToken);
-
-            // Update the original request header
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-
-            // Retry the original request
-            return ApiService(originalRequest);
           } catch (refreshError) {
             console.error("Token refresh failed:", refreshError);
 
-            // Clear tokens and force logout
-            clearAuthTokens();
-            logout(); // update context state
+            // Clear local state and force logout
+            logout();
 
             // Notify user
             toast.error("Session expired. Please log in again.", {
@@ -130,17 +74,28 @@ export const useApiInterceptors = () => {
               theme: "colored",
             });
 
-            // Redirect to login — use setTimeout to avoid React state update on unmounted component
+            // Redirect to login
             setTimeout(() => {
               navigate("/login", { replace: true });
             }, 100);
 
-            // Reject original error so UI can handle it (optional)
-            return Promise.reject(error);
+            return Promise.reject(refreshError);
           }
         }
 
-        // For non-401 errors or already retried, just reject
+        // Handle other errors
+        if (error.response?.status === 403) {
+          toast.error("Access forbidden. Please log in again.", {
+            position: "top-right",
+            autoClose: 3000,
+            theme: "colored",
+          });
+          logout();
+          setTimeout(() => {
+            navigate("/login", { replace: true });
+          }, 100);
+        }
+
         return Promise.reject(error);
       }
     );
@@ -155,17 +110,14 @@ export const useApiInterceptors = () => {
   return ApiService;
 };
 
-// Optional: Export a logout utility that also clears API state
+// Optional: Export a logout utility
 export const logoutUser = async () => {
   try {
-    // Optional: Call backend logout to invalidate refresh token
     await ApiService.post("/auth/logout", {}, { withCredentials: true });
   } catch (err) {
     console.warn("Logout API call failed, proceeding with local logout");
-  } finally {
-    clearAuthTokens();
   }
 };
 
-// Optional: Re-export for direct use
+// Re-export for direct use
 export default ApiService;

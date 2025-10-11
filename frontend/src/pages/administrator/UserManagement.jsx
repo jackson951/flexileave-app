@@ -30,10 +30,8 @@ const LEAVE_TYPES = [
 ];
 
 const UserManagement = () => {
-  const { user } = useAuth();
-  const [token, setToken] = useState(
-    localStorage.getItem("authToken") || sessionStorage.getItem("authToken")
-  );
+  const { user, isLoggedIn } = useAuth();
+
   useApiInterceptors();
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
@@ -106,12 +104,12 @@ const UserManagement = () => {
 
   // Load employees on component mount
   useEffect(() => {
-    if (token) {
+    if (isLoggedIn) {
       fetchEmployees();
     } else {
       setError("Authentication required. Please log in.");
     }
-  }, [token]);
+  }, [isLoggedIn]);
 
   // Filter employees based on search term and department
   useEffect(() => {
