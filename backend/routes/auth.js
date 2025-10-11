@@ -176,8 +176,49 @@ function authenticateToken(req, res, next) {
 }
 
 // -------------------- VERIFY --------------------
-router.get("/verify", authenticateToken, (req, res) => {
-  res.json({ valid: true, user: req.user });
+// -------------------- VERIFY --------------------
+router.get("/verify", authenticateToken, async (req, res) => {
+  try {
+    // Get fresh user data from database including leaveBalances
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        department: true,
+        position: true,
+        joinDate: true,
+        leaveBalances: true, // Make sure this is included
+        role: true,
+        avatar: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ valid: false, message: "User not found" });
+    }
+
+    res.json({
+      valid: true,
+      user: {
+        ...user,
+        // Ensure leaveBalances has all required fields with defaults
+        leaveBalances: user.leaveBalances || {
+          AnnualLeave: 0,
+          SickLeave: 0,
+          FamilyResponsibility: 0,
+          UnpaidLeave: 0,
+          Other: 0,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Verify endpoint error:", error);
+    res.status(500).json({ valid: false, message: "Internal server error" });
+  }
 });
 
 module.exports = router;
