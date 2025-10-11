@@ -126,10 +126,17 @@ const ReviewStep = () => {
 
       setIsSubmitted(true);
     } catch (err) {
-      setSubmitError(
-        err.response?.data?.message ||
-          "Failed to submit leave request. Please try again."
-      );
+      console.log("Error submitting leave request:", err);
+
+      const backendErrors = err.response?.data?.errors;
+      if (backendErrors && Array.isArray(backendErrors)) {
+        setSubmitError(backendErrors.map((e) => e.msg).join(", "));
+      } else {
+        setSubmitError(
+          err.response?.data?.message ||
+            "Failed to submit leave request. Please try again."
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
