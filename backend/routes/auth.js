@@ -25,15 +25,12 @@ const getAccessTokenCookieOptions = () => {
   const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "Strict" : "Lax",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   };
-
-  // Add domain in production if needed
   if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
     options.domain = process.env.COOKIE_DOMAIN;
   }
-
   return options;
 };
 
@@ -41,15 +38,12 @@ const getRefreshTokenCookieOptions = () => {
   const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "Strict" : "Lax",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   };
-
-  // Add domain in production if needed
   if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
     options.domain = process.env.COOKIE_DOMAIN;
   }
-
   return options;
 };
 
@@ -74,23 +68,19 @@ router.post("/login", async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // Store refresh token in DB
+    // Store refresh token
     await prisma.user.update({
       where: { id: user.id },
       data: { refreshToken },
     });
 
-    // Set HttpOnly cookies for both tokens
+    // Set cookies
     res.cookie("accessToken", accessToken, getAccessTokenCookieOptions());
     res.cookie("refreshToken", refreshToken, getRefreshTokenCookieOptions());
 
-    // Remove sensitive fields
-    const { password: pwd, refreshToken: rt, ...userData } = user;
-
-    res.json({
-      message: "Login successful",
-      user: userData,
-    });
+    // Return user data
+    const { password: _, refreshToken: __, ...userData } = user;
+    res.json({ message: "Login successful", user: userData });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Internal server error" });
@@ -100,13 +90,11 @@ router.post("/login", async (req, res) => {
 // -------------------- REFRESH TOKEN --------------------
 router.post("/refresh", async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
-
   if (!refreshToken)
     return res.status(401).json({ message: "Refresh token required" });
 
   try {
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
     });
@@ -114,17 +102,14 @@ router.post("/refresh", async (req, res) => {
     if (!user || user.refreshToken !== refreshToken)
       return res.status(403).json({ message: "Invalid refresh token" });
 
-    // Generate new tokens (rotation)
     const newAccessToken = generateAccessToken(user);
     const newRefreshToken = generateRefreshToken(user);
 
-    // Update DB with new refresh token
     await prisma.user.update({
       where: { id: user.id },
       data: { refreshToken: newRefreshToken },
     });
 
-    // Set new cookies
     res.cookie("accessToken", newAccessToken, getAccessTokenCookieOptions());
     res.cookie("refreshToken", newRefreshToken, getRefreshTokenCookieOptions());
 
@@ -147,11 +132,10 @@ router.post("/logout", async (req, res) => {
         data: { refreshToken: null },
       });
     } catch (err) {
-      console.warn("Logout warning: invalid refresh token", err.message);
+      console.warn("Logout warning:", err.message);
     }
   }
 
-  // Clear both cookies
   res.clearCookie("accessToken", getAccessTokenCookieOptions());
   res.clearCookie("refreshToken", getRefreshTokenCookieOptions());
 
@@ -161,25 +145,19 @@ router.post("/logout", async (req, res) => {
 // -------------------- AUTH MIDDLEWARE --------------------
 function authenticateToken(req, res, next) {
   const token = req.cookies.accessToken;
-
-  if (!token) {
-    return res.status(401).json({ message: "Access token required" });
-  }
+  if (!token) return res.status(401).json({ message: "Access token required" });
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
+    if (err)
       return res.status(403).json({ message: "Invalid or expired token" });
-    }
     req.user = user;
     next();
   });
 }
 
 // -------------------- VERIFY --------------------
-// -------------------- VERIFY --------------------
 router.get("/verify", authenticateToken, async (req, res) => {
   try {
-    // Get fresh user data from database including leaveBalances
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
       select: {
@@ -190,22 +168,20 @@ router.get("/verify", authenticateToken, async (req, res) => {
         department: true,
         position: true,
         joinDate: true,
-        leaveBalances: true, // Make sure this is included
+        leaveBalances: true,
         role: true,
         avatar: true,
         createdAt: true,
       },
     });
 
-    if (!user) {
+    if (!user)
       return res.status(404).json({ valid: false, message: "User not found" });
-    }
 
     res.json({
       valid: true,
       user: {
         ...user,
-        // Ensure leaveBalances has all required fields with defaults
         leaveBalances: user.leaveBalances || {
           AnnualLeave: 0,
           SickLeave: 0,
@@ -215,8 +191,8 @@ router.get("/verify", authenticateToken, async (req, res) => {
         },
       },
     });
-  } catch (error) {
-    console.error("Verify endpoint error:", error);
+  } catch (err) {
+    console.error("Verify endpoint error:", err);
     res.status(500).json({ valid: false, message: "Internal server error" });
   }
 });

@@ -12,22 +12,17 @@ const prisma = new PrismaClient();
 // ------------------- CORS Setup -------------------
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) {
-      return callback(null, true);
-    }
+    if (!origin) return callback(null, true); // Allow Postman, mobile, etc.
 
-    // Allow localhost for development
-    if (origin.includes("localhost")) {
-      return callback(null, true);
-    }
+    // Localhost (development)
+    if (origin.includes("localhost")) return callback(null, true);
 
-    // Allow your main Vercel domain
+    // Main Vercel domain
     if (origin === "https://digititan-leave-app.vercel.app") {
       return callback(null, true);
     }
 
-    // Allow all Vercel preview deployments for your project
+    // Vercel preview deployments
     if (
       origin.includes("digititan-leave") &&
       origin.includes("jackson951s-projects.vercel.app")
@@ -35,12 +30,12 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // Reject all other origins
-    callback(new Error("Not allowed by CORS"));
+    // Otherwise block
+    return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  allowedHeaders: "Content-Type,Authorization",
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
@@ -67,7 +62,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/notifications", notificationRoutes);
 
-// Health check endpoint
+// Health check
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     message: "Server is running",
@@ -75,7 +70,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ------------------- React SPA fallback -------------------
+// ------------------- React SPA Fallback -------------------
 app.get(/^(?!\/api).*/, (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/dist", "index.html"));
 });
