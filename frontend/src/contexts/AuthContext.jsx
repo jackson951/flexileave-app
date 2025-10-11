@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState(safeParseUser(localStorage.getItem("user")));
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
@@ -42,17 +42,14 @@ export const AuthProvider = ({ children }) => {
           // Update user data from verify endpoint
           const userData = response.data.user;
           setUser(userData);
-          localStorage.setItem("user", JSON.stringify(userData));
         } else {
           setIsLoggedIn(false);
           setUser(null);
-          localStorage.removeItem("user");
         }
       } catch (error) {
         console.error("Auth check failed:", error);
         setIsLoggedIn(false);
         setUser(null);
-        localStorage.removeItem("user");
       } finally {
         setLoading(false);
       }
@@ -65,9 +62,6 @@ export const AuthProvider = ({ children }) => {
   const login = async ({ userData, rememberMe = false }) => {
     setUser(userData);
     setIsLoggedIn(true);
-
-    // Store user data in localStorage
-    localStorage.setItem("user", JSON.stringify(userData));
   };
 
   // -------------------- LOGOUT --------------------
@@ -82,8 +76,6 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setUser(null);
       setIsLoggedIn(false);
-      localStorage.removeItem("user");
-
       setLogoutLoading(false);
       navigate("/login");
     }
@@ -97,7 +89,6 @@ export const AuthProvider = ({ children }) => {
     const updatedUser = response.data;
 
     setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
 
     return updatedUser;
   };
