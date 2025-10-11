@@ -8,13 +8,16 @@ const { body, validationResult } = require("express-validator");
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+  const token = req.cookies.accessToken;
 
-  if (!token) return res.sendStatus(401); // Unauthorized
+  if (!token) {
+    return res.status(401).json({ message: "Access token required" });
+  }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403); // Forbidden
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
     req.user = user;
     next();
   });
@@ -332,7 +335,9 @@ router.get("/admins/list", authenticateToken, async (req, res) => {
     res.json(admins);
   } catch (error) {
     console.error("Error fetching admins:", error);
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 });
 
