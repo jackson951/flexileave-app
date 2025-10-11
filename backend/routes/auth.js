@@ -10,34 +10,47 @@ const generateAccessToken = (user) => {
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role, name: user.name },
     process.env.JWT_SECRET,
-    { expiresIn: "24h" } // short-lived access token
+    { expiresIn: "24h" }
   );
 };
 
 const generateRefreshToken = (user) => {
   return jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: "7d", // refresh token lasts 7 days
+    expiresIn: "7d",
   });
 };
 
 // -------------------- COOKIE OPTIONS --------------------
-const getCookieOptions = () => {
-  if (process.env.NODE_ENV === "production") {
-    return {
-      httpOnly: true,
-      secure: true, // only HTTPS
-      sameSite: "Strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    };
-  } else {
-    // Development (localhost)
-    return {
-      httpOnly: true,
-      secure: false, // allow HTTP
-      sameSite: "Lax", // allow cross-port requests
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    };
+const getAccessTokenCookieOptions = () => {
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "Strict" : "Lax",
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  };
+
+  // Add domain in production if needed
+  if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
+    options.domain = process.env.COOKIE_DOMAIN;
   }
+
+  return options;
+};
+
+const getRefreshTokenCookieOptions = () => {
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "Strict" : "Lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  };
+
+  // Add domain in production if needed
+  if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
+    options.domain = process.env.COOKIE_DOMAIN;
+  }
+
+  return options;
 };
 
 // -------------------- LOGIN --------------------
@@ -67,15 +80,15 @@ router.post("/login", async (req, res) => {
       data: { refreshToken },
     });
 
-    // Set HttpOnly refresh cookie
-    res.cookie("refreshToken", refreshToken, getCookieOptions());
+    // Set HttpOnly cookies for both tokens
+    res.cookie("accessToken", accessToken, getAccessTokenCookieOptions());
+    res.cookie("refreshToken", refreshToken, getRefreshTokenCookieOptions());
 
     // Remove sensitive fields
     const { password: pwd, refreshToken: rt, ...userData } = user;
 
     res.json({
       message: "Login successful",
-      token: accessToken,
       user: userData,
     });
   } catch (err) {
@@ -111,10 +124,11 @@ router.post("/refresh", async (req, res) => {
       data: { refreshToken: newRefreshToken },
     });
 
-    // Set new refresh cookie
-    res.cookie("refreshToken", newRefreshToken, getCookieOptions());
+    // Set new cookies
+    res.cookie("accessToken", newAccessToken, getAccessTokenCookieOptions());
+    res.cookie("refreshToken", newRefreshToken, getRefreshTokenCookieOptions());
 
-    res.json({ token: newAccessToken });
+    res.json({ message: "Tokens refreshed successfully" });
   } catch (err) {
     console.error("Refresh error:", err);
     res.status(403).json({ message: "Invalid or expired refresh token" });
@@ -137,27 +151,74 @@ router.post("/logout", async (req, res) => {
     }
   }
 
-  // Clear cookie
-  res.clearCookie("refreshToken", getCookieOptions());
+  // Clear both cookies
+  res.clearCookie("accessToken", getAccessTokenCookieOptions());
+  res.clearCookie("refreshToken", getRefreshTokenCookieOptions());
+
   res.json({ message: "Logged out successfully" });
 });
 
 // -------------------- AUTH MIDDLEWARE --------------------
 function authenticateToken(req, res, next) {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Access token required" });
+  const token = req.cookies.accessToken;
+
+  if (!token) {
+    return res.status(401).json({ message: "Access token required" });
+  }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err)
+    if (err) {
       return res.status(403).json({ message: "Invalid or expired token" });
+    }
     req.user = user;
     next();
   });
 }
 
 // -------------------- VERIFY --------------------
-router.get("/verify", authenticateToken, (req, res) => {
-  res.json({ valid: true, user: req.user });
+// -------------------- VERIFY --------------------
+router.get("/verify", authenticateToken, async (req, res) => {
+  try {
+    // Get fresh user data from database including leaveBalances
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        department: true,
+        position: true,
+        joinDate: true,
+        leaveBalances: true, // Make sure this is included
+        role: true,
+        avatar: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ valid: false, message: "User not found" });
+    }
+
+    res.json({
+      valid: true,
+      user: {
+        ...user,
+        // Ensure leaveBalances has all required fields with defaults
+        leaveBalances: user.leaveBalances || {
+          AnnualLeave: 0,
+          SickLeave: 0,
+          FamilyResponsibility: 0,
+          UnpaidLeave: 0,
+          Other: 0,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Verify endpoint error:", error);
+    res.status(500).json({ valid: false, message: "Internal server error" });
+  }
 });
 
 module.exports = router;

@@ -1,4 +1,3 @@
-// src/contexts/AuthContext.js
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { ApiService } from "../api/web-api-service";
 import { useNavigate } from "react-router-dom";
@@ -26,32 +25,43 @@ export const AuthProvider = ({ children }) => {
   };
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authToken, setAuthToken] = useState(
-    localStorage.getItem("authToken") || sessionStorage.getItem("authToken")
-  );
-  const [user, setUser] = useState(safeParseUser(localStorage.getItem("user")));
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  // -------------------- INITIAL LOAD --------------------
+  // -------------------- INITIAL AUTH CHECK --------------------
   useEffect(() => {
-    if (authToken) setIsLoggedIn(true);
-    setLoading(false);
-  }, [authToken]);
+    const checkAuthStatus = async () => {
+      try {
+        const response = await ApiService.get("/auth/verify", {
+          withCredentials: true,
+        });
+
+        if (response.data.valid) {
+          setIsLoggedIn(true);
+          // Update user data from verify endpoint
+          const userData = response.data.user;
+          setUser(userData);
+        } else {
+          setIsLoggedIn(false);
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        setIsLoggedIn(false);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuthStatus();
+  }, []);
 
   // -------------------- LOGIN --------------------
-  const login = async ({ token, userData, rememberMe = false }) => {
-    setAuthToken(token);
+  const login = async ({ userData, rememberMe = false }) => {
     setUser(userData);
     setIsLoggedIn(true);
-
-    if (rememberMe) {
-      localStorage.setItem("authToken", token);
-      localStorage.setItem("user", JSON.stringify(userData));
-    } else {
-      localStorage.setItem("authToken", token); // keep token always
-      localStorage.setItem("user", JSON.stringify(userData)); // keep user always
-    }
   };
 
   // -------------------- LOGOUT --------------------
@@ -59,19 +69,13 @@ export const AuthProvider = ({ children }) => {
     setLogoutLoading(true);
 
     try {
-      // Call backend logout (clears refresh token + cookie)
+      // Call backend logout (clears cookies + refresh token)
       await ApiService.post("/auth/logout", {}, { withCredentials: true });
     } catch (err) {
       console.warn("Logout request failed:", err.message);
     } finally {
-      setAuthToken(null);
       setUser(null);
       setIsLoggedIn(false);
-
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("user");
-      sessionStorage.removeItem("authToken");
-
       setLogoutLoading(false);
       navigate("/login");
     }
@@ -79,13 +83,12 @@ export const AuthProvider = ({ children }) => {
 
   // -------------------- UPDATE PROFILE --------------------
   const updateUserProfile = async (id, updatedData) => {
-    if (!authToken) throw new Error("No auth token found");
-
-    const response = await ApiService.put(`/users/${id}`, updatedData);
+    const response = await ApiService.put(`/users/${id}`, updatedData, {
+      withCredentials: true,
+    });
     const updatedUser = response.data;
 
     setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
 
     return updatedUser;
   };
@@ -93,14 +96,12 @@ export const AuthProvider = ({ children }) => {
   // -------------------- PROVIDER VALUE --------------------
   const value = {
     isLoggedIn,
-    authToken,
     user,
     loading,
     logoutLoading,
     login,
     logout,
     updateUserProfile,
-    setAuthToken,
   };
 
   return (
