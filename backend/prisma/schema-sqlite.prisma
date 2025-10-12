@@ -1,0 +1,94 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client-sqlite"
+}
+
+
+odel User {
+  id                     Int            @id @default(autoincrement())
+  name                   String
+  email                  String         @unique
+  phone                  String?
+  department             String?
+  position               String?
+  joinDate               DateTime
+  leaveBalances          Json
+  role                   String
+  avatar                 String?
+  password               String
+  createdAt              DateTime       @default(now())
+  refreshToken           String?
+  actionedLeaves         Leave[]        @relation("LeaveActionedBy")
+  leaves                 Leave[]
+  notificationsReceived  Notification[] @relation("NotificationRecipient")
+  notificationsTriggered Notification[] @relation("NotificationTriggeredBy")
+
+  @@map("users")
+}
+
+model Leave {
+  id               Int            @id @default(autoincrement())
+  leaveType        String
+  startDate        DateTime
+  endDate          DateTime
+  days             Int
+  reason           String
+  status           String         @default("pending")
+  submittedAt      DateTime       @default(now())
+  rejectionReason  String?
+  emergencyContact String?
+  emergencyPhone   String?
+  userId           Int
+  actionedBy       Int?
+  attachments      File[]
+  actionedByUser   User?          @relation("LeaveActionedBy", fields: [actionedBy], references: [id])
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications    Notification[]
+
+  @@map("leaves")
+}
+
+model File {
+  id         Int      @id @default(autoincrement())
+  name       String
+  url        String
+  size       Int
+  type       String
+  uploadedAt DateTime @default(now())
+  leaveId    Int?
+  leave      Leave?   @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+
+  @@map("files")
+}
+
+model Notification {
+  id            Int              @id @default(autoincrement())
+  type          NotificationType
+  title         String
+  message       String
+  isRead        Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+  recipientId   Int
+  triggeredById Int?
+  leaveId       Int?
+  metadata      Json?
+  leave         Leave?           @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  recipient     User             @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  triggeredBy   User?            @relation("NotificationTriggeredBy", fields: [triggeredById], references: [id])
+
+  @@index([recipientId, isRead])
+  @@index([recipientId, createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  leave_submitted
+  leave_approved
+  leave_rejected
+  system
+}
