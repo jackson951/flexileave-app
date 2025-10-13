@@ -1,66 +1,52 @@
-datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
-}
-
 generator client {
   provider = "prisma-client-js"
 }
 
-enum NotificationType {
-  leave_submitted
-  leave_approved
-  leave_rejected
-  system
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  name          String
-  email         String   @unique
-  phone         String?
-  department    String?
-  position      String?
-  joinDate      DateTime
-  leaveBalances Json
-  role          String   // "admin" or "employee"
-  avatar        String?
-  password      String
-  createdAt     DateTime @default(now())
-  refreshToken  String?
-
-  // Relations
-  leaves                 Leave[]                     // leaves submitted by this user
-  actionedLeaves         Leave[]                     @relation("LeaveActionedBy") // leaves this user actioned (approved/rejected)
-  notificationsReceived  Notification[]              @relation("NotificationRecipient")
-  notificationsTriggered Notification[]              @relation("NotificationTriggeredBy")
+  id                     Int            @id @default(autoincrement())
+  name                   String
+  email                  String         @unique
+  phone                  String?
+  department             String?
+  position               String?
+  joinDate               DateTime
+  leaveBalances          Json
+  role                   String
+  avatar                 String?
+  password               String
+  createdAt              DateTime       @default(now())
+  refreshToken           String?
+  actionedLeaves         Leave[]        @relation("LeaveActionedBy")
+  leaves                 Leave[]
+  notificationsReceived  Notification[] @relation("NotificationRecipient")
+  notificationsTriggered Notification[] @relation("NotificationTriggeredBy")
 
   @@map("users")
 }
 
 model Leave {
-  id               Int      @id @default(autoincrement())
+  id               Int            @id @default(autoincrement())
   leaveType        String
   startDate        DateTime
   endDate          DateTime
   days             Int
   reason           String
-  status           String   @default("pending") // "pending", "approved", "rejected"
-  submittedAt      DateTime @default(now())
+  status           String         @default("pending")
+  submittedAt      DateTime       @default(now())
   rejectionReason  String?
   emergencyContact String?
   emergencyPhone   String?
-
-  // Who submitted the leave
-  userId Int
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Who actioned the leave
-  actionedBy     Int?
-  actionedByUser User? @relation("LeaveActionedBy", fields: [actionedBy], references: [id])
-
-  attachments   File[]
-  notifications Notification[] // notifications related to this leave
+  userId           Int
+  actionedBy       Int?
+  attachments      File[]
+  actionedByUser   User?          @relation("LeaveActionedBy", fields: [actionedBy], references: [id])
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications    Notification[]
 
   @@map("leaves")
 }
@@ -72,37 +58,35 @@ model File {
   size       Int
   type       String
   uploadedAt DateTime @default(now())
-
-  leaveId Int?
-  leave   Leave? @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  leaveId    Int?
+  leave      Leave?   @relation(fields: [leaveId], references: [id], onDelete: Cascade)
 
   @@map("files")
 }
 
 model Notification {
-  id        Int              @id @default(autoincrement())
-  type      NotificationType
-  title     String
-  message   String
-  isRead    Boolean          @default(false)
-  createdAt DateTime         @default(now())
-
-  // Who receives this notification
-  recipientId Int
-  recipient   User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
-
-  // Who triggered this notification (optional - for leave actions)
+  id            Int              @id @default(autoincrement())
+  type          NotificationType
+  title         String
+  message       String
+  isRead        Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+  recipientId   Int
   triggeredById Int?
-  triggeredBy   User? @relation("NotificationTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+  leaveId       Int?
+  metadata      Json?
+  leave         Leave?           @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  recipient     User             @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  triggeredBy   User?            @relation("NotificationTriggeredBy", fields: [triggeredById], references: [id])
 
-  // Related leave (optional - if notification is leave-related)
-  leaveId Int?
-  leave   Leave? @relation(fields: [leaveId], references: [id], onDelete: Cascade)
-
-  // Additional metadata stored as JSON
-  metadata Json?
-
-  @@index([recipientId, isRead])     // fast unread queries
-  @@index([recipientId, createdAt])  // fast recent queries
+  @@index([recipientId, isRead])
+  @@index([recipientId, createdAt])
   @@map("notifications")
+}
+
+enum NotificationType {
+  leave_submitted
+  leave_approved
+  leave_rejected
+  system
 }
