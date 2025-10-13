@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
@@ -36,46 +37,130 @@ const validateNotificationInput = (req, res, next) => {
   next();
 };
 
+// -------------------- SWAGGER DOCUMENTATION -------------------- //
+
+/**
+ * @swagger
+ * tags:
+ *   name: Notifications
+ *   description: Notification management API
+ * components:
+ *   schemas:
+ *     Notification:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         recipientId:
+ *           type: integer
+ *           example: 2
+ *         title:
+ *           type: string
+ *           example: "Leave Approved"
+ *         message:
+ *           type: string
+ *           example: "Your annual leave request has been approved."
+ *         type:
+ *           type: string
+ *           enum: [leave_submitted, leave_approved, leave_rejected, system]
+ *           example: leave_approved
+ *         isRead:
+ *           type: boolean
+ *           example: false
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           example: "2023-12-01T10:00:00Z"
+ *         leave:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             id:
+ *               type: integer
+ *               example: 1
+ *             leaveType:
+ *               type: string
+ *               example: "AnnualLeave"
+ *             startDate:
+ *               type: string
+ *               format: date
+ *               example: "2023-12-05"
+ *             endDate:
+ *               type: string
+ *               format: date
+ *               example: "2023-12-10"
+ *             user:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 1
+ *                 name:
+ *                   type: string
+ *                   example: "John Doe"
+ *                 email:
+ *                   type: string
+ *                   example: "john@example.com"
+ *                 avatar:
+ *                   type: string
+ *                   example: "https://example.com/avatar.jpg"
+ *         triggeredBy:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             id:
+ *               type: integer
+ *               example: 1
+ *             name:
+ *               type: string
+ *               example: "Admin User"
+ *             avatar:
+ *               type: string
+ *               example: "https://example.com/admin-avatar.jpg"
+ *         recipient:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *               example: 2
+ *             name:
+ *               type: string
+ *               example: "Jane Doe"
+ *             email:
+ *               type: string
+ *               example: "jane@example.com"
+ */
+
 // -------------------- ROUTES -------------------- //
 
 /**
  * @swagger
- * /notifications:
- *   post:
- *     summary: Create a notification (Admin/Manager only)
+ * /api/notifications:
+ *   get:
+ *     summary: Get all notifications for current user
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - userId
- *               - title
- *               - message
- *               - type
- *             properties:
- *               userId:
- *                 type: integer
- *               title:
- *                 type: string
- *               message:
- *                 type: string
- *               type:
- *                 type: string
- *                 enum: [leave_submitted, leave_approved, leave_rejected, system]
- *               leaveId:
- *                 type: integer
+ *       - cookieAuth: []
  *     responses:
- *       201:
- *         description: Notification created successfully
- *       400:
- *         description: Missing required fields
+ *       200:
+ *         description: List of notifications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Notification'
+ *       401:
+ *         description: Access token required
  *       403:
- *         description: Forbidden - Admin/Manager access required
+ *         description: Invalid or expired token
  *       500:
  *         description: Internal server error
  */
@@ -138,17 +223,33 @@ router.get("/", authenticateToken, async (req, res) => {
 
 /**
  * @swagger
- * /notifications/unread-count:
+ * /api/notifications/unread-count:
  *   get:
  *     summary: Get count of unread notifications
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - cookieAuth: []
  *     responses:
  *       200:
  *         description: Count of unread notifications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     count:
+ *                       type: integer
+ *                       example: 3
  *       401:
- *         description: Unauthorized - Missing or invalid token
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token
  *       500:
  *         description: Internal server error
  */
@@ -177,26 +278,38 @@ router.get("/unread-count", authenticateToken, async (req, res) => {
 
 /**
  * @swagger
- * /notifications/{id}/read:
+ * /api/notifications/{id}/read:
  *   put:
  *     summary: Mark a notification as read
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - cookieAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
  *         schema:
  *           type: integer
- *         required: true
  *         description: Notification ID
  *     responses:
  *       200:
  *         description: Notification marked as read
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Notification'
  *       400:
  *         description: Invalid notification ID
+ *       401:
+ *         description: Access token required
  *       403:
- *         description: Unauthorized access
+ *         description: Unauthorized access or invalid token
  *       404:
  *         description: Notification not found
  *       500:
@@ -252,15 +365,36 @@ router.put("/:id/read", authenticateToken, async (req, res) => {
 
 /**
  * @swagger
- * /notifications/mark-all-read:
+ * /api/notifications/mark-all-read:
  *   put:
  *     summary: Mark all notifications as read
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - cookieAuth: []
  *     responses:
  *       200:
  *         description: All notifications marked as read
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "5 notification(s) marked as read"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     count:
+ *                       type: integer
+ *                       example: 5
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token
  *       500:
  *         description: Internal server error
  */
@@ -291,24 +425,37 @@ router.put("/mark-all-read", authenticateToken, async (req, res) => {
 
 /**
  * @swagger
- * /notifications/{id}:
+ * /api/notifications/{id}:
  *   delete:
  *     summary: Delete a notification
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - cookieAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
  *         schema:
  *           type: integer
- *         required: true
  *         description: Notification ID
  *     responses:
  *       200:
  *         description: Notification deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Notification deleted successfully"
  *       400:
  *         description: Invalid notification ID
+ *       401:
+ *         description: Access token required
  *       403:
  *         description: Unauthorized access
  *       404:
@@ -365,15 +512,36 @@ router.delete("/:id", authenticateToken, async (req, res) => {
 
 /**
  * @swagger
- * /notifications/read/all:
+ * /api/notifications/read/all:
  *   delete:
  *     summary: Delete all read notifications
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - cookieAuth: []
  *     responses:
  *       200:
  *         description: Read notifications deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "3 read notification(s) deleted successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     count:
+ *                       type: integer
+ *                       example: 3
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token
  *       500:
  *         description: Internal server error
  */
@@ -403,12 +571,12 @@ router.delete("/read/all", authenticateToken, async (req, res) => {
 
 /**
  * @swagger
- * /notifications:
+ * /api/notifications:
  *   post:
  *     summary: Create a notification (Admin/Manager only)
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - cookieAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -417,25 +585,48 @@ router.delete("/read/all", authenticateToken, async (req, res) => {
  *             type: object
  *             required:
  *               - userId
+ *               - title
  *               - message
  *               - type
  *             properties:
  *               userId:
  *                 type: integer
+ *                 example: 2
+ *               title:
+ *                 type: string
+ *                 example: "Leave Approved"
  *               message:
  *                 type: string
+ *                 example: "Your annual leave request has been approved."
  *               type:
  *                 type: string
  *                 enum: [leave_submitted, leave_approved, leave_rejected, system]
+ *                 example: leave_approved
  *               leaveId:
  *                 type: integer
+ *                 example: 1
  *     responses:
  *       201:
  *         description: Notification created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Notification created successfully"
+ *                 data:
+ *                   $ref: '#/components/schemas/Notification'
  *       400:
  *         description: Missing required fields
+ *       401:
+ *         description: Access token required
  *       403:
- *         description: Forbidden - Admin/Manager access required
+ *         description: Admin/Manager access required or invalid token
  *       500:
  *         description: Internal server error
  */
@@ -447,6 +638,7 @@ router.post(
     try {
       const { userId, message, type, leaveId, title } = req.body;
 
+      // Additional check for title (though validator should catch this)
       if (!title) {
         return res.status(400).json({
           success: false,

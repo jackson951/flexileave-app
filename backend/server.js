@@ -4,6 +4,8 @@ const cors = require("cors");
 const path = require("path");
 const cookieParser = require("cookie-parser");
 const { PrismaClient } = require("@prisma/client");
+const swaggerUi = require("swagger-ui-express");
+const swaggerJsdoc = require("swagger-jsdoc");
 
 const app = express();
 const prisma = new PrismaClient();
@@ -11,22 +13,18 @@ const prisma = new PrismaClient();
 // ------------------- CORS Setup -------------------
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://digititan-leave-app.vercel.app", // Main Vercel app
-  "https://digititan-leave-app-production.up.railway.app", // Backend URL
+  "https://digititan-leave-app.vercel.app",
+  "http://localhost:5000", // swagger/testing
+  "https://digititan-leave-app-production.up.railway.app",
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow mobile apps, Postman, etc.
     if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
+    if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error("Not allowed by CORS"));
   },
-  credentials: true, // Important for cookies
+  credentials: true,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
@@ -41,6 +39,29 @@ app.use(cookieParser());
 // ------------------- Serve Static Files -------------------
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+// ------------------- Swagger Setup -------------------
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Digititan Leave App API",
+      version: "1.0.0",
+      description: "API documentation for the Digititan Leave Management App",
+    },
+    servers: [
+      { url: "http://localhost:5000", description: "Local server" },
+      {
+        url: "https://digititan-leave-app-production.up.railway.app",
+        description: "Production server",
+      },
+    ],
+  },
+  apis: ["./routes/*.js"], // your route files
+};
+
+const swaggerSpecs = swaggerJsdoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 // ------------------- Routes -------------------
 const userRoutes = require("./routes/userRoutes");
@@ -88,4 +109,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`✅ Accepting requests from: ${allowedOrigins.join(", ")}`);
+  console.log(`📄 Swagger UI available at http://localhost:${PORT}/api-docs`);
 });

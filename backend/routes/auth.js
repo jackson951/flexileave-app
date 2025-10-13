@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
@@ -26,7 +27,7 @@ const getAccessTokenCookieOptions = () => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 24 * 60 * 60 * 1000,
   };
   if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
     options.domain = process.env.COOKIE_DOMAIN;
@@ -39,7 +40,7 @@ const getRefreshTokenCookieOptions = () => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   };
   if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
     options.domain = process.env.COOKIE_DOMAIN;
@@ -48,6 +49,38 @@ const getRefreshTokenCookieOptions = () => {
 };
 
 // -------------------- LOGIN --------------------
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login a user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: admin@digititan.com
+ *               password:
+ *                 type: string
+ *                 example: Kgaogelo#99
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       400:
+ *         description: Email and password required
+ *       401:
+ *         description: Invalid credentials
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password)
@@ -64,21 +97,17 @@ router.post("/login", async (req, res) => {
     if (!passwordValid)
       return res.status(401).json({ message: "Invalid credentials." });
 
-    // Generate tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // Store refresh token
     await prisma.user.update({
       where: { id: user.id },
       data: { refreshToken },
     });
 
-    // Set cookies
     res.cookie("accessToken", accessToken, getAccessTokenCookieOptions());
     res.cookie("refreshToken", refreshToken, getRefreshTokenCookieOptions());
 
-    // Return user data
     const { password: _, refreshToken: __, ...userData } = user;
     res.json({ message: "Login successful", user: userData });
   } catch (err) {
@@ -88,6 +117,20 @@ router.post("/login", async (req, res) => {
 });
 
 // -------------------- REFRESH TOKEN --------------------
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Refresh access and refresh tokens
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Tokens refreshed successfully
+ *       401:
+ *         description: Refresh token required
+ *       403:
+ *         description: Invalid or expired refresh token
+ */
 router.post("/refresh", async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
   if (!refreshToken)
@@ -121,6 +164,16 @@ router.post("/refresh", async (req, res) => {
 });
 
 // -------------------- LOGOUT --------------------
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout a user
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ */
 router.post("/logout", async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
 
@@ -156,6 +209,20 @@ function authenticateToken(req, res, next) {
 }
 
 // -------------------- VERIFY --------------------
+/**
+ * @swagger
+ * /api/auth/verify:
+ *   get:
+ *     summary: Verify user token and get user info
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Token valid
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/verify", authenticateToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
