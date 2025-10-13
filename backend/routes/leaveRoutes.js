@@ -1,4 +1,5 @@
-﻿const express = require("express");
+﻿require("dotenv").config();
+const express = require("express");
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
@@ -199,9 +200,156 @@ setInterval(async () => {
   }
 }, 60 * 60 * 1000);
 
+// -------------------- SWAGGER DOCUMENTATION -------------------- //
+
+/**
+ * @swagger
+ * tags:
+ *   name: Leaves
+ *   description: Leave management API
+ * components:
+ *   schemas:
+ *     Leave:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         leaveType:
+ *           type: string
+ *           example: AnnualLeave
+ *         startDate:
+ *           type: string
+ *           format: date
+ *           example: "2023-12-01"
+ *         endDate:
+ *           type: string
+ *           format: date
+ *           example: "2023-12-05"
+ *         days:
+ *           type: integer
+ *           example: 5
+ *         reason:
+ *           type: string
+ *           example: "Family vacation"
+ *         emergencyContact:
+ *           type: string
+ *           example: "John Doe"
+ *         emergencyPhone:
+ *           type: string
+ *           example: "+1234567890"
+ *         status:
+ *           type: string
+ *           enum: [pending, approved, rejected, cancelled]
+ *           example: pending
+ *         rejectionReason:
+ *           type: string
+ *           example: null
+ *         submittedAt:
+ *           type: string
+ *           format: date-time
+ *           example: "2023-11-30T10:00:00Z"
+ *         userId:
+ *           type: integer
+ *           example: 1
+ *         actionedBy:
+ *           type: integer
+ *           example: 2
+ *         user:
+ *           $ref: '#/components/schemas/User'
+ *         actionedByUser:
+ *           $ref: '#/components/schemas/User'
+ *         attachments:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/File'
+ *     User:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         name:
+ *           type: string
+ *           example: "John Doe"
+ *         email:
+ *           type: string
+ *           example: "john@example.com"
+ *         department:
+ *           type: string
+ *           example: "Engineering"
+ *         position:
+ *           type: string
+ *           example: "Software Engineer"
+ *         avatar:
+ *           type: string
+ *           example: "https://example.com/avatar.jpg"
+ *     File:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         name:
+ *           type: string
+ *           example: "document.pdf"
+ *         url:
+ *           type: string
+ *           example: "https://res.cloudinary.com/.../document.pdf"
+ *         size:
+ *           type: integer
+ *           example: 102400
+ *         type:
+ *           type: string
+ *           example: "application/pdf"
+ *         uploadedAt:
+ *           type: string
+ *           format: date-time
+ *           example: "2023-11-30T10:00:00Z"
+ */
+
 // -------------------- ROUTES -------------------- //
 
-// Upload files to Cloudinary
+/**
+ * @swagger
+ * /api/leaves/upload:
+ *   post:
+ *     summary: Upload files to Cloudinary
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               files:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *             required:
+ *               - files
+ *     responses:
+ *       201:
+ *         description: Files uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/File'
+ *       400:
+ *         description: No files uploaded or unsupported file type
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token
+ *       500:
+ *         description: Internal server error
+ */
 router.post(
   "/upload",
   authenticateToken,
@@ -223,7 +371,7 @@ router.post(
           const dbFile = await prisma.file.create({
             data: {
               name: file.originalname,
-              url: cloudinaryResult.secure_url, // ✅ ALWAYS use secure_url
+              url: cloudinaryResult.secure_url,
               size: file.size,
               type: file.mimetype,
             },
@@ -250,7 +398,35 @@ router.post(
   }
 );
 
-// Remove a single uploaded file
+/**
+ * @swagger
+ * /api/leaves/file/{fileId}:
+ *   delete:
+ *     summary: Delete a single uploaded file
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: fileId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the file to delete
+ *     responses:
+ *       200:
+ *         description: File deleted successfully
+ *       400:
+ *         description: Invalid file ID
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token
+ *       404:
+ *         description: File not found
+ *       500:
+ *         description: Internal server error
+ */
 router.delete("/file/:fileId", authenticateToken, async (req, res) => {
   try {
     const fileId = parseInt(req.params.fileId);
@@ -277,7 +453,69 @@ router.delete("/file/:fileId", authenticateToken, async (req, res) => {
   }
 });
 
-// Create leave
+/**
+ * @swagger
+ * /api/leaves:
+ *   post:
+ *     summary: Create a new leave request
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - leaveType
+ *               - startDate
+ *               - endDate
+ *               - reason
+ *             properties:
+ *               leaveType:
+ *                 type: string
+ *                 example: AnnualLeave
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2023-12-01"
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2023-12-05"
+ *               reason:
+ *                 type: string
+ *                 example: "Family vacation"
+ *               emergencyContact:
+ *                 type: string
+ *                 example: "John Doe"
+ *               emergencyPhone:
+ *                 type: string
+ *                 example: "+1234567890"
+ *               fileIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [1, 2]
+ *     responses:
+ *       201:
+ *         description: Leave created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Leave'
+ *       400:
+ *         description: Validation error or insufficient leave balance
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
+ */
 router.post(
   "/",
   authenticateToken,
@@ -398,7 +636,44 @@ router.post(
   }
 );
 
-// Get all leaves (admin/manager)
+/**
+ * @swagger
+ * /api/leaves:
+ *   get:
+ *     summary: Get all leaves (admin/manager only)
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, rejected, cancelled]
+ *       - in: query
+ *         name: userId
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: leaveType
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of leaves
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Leave'
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Admin or manager access required
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
   try {
     const { status, userId, leaveType } = req.query;
@@ -442,7 +717,36 @@ router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
   }
 });
 
-// Get my leaves
+/**
+ * @swagger
+ * /api/leaves/my:
+ *   get:
+ *     summary: Get current user's leaves
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, rejected, cancelled]
+ *     responses:
+ *       200:
+ *         description: List of user's leaves
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Leave'
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/my", authenticateToken, async (req, res) => {
   try {
     const { status } = req.query;
@@ -474,7 +778,39 @@ router.get("/my", authenticateToken, async (req, res) => {
   }
 });
 
-// Get leave by ID
+/**
+ * @swagger
+ * /api/leaves/{id}:
+ *   get:
+ *     summary: Get leave by ID
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the leave to retrieve
+ *     responses:
+ *       200:
+ *         description: Leave details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Leave'
+ *       400:
+ *         description: Invalid leave ID
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Unauthorized access
+ *       404:
+ *         description: Leave not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
@@ -519,7 +855,76 @@ router.get("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// Update leave
+/**
+ * @swagger
+ * /api/leaves/{id}:
+ *   put:
+ *     summary: Update a leave request
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the leave to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               leaveType:
+ *                 type: string
+ *                 example: AnnualLeave
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2023-12-01"
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2023-12-05"
+ *               reason:
+ *                 type: string
+ *                 example: "Family vacation"
+ *               emergencyContact:
+ *                 type: string
+ *                 example: "John Doe"
+ *               emergencyPhone:
+ *                 type: string
+ *                 example: "+1234567890"
+ *               fileIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [1, 2]
+ *               removeFileIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [3]
+ *     responses:
+ *       200:
+ *         description: Leave updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Leave'
+ *       400:
+ *         description: Validation error or cannot update approved/rejected leave
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Unauthorized access
+ *       404:
+ *         description: Leave not found
+ *       500:
+ *         description: Internal server error
+ */
 router.put(
   "/:id",
   authenticateToken,
@@ -694,7 +1099,44 @@ router.put(
   }
 );
 
-// Approve leave
+/**
+ * @swagger
+ * /api/leaves/{id}/approve:
+ *   put:
+ *     summary: Approve a leave request (admin/manager only)
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the leave to approve
+ *     responses:
+ *       200:
+ *         description: Leave approved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 leave:
+ *                   $ref: '#/components/schemas/Leave'
+ *       400:
+ *         description: Only pending leaves can be approved or insufficient balance
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Admin or manager access required
+ *       404:
+ *         description: Leave not found
+ *       500:
+ *         description: Internal server error
+ */
 router.put(
   "/:id/approve",
   authenticateToken,
@@ -787,7 +1229,51 @@ router.put(
   }
 );
 
-// Reject leave
+/**
+ * @swagger
+ * /api/leaves/{id}/reject:
+ *   put:
+ *     summary: Reject a leave request (admin/manager only)
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the leave to reject
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rejectionReason
+ *             properties:
+ *               rejectionReason:
+ *                 type: string
+ *                 example: "Insufficient documentation"
+ *     responses:
+ *       200:
+ *         description: Leave rejected successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Leave'
+ *       400:
+ *         description: Rejection reason required or invalid leave ID
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Admin or manager access required
+ *       404:
+ *         description: Leave not found
+ *       500:
+ *         description: Internal server error
+ */
 router.put(
   "/:id/reject",
   authenticateToken,
@@ -837,7 +1323,39 @@ router.put(
   }
 );
 
-// Cancel leave
+/**
+ * @swagger
+ * /api/leaves/{id}/cancel:
+ *   put:
+ *     summary: Cancel a leave request
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the leave to cancel
+ *     responses:
+ *       200:
+ *         description: Leave cancelled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Leave'
+ *       400:
+ *         description: Only pending leaves can be cancelled
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Unauthorized access
+ *       404:
+ *         description: Leave not found
+ *       500:
+ *         description: Internal server error
+ */
 router.put("/:id/cancel", authenticateToken, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
@@ -885,7 +1403,35 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
   }
 });
 
-// Delete leave (admin/manager only)
+/**
+ * @swagger
+ * /api/leaves/{id}:
+ *   delete:
+ *     summary: Delete a leave request (admin/manager only)
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the leave to delete
+ *     responses:
+ *       200:
+ *         description: Leave and associated files deleted successfully
+ *       400:
+ *         description: Invalid leave ID
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Admin or manager access required
+ *       404:
+ *         description: Leave not found
+ *       500:
+ *         description: Internal server error
+ */
 router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
@@ -943,7 +1489,32 @@ router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
   }
 });
 
-// Manual cleanup endpoint (for admins)
+/**
+ * @swagger
+ * /api/leaves/cleanup-orphaned-files:
+ *   post:
+ *     summary: Manually clean up orphaned files (admin/manager only)
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Orphaned files cleaned up successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Cleaned up 3 orphaned files"
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Admin or manager access required
+ *       500:
+ *         description: Internal server error
+ */
 router.post(
   "/cleanup-orphaned-files",
   authenticateToken,
@@ -959,7 +1530,30 @@ router.post(
   }
 );
 
-// Get temporary/unattached files for user
+/**
+ * @swagger
+ * /api/leaves/temporary-files:
+ *   get:
+ *     summary: Get temporary/unattached files for current user
+ *     tags: [Leaves]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: List of temporary files
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/File'
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/temporary-files", authenticateToken, async (req, res) => {
   try {
     const files = await prisma.file.findMany({
