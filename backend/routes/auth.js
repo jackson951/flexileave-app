@@ -67,10 +67,10 @@ const getRefreshTokenCookieOptions = () => {
  *             properties:
  *               email:
  *                 type: string
- *                 example: admin@digititan.com
+ *                 example: user1@gmail.com
  *               password:
  *                 type: string
- *                 example: Kgaogelo#99
+ *                 example: user1234_password
  *     responses:
  *       200:
  *         description: Login successful
