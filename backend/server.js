@@ -4,8 +4,9 @@ const cors = require("cors");
 const path = require("path");
 const cookieParser = require("cookie-parser");
 const { PrismaClient } = require("@prisma/client");
-const swaggerUi = require("swagger-ui-express");
-const swaggerJsdoc = require("swagger-jsdoc");
+
+// Swagger configuration
+const { swaggerUi, specs } = require("./config/swagger");
 
 const app = express();
 const prisma = new PrismaClient();
@@ -41,27 +42,17 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
 // ------------------- Swagger Setup -------------------
-const swaggerOptions = {
-  definition: {
-    openapi: "3.0.0",
-    info: {
-      title: "Digititan Leave App API",
-      version: "1.0.0",
-      description: "API documentation for the Digititan Leave Management App",
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(specs, {
+    swaggerOptions: {
+      persistAuthorization: true,
     },
-    servers: [
-      { url: "http://localhost:5000", description: "Local server" },
-      {
-        url: "https://digititan-leave-app-production.up.railway.app",
-        description: "Production server",
-      },
-    ],
-  },
-  apis: ["./routes/*.js"], // your route files
-};
-
-const swaggerSpecs = swaggerJsdoc(swaggerOptions);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+    customSiteTitle: "Digititan Leave App API Documentation",
+    customCss: ".swagger-ui .topbar { display: none }",
+  })
+);
 
 // ------------------- Routes -------------------
 const userRoutes = require("./routes/userRoutes");
