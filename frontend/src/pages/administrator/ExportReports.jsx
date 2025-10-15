@@ -60,6 +60,10 @@ const LeaveReportsPage = () => {
 
   useApiInterceptors();
 
+  useEffect(() => {
+    console.log(reports, "the repors to see");
+  }, [reports]);
+
   // View Detail Modal State
   const [selectedReport, setSelectedReport] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -86,6 +90,9 @@ const LeaveReportsPage = () => {
           ApiService.get("/users"),
         ]);
 
+        console.log(leavesResponse.data, "leaves data");
+        console.log(usersResponse.data, "users data");
+
         // Map backend data to frontend structure
         const mappedReports = leavesResponse.data.map((report) => {
           const user =
@@ -103,7 +110,7 @@ const LeaveReportsPage = () => {
             status: report.status.toLowerCase(),
             reason: report.reason || "",
             submittedAt: report.submittedAt,
-            approvedBy: report.approvedBy || "System",
+            approvedBy: report?.actionedByUser?.name || "System",
             notes: report.notes || "",
             user: {
               // Include full user data
