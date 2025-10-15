@@ -128,6 +128,7 @@ const LeaveReportsPage = () => {
 
     fetchLeaveData();
   }, []);
+
   // Get user by ID
   const getUserById = (userId) => {
     return users.find((user) => user.id === userId) || null;
@@ -493,256 +494,261 @@ const LeaveReportsPage = () => {
     setSelectedReport(null);
   };
 
-  // Export to PDF
+  // Enhanced PDF Export with perfect column titles
   const exportToPDF = () => {
     const doc = new jsPDF();
 
+    // Add company header
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, 220, 30, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.text("LEAVE MANAGEMENT SYSTEM", 105, 15, { align: "center" });
+
     // Title based on report type
-    let title = "Leave Reports";
+    let title = "Detailed Leave Report";
     if (reportType === "summary") title = "Leave Summary Report";
     else if (reportType === "balances") title = "Leave Balances Report";
     else if (reportType === "department") title = "Department Leave Report";
 
     // Title
-    doc.setFontSize(18);
-    doc.text(title, 105, 20, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.text(title, 105, 45, { align: "center" });
 
     // Subtitle
-    doc.setFontSize(12);
-    doc.text(`Generated on ${format(new Date(), "MMMM d, yyyy")}`, 105, 30, {
-      align: "center",
-    });
+    doc.setFontSize(10);
+    doc.text(
+      `Generated on ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}`,
+      105,
+      52,
+      {
+        align: "center",
+      }
+    );
 
     // Prepare table data based on report type
     let headers = [];
-    let columnKeys = [];
     let tableData = [];
 
     if (reportType === "detailed") {
-      headers = [
-        "ID",
-        "Employee",
-        "Department",
-        "Type",
-        "Start",
-        "End",
-        "Days",
-        "Status",
-        "Reason",
-      ];
-      columnKeys = [
-        "id",
-        "employeeName",
-        "department",
-        "type",
-        "startDate",
-        "endDate",
-        "days",
-        "status",
-        "reason",
+      // Define all possible columns with clear descriptive titles
+      const allColumns = [
+        { key: "id", title: "LEAVE ID" },
+        { key: "employeeName", title: "EMPLOYEE NAME" },
+        { key: "department", title: "DEPARTMENT" },
+        { key: "type", title: "LEAVE TYPE" },
+        { key: "startDate", title: "START DATE" },
+        { key: "endDate", title: "END DATE" },
+        { key: "days", title: "DAYS" },
+        { key: "status", title: "STATUS" },
+        { key: "reason", title: "REASON" },
+        { key: "submittedAt", title: "SUBMITTED DATE" },
+        { key: "approvedBy", title: "APPROVED BY" },
+        { key: "notes", title: "NOTES" },
       ];
 
-      // Map headers and data based on selected columns
-      const visibleHeaders = [];
-      const visibleColumnKeys = [];
-      exportColumns.forEach((key) => {
-        const index = columnKeys.indexOf(key);
-        if (index !== -1) {
-          visibleHeaders.push(headers[index]);
-          visibleColumnKeys.push(key);
-        }
-      });
+      // Filter columns based on selection
+      const visibleColumns = allColumns.filter((col) =>
+        exportColumns.includes(col.key)
+      );
+
+      headers = visibleColumns.map((col) => col.title);
 
       tableData = filteredReports.map((report) => {
-        return visibleColumnKeys.map((key) => {
-          if (key === "reason") {
-            return report[key].substring(0, 30); // Truncate reason for readability
+        return visibleColumns.map((col) => {
+          const value = report[col.key];
+          if (col.key === "reason" || col.key === "notes") {
+            return (
+              (value || "").substring(0, 50) +
+              ((value || "").length > 50 ? "..." : "")
+            );
           }
-          if (key === "status") {
-            return report[key].charAt(0).toUpperCase() + report[key].slice(1);
+          if (col.key === "status") {
+            return (
+              (value || "").charAt(0).toUpperCase() + (value || "").slice(1)
+            );
           }
-          if (key === "startDate" || key === "endDate") {
-            return format(new Date(report[key]), "MMM d, yyyy");
+          if (
+            col.key === "startDate" ||
+            col.key === "endDate" ||
+            col.key === "submittedAt"
+          ) {
+            return value ? format(new Date(value), "MMM d, yyyy") : "N/A";
           }
-          return report[key];
+          return value !== null && value !== undefined
+            ? value.toString()
+            : "N/A";
         });
       });
-
-      headers = visibleHeaders;
     } else if (reportType === "summary") {
       headers = [
-        "Employee Name",
-        "Department",
-        "Total Requests",
-        "Approved Requests",
-        "Pending Requests",
-        "Rejected Requests",
-        "Total Days",
-        "Approved Days",
+        "EMPLOYEE NAME",
+        "DEPARTMENT",
+        "TOTAL REQUESTS",
+        "APPROVED",
+        "PENDING",
+        "REJECTED",
+        "TOTAL DAYS",
+        "APPROVED DAYS",
       ];
 
       tableData = filteredReports.map((report) => [
         report.employeeName,
         report.department,
-        report.totalRequests,
-        report.approvedRequests,
-        report.pendingRequests,
-        report.rejectedRequests,
-        report.totalDays,
-        report.approvedDays,
+        report.totalRequests.toString(),
+        report.approvedRequests.toString(),
+        report.pendingRequests.toString(),
+        report.rejectedRequests.toString(),
+        report.totalDays.toString(),
+        report.approvedDays.toString(),
       ]);
     } else if (reportType === "balances") {
       headers = [
-        "Employee Name",
-        "Department",
-        "Position",
-        "Original Balance",
-        "Used Days",
-        "Remaining Balance",
-        "Utilization %",
+        "EMPLOYEE NAME",
+        "DEPARTMENT",
+        "POSITION",
+        "ORIGINAL BALANCE",
+        "USED DAYS",
+        "REMAINING BALANCE",
+        "UTILIZATION %",
       ];
 
       tableData = filteredReports.map((report) => [
         report.employeeName,
         report.department,
-        report.position,
-        report.totalOriginal,
-        report.totalUsed,
-        report.totalRemaining,
+        report.position || "N/A",
+        report.totalOriginal.toString(),
+        report.totalUsed.toString(),
+        report.totalRemaining.toString(),
         `${report.percentageUsed}%`,
       ]);
     } else if (reportType === "department") {
       headers = [
-        "Department",
-        "Employees",
-        "Total Requests",
-        "Approved Requests",
-        "Pending Requests",
-        "Rejected Requests",
-        "Total Days",
-        "Approved Days",
+        "DEPARTMENT",
+        "EMPLOYEES",
+        "TOTAL REQUESTS",
+        "APPROVED",
+        "PENDING",
+        "REJECTED",
+        "TOTAL DAYS",
+        "APPROVED DAYS",
       ];
 
       tableData = filteredReports.map((report) => [
         report.department,
-        report.totalEmployees,
-        report.totalRequests,
-        report.approvedRequests,
-        report.pendingRequests,
-        report.rejectedRequests,
-        report.totalDays,
-        report.approvedDays,
+        report.totalEmployees.toString(),
+        report.totalRequests.toString(),
+        report.approvedRequests.toString(),
+        report.pendingRequests.toString(),
+        report.rejectedRequests.toString(),
+        report.totalDays.toString(),
+        report.approvedDays.toString(),
       ]);
     }
 
-    // Add table
+    // Add table with enhanced styling
     doc.autoTable({
       head: [headers],
       body: tableData,
-      startY: 40,
-      styles: { fontSize: 9 },
+      startY: 60,
+      styles: {
+        fontSize: 8,
+        cellPadding: 4,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1,
+        textColor: [0, 0, 0],
+      },
       headStyles: {
         fillColor: [59, 130, 246],
         textColor: [255, 255, 255],
+        fontStyle: "bold",
+        lineWidth: 0.1,
+        fontSize: 9,
       },
-      columnStyles: headers.reduce((acc, header, idx) => {
-        const widthMap = {
-          ID: 15,
-          Employee: 25,
-          "Employee Name": 25,
-          Department: 25,
-          Position: 20,
-          Type: 20,
-          Start: 20,
-          End: 20,
-          Days: 15,
-          Status: 20,
-          Reason: 30,
-          "Total Requests": 20,
-          "Approved Requests": 20,
-          "Pending Requests": 20,
-          "Rejected Requests": 20,
-          "Total Days": 20,
-          "Approved Days": 20,
-          "Original Balance": 25,
-          "Used Days": 20,
-          "Remaining Balance": 25,
-          "Utilization %": 20,
-          Employees: 20,
-        };
-        acc[idx] = { cellWidth: widthMap[header] || 20 };
-        return acc;
-      }, {}),
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+      margin: { top: 60 },
     });
+
+    // Add footer with page numbers
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        doc.internal.pageSize.width / 2,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+      doc.text(
+        `Confidential - ${format(new Date(), "yyyy")} Your Company Name`,
+        doc.internal.pageSize.width / 2,
+        doc.internal.pageSize.height - 5,
+        { align: "center" }
+      );
+    }
 
     // Save PDF
     const filename = `${title.toLowerCase().replace(/\s+/g, "_")}_${format(
       new Date(),
-      "yyyyMMdd"
+      "yyyyMMdd_HHmm"
     )}.pdf`;
     doc.save(filename);
   };
 
-  // Export to CSV
+  // Enhanced CSV Export with perfect column titles
   const exportToCSV = () => {
     let headers = [];
-    let columnKeys = [];
     let data = [];
 
     if (reportType === "detailed") {
-      headers = [
-        "Leave ID",
-        "Employee Name",
-        "Department",
-        "Leave Type",
-        "Start Date",
-        "End Date",
-        "Number of Days",
-        "Status",
-        "Reason",
-        "Submitted At",
-        "Approved By",
-        "Notes",
-      ];
-      columnKeys = [
-        "id",
-        "employeeName",
-        "department",
-        "type",
-        "startDate",
-        "endDate",
-        "days",
-        "status",
-        "reason",
-        "submittedAt",
-        "approvedBy",
-        "notes",
+      // Define all possible columns with clear descriptive titles
+      const allColumns = [
+        { key: "id", title: "Leave ID" },
+        { key: "employeeName", title: "Employee Name" },
+        { key: "department", title: "Department" },
+        { key: "type", title: "Leave Type" },
+        { key: "startDate", title: "Start Date" },
+        { key: "endDate", title: "End Date" },
+        { key: "days", title: "Number of Days" },
+        { key: "status", title: "Status" },
+        { key: "reason", title: "Reason" },
+        { key: "submittedAt", title: "Submitted Date" },
+        { key: "approvedBy", title: "Approved By" },
+        { key: "notes", title: "Notes" },
       ];
 
-      // Map headers and data based on selected columns
-      const visibleHeaders = [];
-      const visibleColumnKeys = [];
-      exportColumns.forEach((key) => {
-        const index = columnKeys.indexOf(key);
-        if (index !== -1) {
-          visibleHeaders.push(headers[index]);
-          visibleColumnKeys.push(key);
-        }
-      });
+      // Filter columns based on selection
+      const visibleColumns = allColumns.filter((col) =>
+        exportColumns.includes(col.key)
+      );
+
+      headers = visibleColumns.map((col) => col.title);
 
       data = filteredReports.map((report) => {
-        return visibleColumnKeys.map((key) => {
-          if (key === "status") {
-            return report[key].charAt(0).toUpperCase() + report[key].slice(1);
+        return visibleColumns.map((col) => {
+          const value = report[col.key];
+          if (col.key === "status") {
+            return (
+              (value || "").charAt(0).toUpperCase() + (value || "").slice(1)
+            );
           }
-          if (key === "startDate" || key === "endDate") {
-            return format(new Date(report[key]), "yyyy-MM-dd");
+          if (
+            col.key === "startDate" ||
+            col.key === "endDate" ||
+            col.key === "submittedAt"
+          ) {
+            return value ? format(new Date(value), "yyyy-MM-dd") : "N/A";
           }
-          return report[key];
+          return value !== null && value !== undefined
+            ? value.toString()
+            : "N/A";
         });
       });
-
-      headers = visibleHeaders;
     } else if (reportType === "summary") {
       headers = [
         "Employee Name",
@@ -779,7 +785,7 @@ const LeaveReportsPage = () => {
       data = filteredReports.map((report) => [
         report.employeeName,
         report.department,
-        report.position,
+        report.position || "N/A",
         report.totalOriginal,
         report.totalUsed,
         report.totalRemaining,
@@ -809,84 +815,36 @@ const LeaveReportsPage = () => {
       ]);
     }
 
-    // Add leave type breakdown for summary report
-    if (reportType === "summary") {
-      // Add a separator row
-      data.push([]);
-      data.push(["Leave Type Breakdown", "", "", "", "", "", "", ""]);
+    // Add metadata rows at the beginning
+    const metaData = [
+      [
+        `${
+          reportType.charAt(0).toUpperCase() + reportType.slice(1)
+        } Leave Report`,
+      ],
+      [`Generated on: ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}`],
+      [`Total Records: ${filteredReports.length}`],
+      [], // Empty row for spacing
+      headers, // Column headers
+    ];
 
-      filteredReports.forEach((report) => {
-        data.push([]);
-        data.push([
-          `Employee: ${report.employeeName}`,
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-        ]);
-
-        Object.entries(report.leaveTypes).forEach(([leaveType, stats]) => {
-          data.push([
-            leaveType,
-            "Requests: " + stats.requests,
-            "Days: " + stats.days,
-            "Approved: " + stats.approved,
-            "Pending: " + stats.pending,
-            "Rejected: " + stats.rejected,
-            "",
-            "",
-          ]);
-        });
-      });
-    }
-
-    // Add leave balances breakdown for balances report
-    if (reportType === "balances") {
-      // Add a separator row
-      data.push([]);
-      data.push(["Leave Type Breakdown", "", "", "", "", "", ""]);
-
-      filteredReports.forEach((report) => {
-        data.push([]);
-        data.push([`Employee: ${report.employeeName}`, "", "", "", "", "", ""]);
-
-        if (report.leaveBalances) {
-          Object.entries(report.leaveBalances).forEach(
-            ([leaveType, balance]) => {
-              data.push([
-                leaveType,
-                "Original: " + balance.original,
-                "Used: " + balance.used,
-                "Remaining: " + balance.remaining,
-                "Utilization: " + balance.percentageUsed + "%",
-                "",
-                "",
-              ]);
-            }
-          );
-        }
-      });
-    }
-
-    const csvContent = Papa.unparse([headers, ...data], {
+    const csvContent = Papa.unparse([...metaData, ...data], {
       quotes: true,
       delimiter: ",",
     });
+
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
-    let filename = `leave_report_${format(new Date(), "yyyyMMdd")}.csv`;
+    let filename = `leave_report_${format(new Date(), "yyyyMMdd_HHmm")}.csv`;
     if (reportType === "summary")
-      filename = `leave_summary_${format(new Date(), "yyyyMMdd")}.csv`;
+      filename = `leave_summary_${format(new Date(), "yyyyMMdd_HHmm")}.csv`;
     else if (reportType === "balances")
-      filename = `leave_balances_${format(new Date(), "yyyyMMdd")}.csv`;
+      filename = `leave_balances_${format(new Date(), "yyyyMMdd_HHmm")}.csv`;
     else if (reportType === "department")
       filename = `department_leave_report_${format(
         new Date(),
-        "yyyyMMdd"
+        "yyyyMMdd_HHmm"
       )}.csv`;
 
     const link = document.createElement("a");
@@ -898,65 +856,57 @@ const LeaveReportsPage = () => {
     document.body.removeChild(link);
   };
 
-  // Export to Excel
+  // Enhanced Excel Export with perfect column titles and professional formatting
   const exportToExcel = () => {
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
     let headers = [];
-    let columnKeys = [];
-    let worksheetData = [];
+    let data = [];
 
     if (reportType === "detailed") {
-      headers = [
-        "Leave ID",
-        "Employee Name",
-        "Department",
-        "Leave Type",
-        "Start Date",
-        "End Date",
-        "Number of Days",
-        "Status",
-        "Reason",
-        "Submitted At",
-        "Approved By",
-        "Notes",
-      ];
-      columnKeys = [
-        "id",
-        "employeeName",
-        "department",
-        "type",
-        "startDate",
-        "endDate",
-        "days",
-        "status",
-        "reason",
-        "submittedAt",
-        "approvedBy",
-        "notes",
+      // Define all possible columns with clear descriptive titles
+      const allColumns = [
+        { key: "id", title: "Leave ID" },
+        { key: "employeeName", title: "Employee Name" },
+        { key: "department", title: "Department" },
+        { key: "type", title: "Leave Type" },
+        { key: "startDate", title: "Start Date" },
+        { key: "endDate", title: "End Date" },
+        { key: "days", title: "Number of Days" },
+        { key: "status", title: "Status" },
+        { key: "reason", title: "Reason" },
+        { key: "submittedAt", title: "Submitted Date" },
+        { key: "approvedBy", title: "Approved By" },
+        { key: "notes", title: "Notes" },
       ];
 
-      // Map headers and data based on selected columns
-      const visibleHeaders = [];
-      const visibleColumnKeys = [];
-      exportColumns.forEach((key) => {
-        const index = columnKeys.indexOf(key);
-        if (index !== -1) {
-          visibleHeaders.push(headers[index]);
-          visibleColumnKeys.push(key);
-        }
-      });
+      // Filter columns based on selection
+      const visibleColumns = allColumns.filter((col) =>
+        exportColumns.includes(col.key)
+      );
 
-      worksheetData = [visibleHeaders];
-      filteredReports.forEach((report) => {
-        const row = visibleColumnKeys.map((key) => {
-          if (key === "status") {
-            return report[key].charAt(0).toUpperCase() + report[key].slice(1);
+      headers = visibleColumns.map((col) => col.title);
+
+      data = filteredReports.map((report) => {
+        return visibleColumns.map((col) => {
+          const value = report[col.key];
+          if (col.key === "status") {
+            return (
+              (value || "").charAt(0).toUpperCase() + (value || "").slice(1)
+            );
           }
-          if (key === "startDate" || key === "endDate") {
-            return format(new Date(report[key]), "yyyy-MM-dd");
+          if (
+            col.key === "startDate" ||
+            col.key === "endDate" ||
+            col.key === "submittedAt"
+          ) {
+            return value ? new Date(value) : "N/A";
           }
-          return report[key];
+          return value !== null && value !== undefined
+            ? value.toString()
+            : "N/A";
         });
-        worksheetData.push(row);
       });
     } else if (reportType === "summary") {
       headers = [
@@ -970,50 +920,16 @@ const LeaveReportsPage = () => {
         "Approved Days",
       ];
 
-      worksheetData = [headers];
-      filteredReports.forEach((report) => {
-        worksheetData.push([
-          report.employeeName,
-          report.department,
-          report.totalRequests,
-          report.approvedRequests,
-          report.pendingRequests,
-          report.rejectedRequests,
-          report.totalDays,
-          report.approvedDays,
-        ]);
-      });
-
-      // Add leave type breakdown
-      worksheetData.push([]);
-      worksheetData.push(["Leave Type Breakdown", "", "", "", "", "", "", ""]);
-
-      filteredReports.forEach((report) => {
-        worksheetData.push([]);
-        worksheetData.push([
-          `Employee: ${report.employeeName}`,
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-        ]);
-
-        Object.entries(report.leaveTypes).forEach(([leaveType, stats]) => {
-          worksheetData.push([
-            leaveType,
-            "Requests: " + stats.requests,
-            "Days: " + stats.days,
-            "Approved: " + stats.approved,
-            "Pending: " + stats.pending,
-            "Rejected: " + stats.rejected,
-            "",
-            "",
-          ]);
-        });
-      });
+      data = filteredReports.map((report) => [
+        report.employeeName,
+        report.department,
+        report.totalRequests,
+        report.approvedRequests,
+        report.pendingRequests,
+        report.rejectedRequests,
+        report.totalDays,
+        report.approvedDays,
+      ]);
     } else if (reportType === "balances") {
       headers = [
         "Employee Name",
@@ -1025,51 +941,15 @@ const LeaveReportsPage = () => {
         "Utilization %",
       ];
 
-      worksheetData = [headers];
-      filteredReports.forEach((report) => {
-        worksheetData.push([
-          report.employeeName,
-          report.department,
-          report.position,
-          report.totalOriginal,
-          report.totalUsed,
-          report.totalRemaining,
-          `${report.percentageUsed}%`,
-        ]);
-      });
-
-      // Add leave type breakdown
-      worksheetData.push([]);
-      worksheetData.push(["Leave Type Breakdown", "", "", "", "", "", ""]);
-
-      filteredReports.forEach((report) => {
-        worksheetData.push([]);
-        worksheetData.push([
-          `Employee: ${report.employeeName}`,
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-        ]);
-
-        if (report.leaveBalances) {
-          Object.entries(report.leaveBalances).forEach(
-            ([leaveType, balance]) => {
-              worksheetData.push([
-                leaveType,
-                "Original: " + balance.original,
-                "Used: " + balance.used,
-                "Remaining: " + balance.remaining,
-                "Utilization: " + balance.percentageUsed + "%",
-                "",
-                "",
-              ]);
-            }
-          );
-        }
-      });
+      data = filteredReports.map((report) => [
+        report.employeeName,
+        report.department,
+        report.position || "N/A",
+        report.totalOriginal,
+        report.totalUsed,
+        report.totalRemaining,
+        report.percentageUsed,
+      ]);
     } else if (reportType === "department") {
       headers = [
         "Department",
@@ -1082,44 +962,86 @@ const LeaveReportsPage = () => {
         "Approved Days",
       ];
 
-      worksheetData = [headers];
-      filteredReports.forEach((report) => {
-        worksheetData.push([
-          report.department,
-          report.totalEmployees,
-          report.totalRequests,
-          report.approvedRequests,
-          report.pendingRequests,
-          report.rejectedRequests,
-          report.totalDays,
-          report.approvedDays,
-        ]);
-      });
+      data = filteredReports.map((report) => [
+        report.department,
+        report.totalEmployees,
+        report.totalRequests,
+        report.approvedRequests,
+        report.pendingRequests,
+        report.rejectedRequests,
+        report.totalDays,
+        report.approvedDays,
+      ]);
     }
 
+    // Create worksheet data with proper structure
+    const wsData = [
+      // Title and metadata
+      [
+        `${
+          reportType.charAt(0).toUpperCase() + reportType.slice(1)
+        } Leave Report`,
+      ],
+      [`Generated on: ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}`],
+      [`Total Records: ${filteredReports.length}`],
+      [], // Empty row for spacing
+      headers, // Column headers
+      ...data, // Actual data
+    ];
+
     // Create worksheet
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    // Create workbook
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Leave Report");
+    // Set column widths based on content
+    const colWidths = headers.map((header, index) => {
+      const maxContentLength = Math.max(
+        header.length,
+        ...data.map((row) => (row[index] ? row[index].toString().length : 0))
+      );
+      return { wch: Math.min(Math.max(maxContentLength + 2, 12), 30) };
+    });
+    ws["!cols"] = colWidths;
 
-    // Convert to Excel file
-    const wbout = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    // Define merges for title and metadata
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } }, // Title row
+      { s: { r: 1, c: 0 }, e: { r: 1, c: headers.length - 1 } }, // Generated date
+      { s: { r: 2, c: 0 }, e: { r: 2, c: headers.length - 1 } }, // Total records
+    ];
 
-    // Create download link
+    // Add auto-filter to headers (starting from row 5 after metadata)
+    const headerRowIndex = 4; // 0-based index for row 5
+    ws["!autofilter"] = {
+      ref: XLSX.utils.encode_range({
+        s: { r: headerRowIndex, c: 0 },
+        e: { r: headerRowIndex + data.length, c: headers.length - 1 },
+      }),
+    };
+
+    // Add the worksheet to the workbook
+    const sheetName =
+      reportType.charAt(0).toUpperCase() + reportType.slice(1) + " Report";
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31)); // Excel sheet names max 31 chars
+
+    // Generate Excel file and trigger download
+    const wbout = XLSX.write(wb, {
+      bookType: "xlsx",
+      type: "array",
+      bookSST: false,
+    });
+
     const blob = new Blob([wbout], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);
 
-    let filename = `leave_report_${format(new Date(), "yyyyMMdd")}.xlsx`;
+    let filename = `leave_report_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
     if (reportType === "summary")
-      filename = `leave_summary_${format(new Date(), "yyyyMMdd")}.xlsx`;
+      filename = `leave_summary_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
     else if (reportType === "balances")
-      filename = `leave_balances_${format(new Date(), "yyyyMMdd")}.xlsx`;
+      filename = `leave_balances_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
     else if (reportType === "department")
       filename = `department_leave_report_${format(
         new Date(),
-        "yyyyMMdd"
+        "yyyyMMdd_HHmm"
       )}.xlsx`;
 
     const link = document.createElement("a");
@@ -1132,9 +1054,13 @@ const LeaveReportsPage = () => {
   };
 
   // Unique values for filters
-  const uniqueDepartments = [...new Set(reports.map((r) => r.department))];
-  const uniqueTypes = [...new Set(reports.map((r) => r.type))];
-  const uniqueStatuses = [...new Set(reports.map((r) => r.status))];
+  const uniqueDepartments = [
+    ...new Set(reports.map((r) => r.department)),
+  ].filter(Boolean);
+  const uniqueTypes = [...new Set(reports.map((r) => r.type))].filter(Boolean);
+  const uniqueStatuses = [...new Set(reports.map((r) => r.status))].filter(
+    Boolean
+  );
   const uniqueEmployees = Array.from(
     new Map(
       reports.map((r) => [
@@ -1169,13 +1095,14 @@ const LeaveReportsPage = () => {
       </span>
     );
   };
+
   // Progress bar component for utilization
   const ProgressBar = ({ percentage, color = "bg-blue-500" }) => {
     return (
       <div className="w-full bg-gray-200 rounded-full h-2.5">
         <div
-          className={`${color} h-2.5 rounded-full`}
-          style={{ width: `${percentage}%` }}
+          className={`${color} h-2.5 rounded-full transition-all duration-300`}
+          style={{ width: `${Math.min(percentage, 100)}%` }}
         ></div>
       </div>
     );
@@ -1290,7 +1217,7 @@ const LeaveReportsPage = () => {
       {/* Status Tabs (only for detailed report) */}
       {reportType === "detailed" && (
         <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
+          <nav className="-mb-px flex space-x-8 overflow-x-auto">
             {["all", "pending", "approved", "rejected"].map((tab) => (
               <button
                 key={tab}
@@ -1329,7 +1256,7 @@ const LeaveReportsPage = () => {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   placeholder={
                     reportType === "detailed"
                       ? "Search by employee, ID, or reason..."
@@ -1352,7 +1279,7 @@ const LeaveReportsPage = () => {
 
           {/* Expanded Filters */}
           {showFilters && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {reportType === "detailed" && (
                 <>
                   <div>
@@ -1393,7 +1320,7 @@ const LeaveReportsPage = () => {
                       ))}
                     </select>
                   </div>
-                  <div>
+                  <div className="lg:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Date Range
                     </label>
@@ -1432,6 +1359,7 @@ const LeaveReportsPage = () => {
                   }
                   className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 >
+                  <option value="all">All Departments</option>
                   {uniqueDepartments.map((dept) => (
                     <option key={`dept-${dept}`} value={dept}>
                       {dept}
@@ -1474,7 +1402,7 @@ const LeaveReportsPage = () => {
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("id")}
                   >
                     <div className="flex items-center">
@@ -1484,7 +1412,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("employeeName")}
                   >
                     <div className="flex items-center">
@@ -1494,7 +1422,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("department")}
                   >
                     <div className="flex items-center">
@@ -1504,7 +1432,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("type")}
                   >
                     <div className="flex items-center">
@@ -1514,7 +1442,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("startDate")}
                   >
                     <div className="flex items-center">
@@ -1524,7 +1452,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("days")}
                   >
                     <div className="flex items-center">
@@ -1534,7 +1462,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("status")}
                   >
                     <div className="flex items-center">
@@ -1542,7 +1470,7 @@ const LeaveReportsPage = () => {
                       {getSortIcon("status")}
                     </div>
                   </th>
-                  <th scope="col" className="relative px-6 py-3">
+                  <th scope="col" className="relative px-4 py-3">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
@@ -1553,19 +1481,19 @@ const LeaveReportsPage = () => {
                     key={`${report.id}-${index}`}
                     className="hover:bg-gray-50"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {report.id}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {report.employeeName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {report.department}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {report.type}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <CalendarIcon className="h-4 w-4 mr-2 text-gray-400" />
                         {report.startDate
@@ -1577,13 +1505,13 @@ const LeaveReportsPage = () => {
                           : "N/A"}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {report.days} {report.days === 1 ? "day" : "days"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <StatusBadge status={report.status} />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
                         <button
                           onClick={() => handleViewReport(report)}
@@ -1606,7 +1534,7 @@ const LeaveReportsPage = () => {
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("employeeName")}
                   >
                     <div className="flex items-center">
@@ -1616,7 +1544,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("department")}
                   >
                     <div className="flex items-center">
@@ -1626,7 +1554,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalRequests")}
                   >
                     <div className="flex items-center">
@@ -1636,7 +1564,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("approvedRequests")}
                   >
                     <div className="flex items-center">
@@ -1646,7 +1574,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("pendingRequests")}
                   >
                     <div className="flex items-center">
@@ -1656,7 +1584,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("rejectedRequests")}
                   >
                     <div className="flex items-center">
@@ -1666,7 +1594,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalDays")}
                   >
                     <div className="flex items-center">
@@ -1676,7 +1604,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("approvedDays")}
                   >
                     <div className="flex items-center">
@@ -1692,28 +1620,28 @@ const LeaveReportsPage = () => {
                     key={`${report.userId}-${index}`}
                     className="hover:bg-gray-50"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {report.employeeName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {report.department}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {report.totalRequests}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
                       {report.approvedRequests}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">
                       {report.pendingRequests}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
                       {report.rejectedRequests}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {report.totalDays}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
                       {report.approvedDays}
                     </td>
                   </tr>
@@ -1728,7 +1656,7 @@ const LeaveReportsPage = () => {
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("employeeName")}
                   >
                     <div className="flex items-center">
@@ -1738,7 +1666,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("department")}
                   >
                     <div className="flex items-center">
@@ -1748,7 +1676,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("position")}
                   >
                     <div className="flex items-center">
@@ -1758,7 +1686,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalOriginal")}
                   >
                     <div className="flex items-center">
@@ -1768,7 +1696,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalUsed")}
                   >
                     <div className="flex items-center">
@@ -1778,7 +1706,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalRemaining")}
                   >
                     <div className="flex items-center">
@@ -1788,7 +1716,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
                     <div className="flex items-center">
                       <span>Utilization</span>
@@ -1802,25 +1730,25 @@ const LeaveReportsPage = () => {
                     key={`${report.employeeId}-${index}`}
                     className="hover:bg-gray-50"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {report.employeeName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {report.department}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                       {report.position}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {report.totalOriginal}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
                       {report.totalUsed}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
                       {report.totalRemaining}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-20 mr-2">
                           <ProgressBar
@@ -1851,7 +1779,7 @@ const LeaveReportsPage = () => {
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("department")}
                   >
                     <div className="flex items-center">
@@ -1861,7 +1789,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalEmployees")}
                   >
                     <div className="flex items-center">
@@ -1871,7 +1799,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalRequests")}
                   >
                     <div className="flex items-center">
@@ -1881,7 +1809,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("approvedRequests")}
                   >
                     <div className="flex items-center">
@@ -1891,7 +1819,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("pendingRequests")}
                   >
                     <div className="flex items-center">
@@ -1901,7 +1829,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("rejectedRequests")}
                   >
                     <div className="flex items-center">
@@ -1911,7 +1839,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalDays")}
                   >
                     <div className="flex items-center">
@@ -1921,7 +1849,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("approvedDays")}
                   >
                     <div className="flex items-center">
@@ -1937,28 +1865,28 @@ const LeaveReportsPage = () => {
                     key={`${report.department}-${index}`}
                     className="hover:bg-gray-50"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {report.department}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {report.totalEmployees}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {report.totalRequests}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
                       {report.approvedRequests}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">
                       {report.pendingRequests}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
                       {report.rejectedRequests}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {report.totalDays}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
                       {report.approvedDays}
                     </td>
                   </tr>
@@ -1990,7 +1918,7 @@ const LeaveReportsPage = () => {
               <button
                 onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                 disabled={currentPage === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
@@ -1999,7 +1927,7 @@ const LeaveReportsPage = () => {
                   setCurrentPage((p) => Math.min(p + 1, totalPages))
                 }
                 disabled={currentPage === totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>
@@ -2028,7 +1956,7 @@ const LeaveReportsPage = () => {
                   <button
                     onClick={() => setCurrentPage(1)}
                     disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <span className="sr-only">First</span>
                     <ChevronUpIcon className="h-4 w-4 transform rotate-90" />
@@ -2036,7 +1964,7 @@ const LeaveReportsPage = () => {
                   <button
                     onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                     disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
@@ -2048,14 +1976,14 @@ const LeaveReportsPage = () => {
                       setCurrentPage((p) => Math.min(p + 1, totalPages))
                     }
                     disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>
                   <button
                     onClick={() => setCurrentPage(totalPages)}
                     disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <span className="sr-only">Last</span>
                     <ChevronUpIcon className="h-4 w-4 transform -rotate-90" />
@@ -2157,10 +2085,12 @@ const LeaveReportsPage = () => {
                     Submitted At
                   </label>
                   <p className="text-gray-900">
-                    {format(
-                      new Date(selectedReport.submittedAt),
-                      "MMM d, yyyy hh:mm a"
-                    )}
+                    {selectedReport.submittedAt
+                      ? format(
+                          new Date(selectedReport.submittedAt),
+                          "MMM d, yyyy 'at' hh:mm a"
+                        )
+                      : "N/A"}
                   </p>
                 </div>
                 <div className="md:col-span-2">
@@ -2267,7 +2197,7 @@ const LeaveReportsPage = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-3">
                     Select Columns to Export
                   </label>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-md p-3">
                     {[
                       { key: "id", label: "Leave ID" },
                       { key: "employeeName", label: "Employee Name" },
@@ -2278,7 +2208,7 @@ const LeaveReportsPage = () => {
                       { key: "days", label: "Number of Days" },
                       { key: "status", label: "Status" },
                       { key: "reason", label: "Reason" },
-                      { key: "submittedAt", label: "Submitted At" },
+                      { key: "submittedAt", label: "Submitted Date" },
                       { key: "approvedBy", label: "Approved By" },
                       { key: "notes", label: "Notes" },
                     ].map((column) => (
