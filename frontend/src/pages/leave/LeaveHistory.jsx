@@ -479,15 +479,83 @@ const LeaveHistory = () => {
     );
   };
 
-  if (loading) {
+  // Skeleton Loading Component
+  const SkeletonLoader = () => {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-          <p className="text-gray-600 ml-4">Loading leave history...</p>
+        {/* Back Button Skeleton */}
+        <div className="mb-6">
+          <div className="h-5 bg-gray-200 rounded w-24 animate-pulse"></div>
+        </div>
+
+        {/* Header Skeleton */}
+        <div className="mb-8">
+          <div className="h-8 bg-gray-200 rounded w-64 animate-pulse mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-96 animate-pulse mb-4"></div>
+
+          {/* Leave Balances Skeleton */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="h-4 bg-gray-200 rounded w-48 animate-pulse mb-3"></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between items-center bg-white px-3 py-2 rounded"
+                >
+                  <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+                  <div className="h-4 bg-gray-200 rounded w-8 animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Filters Skeleton */}
+        <div className="bg-white shadow rounded-lg mb-6 p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div className="relative">
+              <div className="h-10 bg-gray-200 rounded w-48 animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Requests List Skeleton */}
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+          {/* Skeleton Rows */}
+          {[...Array(4)].map((_, index) => (
+            <div
+              key={index}
+              className="px-4 py-4 sm:px-6 border-b border-gray-200"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 rounded-full p-1 bg-gray-200 animate-pulse">
+                    <div className="h-5 w-5"></div>
+                  </div>
+                  <div className="ml-4">
+                    <div className="h-5 bg-gray-200 rounded w-48 animate-pulse mb-1"></div>
+                    <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="ml-2 flex-shrink-0 flex">
+                  <div className="text-right mr-4">
+                    <div className="h-6 bg-gray-200 rounded w-20 animate-pulse"></div>
+                  </div>
+                  <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
+  };
+
+  if (loading) {
+    return <SkeletonLoader />;
   }
 
   if (error) {
