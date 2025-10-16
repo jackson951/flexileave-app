@@ -359,6 +359,93 @@ const LeaveApprovals = () => {
     );
   };
 
+  // Skeleton Loading Component
+  const SkeletonLoader = () => {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Skeleton */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="space-y-2">
+              <div className="h-8 bg-gray-200 rounded w-64 animate-pulse"></div>
+              <div className="h-4 bg-gray-200 rounded w-96 animate-pulse"></div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="h-10 bg-gray-200 rounded w-32 animate-pulse"></div>
+              <div className="h-10 bg-gray-200 rounded w-36 animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Skeleton */}
+        <div className="mb-6 sm:mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto pb-2 -mx-4 px-4">
+            {[...Array(4)].map((_, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-lg shadow-xs border border-gray-200 p-4 min-w-[150px]"
+              >
+                <div className="flex items-center">
+                  <div className="p-2 rounded-full bg-gray-200 animate-pulse">
+                    <div className="h-5 w-5"></div>
+                  </div>
+                  <div className="ml-3">
+                    <div className="h-4 bg-gray-200 rounded w-16 animate-pulse mb-1"></div>
+                    <div className="h-6 bg-gray-200 rounded w-8 animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Search and Filter Skeleton */}
+        <div className="bg-white shadow-xs rounded-xl border border-gray-200 mb-6 sm:mb-8 p-4 sm:p-6">
+          <div className="flex flex-col gap-4">
+            <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="bg-white shadow-xs rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div className="h-6 bg-gray-200 rounded w-48 animate-pulse"></div>
+          </div>
+
+          {/* Skeleton Rows */}
+          {[...Array(5)].map((_, index) => (
+            <div key={index} className="p-4 sm:p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center min-w-0 space-x-3 sm:space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gray-200 animate-pulse"></div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                      <div className="h-5 bg-gray-200 rounded w-32 animate-pulse mb-1"></div>
+                      <div className="h-6 bg-gray-200 rounded w-20 animate-pulse"></div>
+                    </div>
+                    <div className="h-4 bg-gray-200 rounded w-24 animate-pulse mt-1"></div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 sm:space-x-4">
+                  {!isMobile && (
+                    <div className="text-right hidden sm:block">
+                      <div className="h-4 bg-gray-200 rounded w-20 animate-pulse mb-1"></div>
+                      <div className="h-3 bg-gray-200 rounded w-24 animate-pulse"></div>
+                    </div>
+                  )}
+                  <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   if (currentView === "history") {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -368,16 +455,7 @@ const LeaveApprovals = () => {
   }
 
   if (loading && !refreshing) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-xl shadow-lg p-8">
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-            <p className="text-gray-600 text-lg">Loading leave requests...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <SkeletonLoader />;
   }
 
   if (error) {
