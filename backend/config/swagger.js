@@ -23,10 +23,6 @@ const options = {
         url: "https://digititan-leave-app-production.up.railway.app",
         description: "Production server",
       },
-      {
-        url: "https://digititan-leave-app.onrender.com",
-        description: "Alternate Production server",
-      },
     ],
     components: {
       schemas: {
