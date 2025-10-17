@@ -17,6 +17,7 @@ const allowedOrigins = [
   "https://digititan-leave-app.vercel.app",
   "http://localhost:5000", // swagger/testing
   "https://digititan-leave-app-production.up.railway.app",
+  "https://digititan-leave-app.onrender.com",
 ];
 
 const corsOptions = {
