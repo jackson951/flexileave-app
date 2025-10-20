@@ -6,7 +6,7 @@ const cookieParser = require("cookie-parser");
 const { PrismaClient } = require("@prisma/client");
 
 // Swagger configuration
-const { swaggerUi, specs } = require("./config/swagger");
+const { swaggerUi, specs, swaggerUiOptions } = require("./config/swagger");
 
 const app = express();
 const prisma = new PrismaClient();
@@ -43,18 +43,8 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
 // ------------------- Swagger Setup -------------------
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(specs, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-    customSiteTitle: "Digititan Leave App API Documentation",
-    customCss: ".swagger-ui .topbar { display: none }",
-  })
-);
-
+// Serve Swagger UI
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs, swaggerUiOptions));
 // ------------------- Routes -------------------
 const userRoutes = require("./routes/userRoutes");
 const authRoutes = require("./routes/auth");
