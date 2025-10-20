@@ -296,4 +296,18 @@ const options = {
 
 const specs = swaggerJsdoc(options);
 
-module.exports = { swaggerUi, specs };
+// Custom Swagger UI options to include HttpOnly cookies
+const swaggerUiOptions = {
+  swaggerOptions: {
+    persistAuthorization: true,
+    requestInterceptor: (req) => {
+      // This ensures HttpOnly cookies are sent with requests from Swagger UI
+      req.credentials = "include";
+      return req;
+    },
+  },
+  customSiteTitle: "Digititan Leave App API Documentation",
+  customCss: ".swagger-ui .topbar { display: none }",
+};
+
+module.exports = { swaggerUi, specs, swaggerUiOptions };
