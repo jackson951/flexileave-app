@@ -20,7 +20,7 @@ const options = {
         description: "Development server",
       },
       {
-        url: "https://digititan-leave-app-production.up.railway.app",
+        url: "https://digititan-leave-app.onrender.com",
         description: "Production server",
       },
     ],
