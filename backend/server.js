@@ -10,13 +10,14 @@ const { swaggerUi, specs } = require("./config/swagger");
 
 const app = express();
 const prisma = new PrismaClient();
+app.set("trust proxy", 1); // important for secure cookies
 
 // ------------------- CORS Setup -------------------
 const allowedOrigins = [
   "http://localhost:5173",
   "https://digititan-leave-app.vercel.app",
   "http://localhost:5000", // swagger/testing
-  "https://digititan-leave-app-production.up.railway.app",
+  "https://digititan-leave-app.onrender.com",
 ];
 
 const corsOptions = {
