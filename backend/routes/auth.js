@@ -7,46 +7,40 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 // -------------------- TOKEN HELPERS --------------------
-const generateAccessToken = (user) => {
-  return jwt.sign(
+const generateAccessToken = (user) =>
+  jwt.sign(
     { userId: user.id, email: user.email, role: user.role, name: user.name },
     process.env.JWT_SECRET,
     { expiresIn: "24h" }
   );
-};
 
-const generateRefreshToken = (user) => {
-  return jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, {
+const generateRefreshToken = (user) =>
+  jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, {
     expiresIn: "7d",
   });
-};
 
 // -------------------- COOKIE OPTIONS --------------------
-const getAccessTokenCookieOptions = () => {
-  const options = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 24 * 60 * 60 * 1000,
-  };
-  if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
-    options.domain = process.env.COOKIE_DOMAIN;
-  }
-  return options;
-};
+const getAccessTokenCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+  maxAge: 24 * 60 * 60 * 1000,
+  domain:
+    process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN
+      ? process.env.COOKIE_DOMAIN
+      : undefined,
+});
 
-const getRefreshTokenCookieOptions = () => {
-  const options = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  };
-  if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
-    options.domain = process.env.COOKIE_DOMAIN;
-  }
-  return options;
-};
+const getRefreshTokenCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  domain:
+    process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN
+      ? process.env.COOKIE_DOMAIN
+      : undefined,
+});
 
 // -------------------- LOGIN --------------------
 /**
@@ -67,10 +61,10 @@ const getRefreshTokenCookieOptions = () => {
  *             properties:
  *               email:
  *                 type: string
- *                 example: user1@gmail.com
+ *                 example: jacksonk@digititan.co.za
  *               password:
  *                 type: string
- *                 example: user1234_password
+ *                 example: Kgaogelo#99
  *     responses:
  *       200:
  *         description: Login successful
@@ -90,7 +84,6 @@ router.post("/login", async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
     });
-
     if (!user) return res.status(401).json({ message: "Invalid credentials." });
 
     const passwordValid = await bcrypt.compare(password, user.password);
@@ -191,7 +184,6 @@ router.post("/logout", async (req, res) => {
 
   res.clearCookie("accessToken", getAccessTokenCookieOptions());
   res.clearCookie("refreshToken", getRefreshTokenCookieOptions());
-
   res.json({ message: "Logged out successfully" });
 });
 
