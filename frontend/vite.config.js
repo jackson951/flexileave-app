@@ -26,6 +26,10 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 2000, // increases warning threshold to avoid warnings for large chunks
     rollupOptions: {
+      external: [
+        // Add any problematic modules here
+        "date-fns",
+      ],
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {
