@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"), // optional: convenient import alias
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   optimizeDeps: {
@@ -20,20 +20,17 @@ export default defineConfig({
       "jspdf-autotable",
       "axios",
       "papaparse",
-      "date-fns",
+      "date-fns", // Keep here for dependency optimization
     ],
   },
   build: {
-    chunkSizeWarningLimit: 2000, // increases warning threshold to avoid warnings for large chunks
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
-      external: [
-        // Add any problematic modules here
-        "date-fns",
-      ],
+      // Remove date-fns from external (this was the main issue)
+      external: [], // Empty unless you have actual external dependencies
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            // split vendor code into separate chunk
             return "vendor";
           }
         },
