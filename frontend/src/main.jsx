@@ -5,14 +5,17 @@ import App from "./App.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { LeaveRequestProvider } from "./contexts/LeaveRequestContext.jsx";
+import { HelmetProvider } from "react-helmet-async";
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <BrowserRouter>
-      <LeaveRequestProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </LeaveRequestProvider>
-    </BrowserRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        <LeaveRequestProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </LeaveRequestProvider>
+      </BrowserRouter>
+    </HelmetProvider>
   </StrictMode>
 );
