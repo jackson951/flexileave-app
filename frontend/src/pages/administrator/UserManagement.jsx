@@ -30,7 +30,7 @@ const LEAVE_TYPES = [
 ];
 
 const UserManagement = () => {
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, setUser } = useAuth();
 
   useApiInterceptors();
   const [employees, setEmployees] = useState([]);
@@ -199,6 +199,22 @@ const UserManagement = () => {
           payload
         );
         savedEmployee = response.data; // Axios response data is in response.data
+
+        if (editingEmployee.id === user.id) {
+          setUser((prevUser) => {
+            const hasNameChanged = savedEmployee.name !== prevUser.name;
+
+            return {
+              ...prevUser,
+              ...savedEmployee,
+              avatar: hasNameChanged
+                ? `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    formData.name || "User"
+                  )}&background=random&size=128`
+                : prevUser.avatar,
+            };
+          });
+        }
       } else {
         // Create new employee using ApiService for consistency
         const response = await ApiService.post("/users", payload);
