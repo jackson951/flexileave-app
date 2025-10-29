@@ -1,8 +1,9 @@
-import React from "react";
+import React, { lazy } from "react";
 import "./App.css";
 import AppRoutes from "./Routes/AppRoutes";
-import Header from "./components/header"; // Make sure path is correct
 import { useAuth } from "./contexts/AuthContext";
+
+const Header = lazy(() => import("./components/header"));
 
 import { useApiInterceptors } from "./api/web-api-service";
 
