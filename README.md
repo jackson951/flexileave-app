@@ -26,5 +26,5 @@ A modern **Leave Management System** that allows organizations to manage employe
 
 1. Clone the repository:  
 ```bash
-git clone <https://github.com/jackson951/digititan-leave-app.git>
+git clone <https://github.com/jackson951/leave-request-and-management-app.git>
 
