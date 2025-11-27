@@ -264,4 +264,19 @@ router.get("/verify", authenticateToken, async (req, res) => {
   }
 });
 
+// -------------------- HEALTH CHECK --------------------
+/**
+ * @swagger
+ * /api/health:
+ *   get:
+ *     summary: Check if the server is running
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ */
+router.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", message: "Server is running" });
+});
+
 module.exports = router;
