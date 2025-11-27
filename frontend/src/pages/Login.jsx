@@ -27,20 +27,20 @@ const LoginPage = () => {
   const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
 
   // SEO metadata
-  const pageTitle = "Login to Digititan - Employee Portal";
+  const pageTitle = "Login to myleaveapp - Employee Portal";
   const pageDescription =
-    "Secure login access to Digititan's employee dashboard. Manage your leave, profile, and work resources.";
+    "Secure login access to myleaveapp's employee dashboard. Manage your leave, profile, and work resources.";
   const pageKeywords =
-    "digititan login, employee portal, secure login, hr system, leave management";
+    "myleaveapp login, employee portal, secure login, hr system, leave management";
   const canonicalUrl = `${window.location.origin}/login`;
 
   useEffect(() => {
     const emailInput = document.getElementById("email");
     if (emailInput) emailInput.focus();
 
-    const savedEmail = localStorage.getItem("digititan_email");
+    const savedEmail = localStorage.getItem("myleaveapp_email");
     const savedRememberMe =
-      localStorage.getItem("digititan_rememberMe") === "true";
+      localStorage.getItem("myleaveapp_rememberMe") === "true";
     if (savedEmail && savedRememberMe) {
       setFormData((prev) => ({
         ...prev,
@@ -94,11 +94,11 @@ const LoginPage = () => {
 
       // Store credentials if remember me is checked
       if (formData.rememberMe) {
-        localStorage.setItem("digititan_email", formData.email);
-        localStorage.setItem("digititan_rememberMe", "true");
+        localStorage.setItem("myleaveapp_email", formData.email);
+        localStorage.setItem("myleaveapp_rememberMe", "true");
       } else {
-        localStorage.removeItem("digititan_email");
-        localStorage.removeItem("digititan_rememberMe");
+        localStorage.removeItem("myleaveapp_email");
+        localStorage.removeItem("myleaveapp_rememberMe");
       }
 
       await login({
@@ -123,7 +123,7 @@ const LoginPage = () => {
     url: canonicalUrl,
     mainEntity: {
       "@type": "WebApplication",
-      name: "Digititan Employee Portal",
+      name: "myleaveapp Employee Portal",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web Browser",
       description: pageDescription,
@@ -148,7 +148,7 @@ const LoginPage = () => {
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
         <meta property="og:url" content={canonicalUrl} />
-        <meta property="og:site_name" content="Digititan" />
+        <meta property="og:site_name" content="myleaveapp" />
 
         {/* Twitter Card meta tags */}
         <meta name="twitter:card" content="summary" />
@@ -157,7 +157,7 @@ const LoginPage = () => {
 
         {/* Additional SEO meta tags */}
         <meta name="robots" content="index, follow" />
-        <meta name="author" content="Digititan" />
+        <meta name="author" content="myleaveapp" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
         {/* Structured data */}
@@ -266,7 +266,7 @@ const LoginPage = () => {
                             ? "border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50"
                             : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
                         } focus:outline-none text-sm font-medium`}
-                        placeholder="employee@digititan.com"
+                        placeholder="employee@myleaveapp.com"
                         aria-describedby={errors.email ? "email-error" : null}
                         aria-invalid={errors.email ? "true" : "false"}
                         required
@@ -477,7 +477,7 @@ const LoginPage = () => {
                 </a>
               </p>
               <p className="text-xs text-gray-400">
-                © {new Date().getFullYear()} Digititan. All rights reserved. •
+                © {new Date().getFullYear()} myleaveapp. All rights reserved. •
                 v2.1.0
               </p>
             </div>

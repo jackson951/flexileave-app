@@ -29,11 +29,11 @@ const ForgotPasswordPage = () => {
   const [focusedField, setFocusedField] = useState(null);
 
   // SEO metadata
-  const pageTitle = "Reset Password - Digititan Employee Portal";
+  const pageTitle = "Reset Password - myleaveapp Employee Portal";
   const pageDescription =
-    "Securely reset your Digititan employee account password. Get OTP verification and create a new strong password for your account.";
+    "Securely reset your myleaveapp employee account password. Get OTP verification and create a new strong password for your account.";
   const pageKeywords =
-    "digititan reset password, forgot password, employee portal, password recovery, OTP verification";
+    "myleaveapp reset password, forgot password, employee portal, password recovery, OTP verification";
   const canonicalUrl = `${window.location.origin}/forgot-password`;
 
   // Timer effect
@@ -233,11 +233,11 @@ const ForgotPasswordPage = () => {
     mainEntity: {
       "@type": "Service",
       name: "Password Reset Service",
-      description: "Secure password recovery service for Digititan employees",
+      description: "Secure password recovery service for myleaveapp employees",
       serviceType: "Password Recovery",
       provider: {
         "@type": "Organization",
-        name: "Digititan",
+        name: "myleaveapp",
       },
     },
   };
@@ -256,7 +256,7 @@ const ForgotPasswordPage = () => {
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
         <meta property="og:url" content={canonicalUrl} />
-        <meta property="og:site_name" content="Digititan" />
+        <meta property="og:site_name" content="myleaveapp" />
 
         {/* Twitter Card meta tags */}
         <meta name="twitter:card" content="summary" />
@@ -265,7 +265,7 @@ const ForgotPasswordPage = () => {
 
         {/* Additional SEO meta tags */}
         <meta name="robots" content="index, follow" />
-        <meta name="author" content="Digititan" />
+        <meta name="author" content="myleaveapp" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
         {/* Structured data */}
@@ -402,7 +402,7 @@ const ForgotPasswordPage = () => {
                               ? "border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50"
                               : "border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
                           } focus:outline-none text-sm font-medium`}
-                          placeholder="employee@digititan.com"
+                          placeholder="employee@myleaveapp.com"
                           aria-describedby={errors.email ? "email-error" : null}
                           aria-invalid={errors.email ? "true" : "false"}
                           required
@@ -859,7 +859,7 @@ const ForgotPasswordPage = () => {
                 </p>
               )}
               <p className="text-xs text-gray-400">
-                © {new Date().getFullYear()} Digititan. All rights reserved. •
+                © {new Date().getFullYear()} myleaveapp. All rights reserved. •
                 v2.1.0
               </p>
             </div>

@@ -2,7 +2,7 @@
 import React from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
-import digititanLogo from "../assets/digititan-logo.jpeg";
+import myleaveappLogo from "../assets/myleaveapp-logo.jpeg";
 
 const Header = ({ variant = "default" }) => {
   const { isLoggedIn, user, logout } = useAuth();
@@ -27,13 +27,13 @@ const Header = ({ variant = "default" }) => {
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
               <img
-                src={digititanLogo}
-                alt="Digititan Logo"
+                src={myleaveappLogo}
+                alt="myleaveapp Logo"
                 className="w-full h-full object-cover rounded-lg"
               />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Digititan</h1>
+              <h1 className="text-xl font-bold text-gray-900">myleaveapp</h1>
               <p className="text-xs text-gray-500 -mt-1">Leave Management</p>
             </div>
           </div>

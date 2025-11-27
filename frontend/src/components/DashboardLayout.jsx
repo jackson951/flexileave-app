@@ -19,7 +19,7 @@ import {
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../contexts/AuthContext";
-import digititanLogo from "../assets/digititan-logo.jpeg";
+import myleaveappLogo from "../assets/myleaveapp-logo.jpeg";
 import { ApiService, useApiInterceptors } from "../api/web-api-service";
 import { formatDistanceToNow } from "date-fns";
 
@@ -259,14 +259,14 @@ const DashboardLayout = () => {
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
                       <img
-                        src={digititanLogo}
-                        alt="Digititan Logo"
+                        src={myleaveappLogo}
+                        alt="myleaveapp Logo"
                         className="w-full h-full object-cover rounded-lg"
                       />
                     </div>
                     <div>
                       <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                        Digititan
+                        myleaveapp
                       </h1>
                       <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
                         Leave Management
@@ -351,14 +351,14 @@ const DashboardLayout = () => {
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
                 <img
-                  src={digititanLogo}
-                  alt="Digititan Logo"
+                  src={myleaveappLogo}
+                  alt="myleaveapp Logo"
                   className="w-full h-full object-cover rounded-lg"
                 />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Digititan
+                  myleaveapp
                 </h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
                   Leave Management
@@ -452,13 +452,13 @@ const DashboardLayout = () => {
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
                     <img
-                      src={digititanLogo}
-                      alt="Digititan Logo"
+                      src={myleaveappLogo}
+                      alt="myleaveapp Logo"
                       className="w-full h-full object-cover rounded-lg"
                     />
                   </div>
                   <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                    Digititan
+                    myleaveapp
                   </h1>
                 </div>
               </div>

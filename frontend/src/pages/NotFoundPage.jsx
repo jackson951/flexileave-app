@@ -7,7 +7,7 @@ import {
   ArrowPathIcon,
   CloudIcon,
 } from "@heroicons/react/24/outline";
-import {useAuth }from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
 
 const NotFoundPage = () => {
   const navigate = useNavigate();
@@ -185,10 +185,10 @@ const NotFoundPage = () => {
               <p className="text-sm text-indigo-600 mt-1">
                 Contact our support team at{" "}
                 <a
-                  href="mailto:support@digititan.com"
+                  href="mailto:support@myleaveapp.com"
                   className="font-medium underline hover:text-indigo-500 transition-colors"
                 >
-                  support@digititan.com
+                  support@myleaveapp.com
                 </a>
               </p>
             </div>

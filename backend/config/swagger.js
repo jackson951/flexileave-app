@@ -5,13 +5,13 @@ const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Digititan Leave App API",
+      title: "myleaveapp Leave App API",
       version: "1.0.0",
       description:
-        "API documentation for the Digititan Leave Management App. <br><strong>Note:</strong> Authentication is handled via HttpOnly cookies. Login first via the auth endpoints to get authenticated.",
+        "API documentation for the myleaveapp Leave Management App. <br><strong>Note:</strong> Authentication is handled via HttpOnly cookies. Login first via the auth endpoints to get authenticated.",
       contact: {
         name: "API Support",
-        email: "support@digititan.com",
+        email: "support@myleaveapp.com",
       },
     },
     servers: [
@@ -20,7 +20,7 @@ const options = {
         description: "Development server",
       },
       {
-        url: "https://digititan-leave-app.onrender.com",
+        url: "https://myleaveapp-leave-app.onrender.com",
         description: "Production server",
       },
     ],
@@ -306,7 +306,7 @@ const swaggerUiOptions = {
       return req;
     },
   },
-  customSiteTitle: "Digititan Leave App API Documentation",
+  customSiteTitle: "myleaveapp Leave App API Documentation",
   customCss: ".swagger-ui .topbar { display: none }",
 };
 

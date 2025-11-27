@@ -8,11 +8,11 @@ async function main() {
   const hashedPassword = await bcrypt.hash("Kgaogelo#99", 10); // replace with your desired password
 
   const adminUser = await prisma.user.upsert({
-    where: { email: "jacksonk@digititan.co.za" },
+    where: { email: "jacksonk@myleaveapp.co.za" },
     update: {},
     create: {
       name: "Jackson Khuto",
-      email: "jacksonk@digititan.co.za",
+      email: "jacksonk@myleaveapp.co.za",
       phone: "+27 661802747",
       department: "IT",
       position: "Administrator",
