@@ -15,7 +15,7 @@ app.set("trust proxy", 1); // important for secure cookies
 // ------------------- CORS Setup -------------------
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://my-leave-app.vercel.app",
+  "https://flexileave.vercel.app",
   "http://localhost:5000", // swagger/testing
   "https://digititan-leave-app.onrender.com",
 ];
