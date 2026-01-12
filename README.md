@@ -8,7 +8,7 @@ A modern **Leave Management System** that allows organizations to manage employe
 
 - **Frontend:** React + Tailwind CSS  
 - **Backend:** Node.js + Express  
-- **Database:** SQLite managed with Prisma ORM  
+- **Database:** PostgreSQL managed with Prisma ORM  
 - **Authentication:** JWT-based, role-based access control  
 
 ---
