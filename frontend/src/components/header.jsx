@@ -2,7 +2,7 @@
 import React from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
-import digititanLogo from "../assets/digititan-logo.jpeg";
+import digititanLogo from "../assets/digititan-logo.jpg";
 
 const Header = ({ variant = "default" }) => {
   const { isLoggedIn, user, logout } = useAuth();
