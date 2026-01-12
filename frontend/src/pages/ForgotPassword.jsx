@@ -9,7 +9,6 @@ import {
   ShieldCheckIcon,
   ClockIcon,
 } from "@heroicons/react/24/outline";
-import axios from "axios";
 import { Helmet } from "react-helmet-async";
 
 const ForgotPasswordPage = () => {
@@ -27,20 +26,17 @@ const ForgotPasswordPage = () => {
   const [step, setStep] = useState(1);
   const [countdown, setCountdown] = useState(0);
   const [otpResent, setOtpResent] = useState(false);
-  const [focusedField, setFocusedField] = useState(null);
 
   /* =======================
-     SEO METADATA (FlexiLeave)
+     SEO
      ======================= */
-  const pageTitle = "Reset Password – FlexiLeave Employee Portal";
+  const pageTitle = "Reset Password – FlexiLeave";
   const pageDescription =
-    "Securely reset your FlexiLeave account password using OTP verification and create a new strong password.";
-  const pageKeywords =
-    "flexileave reset password, forgot password, leave management system, employee portal, otp verification";
+    "Reset your FlexiLeave account password securely using OTP verification.";
   const canonicalUrl = `${window.location.origin}/forgot-password`;
 
   /* =======================
-     COUNTDOWN TIMER
+     COUNTDOWN
      ======================= */
   useEffect(() => {
     if (countdown > 0) {
@@ -50,92 +46,65 @@ const ForgotPasswordPage = () => {
   }, [countdown]);
 
   /* =======================
-     AUTO FOCUS PER STEP
-     ======================= */
-  useEffect(() => {
-    if (step === 1) document.getElementById("email")?.focus();
-    if (step === 2) document.getElementById("otp-0")?.focus();
-    if (step === 3) document.getElementById("password")?.focus();
-  }, [step]);
-
-  /* =======================
      VALIDATION
      ======================= */
   const validateEmail = () => {
-    const newErrors = {};
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const err = {};
+    if (!formData.email) err.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
+      err.email = "Invalid email address";
+    setErrors(err);
+    return !Object.keys(err).length;
   };
 
-  const validateOTP = () => {
-    const newErrors = {};
-    if (!formData.otp || formData.otp.length !== 6) {
-      newErrors.otp = "Please enter the 6-digit verification code";
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const validateOtp = () => {
+    const err = {};
+    if (formData.otp.length !== 6)
+      err.otp = "Enter the 6-digit verification code";
+    setErrors(err);
+    return !Object.keys(err).length;
   };
 
   const validatePassword = () => {
-    const newErrors = {};
+    const err = {};
+    if (formData.password.length < 8)
+      err.password = "Minimum 8 characters required";
+    else if (!/[A-Z]/.test(formData.password))
+      err.password = "Must include an uppercase letter";
+    else if (!/[0-9]/.test(formData.password))
+      err.password = "Must include a number";
+    else if (!/[^A-Za-z0-9]/.test(formData.password))
+      err.password = "Must include a special character";
 
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
-    } else if (!/[A-Z]/.test(formData.password)) {
-      newErrors.password =
-        "Password must contain at least one uppercase letter";
-    } else if (!/[0-9]/.test(formData.password)) {
-      newErrors.password = "Password must contain at least one number";
-    } else if (!/[^A-Za-z0-9]/.test(formData.password)) {
-      newErrors.password =
-        "Password must contain at least one special character";
-    }
+    if (formData.password !== formData.confirmPassword)
+      err.confirmPassword = "Passwords do not match";
 
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors(err);
+    return !Object.keys(err).length;
   };
 
   /* =======================
      HANDLERS
      ======================= */
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setErrors({});
   };
 
   const handleOtpChange = (e, index) => {
-    const value = e.target.value;
-    if (value && !/^\d+$/.test(value)) return;
+    if (!/^\d?$/.test(e.target.value)) return;
 
-    const otpArray = formData.otp.split("");
-    otpArray[index] = value;
-    const newOtp = otpArray.join("").slice(0, 6);
+    const otp = formData.otp.split("");
+    otp[index] = e.target.value;
+    const joined = otp.join("").slice(0, 6);
 
-    setFormData((prev) => ({ ...prev, otp: newOtp }));
+    setFormData({ ...formData, otp: joined });
 
-    if (value && index < 5) {
-      document.getElementById(`otp-${index + 1}`)?.focus();
+    if (e.target.value && index < 5) {
+      document.getElementById(`otp-${index + 1}`).focus();
     }
 
-    if (newOtp.length === 6) handleVerifyOtp();
-  };
-
-  const handleBackspace = (e, index) => {
-    if (e.key === "Backspace" && !e.target.value && index > 0) {
-      document.getElementById(`otp-${index - 1}`)?.focus();
-    }
+    if (joined.length === 6) handleVerifyOtp();
   };
 
   const handleRequestOtp = async (e) => {
@@ -143,45 +112,30 @@ const ForgotPasswordPage = () => {
     if (!validateEmail()) return;
 
     setIsLoading(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    setTimeout(() => {
       setStep(2);
       setCountdown(120);
-      setOtpResent(false);
-    } catch {
-      setErrors({ submit: "Failed to send verification code." });
-    } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    setIsLoading(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setCountdown(120);
-      setOtpResent(true);
-      setErrors({});
-    } catch {
-      setErrors({ submit: "Failed to resend verification code." });
-    } finally {
-      setIsLoading(false);
-    }
+    }, 1000);
   };
 
   const handleVerifyOtp = async () => {
-    if (!validateOTP()) return;
+    if (!validateOtp()) return;
 
     setIsLoading(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    setTimeout(() => {
       setStep(3);
-      setErrors({});
-    } catch {
-      setErrors({ submit: "Invalid verification code." });
-    } finally {
       setIsLoading(false);
-    }
+    }, 1000);
+  };
+
+  const handleResendOtp = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setCountdown(120);
+      setOtpResent(true);
+      setIsLoading(false);
+    }, 1000);
   };
 
   const handleResetPassword = async (e) => {
@@ -189,82 +143,188 @@ const ForgotPasswordPage = () => {
     if (!validatePassword()) return;
 
     setIsLoading(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    setTimeout(() => {
       setStep(4);
-      setErrors({});
-    } catch {
-      setErrors({ submit: "Failed to reset password." });
-    } finally {
       setIsLoading(false);
-    }
+    }, 1200);
   };
 
-  const handleBackToLogin = () => navigate("/login");
-
-  const formatTime = (seconds) =>
-    `${Math.floor(seconds / 60)}:${seconds % 60 < 10 ? "0" : ""}${
-      seconds % 60
-    }`;
+  const formatTime = (s) =>
+    `${Math.floor(s / 60)}:${s % 60 < 10 ? "0" : ""}${s % 60}`;
 
   /* =======================
-     STRUCTURED DATA
+     UI
      ======================= */
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    name: pageTitle,
-    description: pageDescription,
-    url: canonicalUrl,
-    mainEntity: {
-      "@type": "Service",
-      name: "FlexiLeave Password Reset",
-      serviceType: "Password Recovery",
-      provider: {
-        "@type": "Organization",
-        name: "FlexiLeave",
-      },
-    },
-  };
-
   return (
     <>
       <Helmet>
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
-        <meta name="keywords" content={pageKeywords} />
         <link rel="canonical" href={canonicalUrl} />
-
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content={pageTitle} />
-        <meta property="og:description" content={pageDescription} />
-        <meta property="og:url" content={canonicalUrl} />
-        <meta property="og:site_name" content="FlexiLeave" />
-
-        <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content={pageTitle} />
-        <meta name="twitter:description" content={pageDescription} />
-
-        <meta name="robots" content="index, follow" />
-        <meta name="author" content="FlexiLeave" />
-
-        <script type="application/ld+json">
-          {JSON.stringify(structuredData)}
-        </script>
       </Helmet>
 
-      {/* ===== UI REMAINS UNCHANGED ===== */}
-      {/* Gradient background, cards, forms, steps, animations preserved */}
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+          {/* HEADER */}
+          <button
+            onClick={() => navigate("/login")}
+            className="flex items-center text-sm text-gray-500 hover:text-gray-700 mb-6"
+          >
+            <ArrowLeftIcon className="w-4 h-4 mr-1" /> Back to login
+          </button>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-        <div className="flex min-h-screen items-center justify-center p-4">
-          <div className="w-full max-w-md">
-            {/* --- UI CONTENT UNCHANGED --- */}
-          </div>
-        </div>
+          {/* STEP 1 */}
+          {step === 1 && (
+            <>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Forgot Password
+              </h1>
+              <p className="text-sm text-gray-500 mb-6">
+                Enter your FlexiLeave email to receive a verification code.
+              </p>
 
-        <div className="mt-6 text-center text-xs text-gray-400">
-          © {new Date().getFullYear()} FlexiLeave. All rights reserved. • v2.1.0
+              <form onSubmit={handleRequestOtp}>
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-gray-700">
+                    Email address
+                  </label>
+                  <div className="relative mt-1">
+                    <EnvelopeIcon className="w-5 h-5 absolute left-3 top-3 text-gray-400" />
+                    <input
+                      type="email"
+                      name="email"
+                      className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="you@company.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  {errors.email && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.email}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  disabled={isLoading}
+                  className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition"
+                >
+                  {isLoading ? "Sending..." : "Send OTP"}
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* STEP 2 */}
+          {step === 2 && (
+            <>
+              <h2 className="text-xl font-semibold mb-2">
+                Verify your email
+              </h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Enter the 6-digit code sent to your email.
+              </p>
+
+              <div className="flex justify-between mb-4">
+                {[...Array(6)].map((_, i) => (
+                  <input
+                    key={i}
+                    id={`otp-${i}`}
+                    maxLength="1"
+                    className="w-12 h-12 text-center text-lg border rounded-lg"
+                    onChange={(e) => handleOtpChange(e, i)}
+                  />
+                ))}
+              </div>
+
+              {errors.otp && (
+                <p className="text-red-500 text-xs mb-3">{errors.otp}</p>
+              )}
+
+              <div className="flex items-center justify-between text-sm">
+                {countdown > 0 ? (
+                  <span className="flex items-center text-gray-500">
+                    <ClockIcon className="w-4 h-4 mr-1" />
+                    Resend in {formatTime(countdown)}
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleResendOtp}
+                    className="text-indigo-600 hover:underline"
+                  >
+                    Resend code
+                  </button>
+                )}
+
+                {otpResent && (
+                  <span className="text-green-600 text-xs">
+                    Code resent
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* STEP 3 */}
+          {step === 3 && (
+            <>
+              <h2 className="text-xl font-semibold mb-4">
+                Create new password
+              </h2>
+
+              <form onSubmit={handleResetPassword}>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="New password"
+                  className="w-full mb-3 p-2 border rounded-lg"
+                  onChange={handleChange}
+                />
+                {errors.password && (
+                  <p className="text-red-500 text-xs mb-2">
+                    {errors.password}
+                  </p>
+                )}
+
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirm password"
+                  className="w-full mb-4 p-2 border rounded-lg"
+                  onChange={handleChange}
+                />
+                {errors.confirmPassword && (
+                  <p className="text-red-500 text-xs mb-2">
+                    {errors.confirmPassword}
+                  </p>
+                )}
+
+                <button className="w-full bg-indigo-600 text-white py-2 rounded-lg">
+                  Reset Password
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* STEP 4 */}
+          {step === 4 && (
+            <div className="text-center">
+              <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">
+                Password Reset Successful
+              </h2>
+              <p className="text-sm text-gray-500 mb-6">
+                You can now log in using your new password.
+              </p>
+              <button
+                onClick={() => navigate("/login")}
+                className="bg-indigo-600 text-white px-6 py-2 rounded-lg"
+              >
+                Go to Login
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>
