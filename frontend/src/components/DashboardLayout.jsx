@@ -19,7 +19,7 @@ import {
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../contexts/AuthContext";
-import digititanLogo from "../assets/digititan-logo.jpeg";
+import digititanLogo from "../assets/digititan-logo.jpg";
 import { ApiService, useApiInterceptors } from "../api/web-api-service";
 import { formatDistanceToNow } from "date-fns";
 
