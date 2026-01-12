@@ -33,7 +33,7 @@ const Header = ({ variant = "default" }) => {
               />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Digititan</h1>
+              <h1 className="text-xl font-bold text-gray-900">FlexiLeave</h1>
               <p className="text-xs text-gray-500 -mt-1">Leave Management</p>
             </div>
           </div>
