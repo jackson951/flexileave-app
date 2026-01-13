@@ -1,4 +1,4 @@
-# Leave Management App
+# FlexiLeave App
 
 A modern **Leave Management System** that allows organizations to manage employee leave requests efficiently. Employees can submit and track their leave, while admins can manage users and leave approvals.
 
@@ -26,5 +26,5 @@ A modern **Leave Management System** that allows organizations to manage employe
 
 1. Clone the repository:  
 ```bash
-git clone <https://github.com/jackson951/leave-request-and-management-app.git>
+git clone <https://github.com/jackson951/flexileave-app.git>
 
