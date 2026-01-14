@@ -30,7 +30,7 @@ Below are example screenshots of the FlexiLeave application. These images are st
 
 ### Login & Authentication
 
-![Login Screen](frontend/public/ex-1.png)
+![Login Screen](frontend/public/ex-6.png)
 
 ### Employee Management 
 
@@ -43,7 +43,7 @@ Below are example screenshots of the FlexiLeave application. These images are st
 
 ### Leave Tracking & History
 
-![Leave History](frontend/public/ex-4.png)
+![Leave History](frontend/public/ex-7.png)
 
 ### Admin Dashboard-Approval and Rejection
 
