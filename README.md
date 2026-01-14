@@ -48,6 +48,7 @@ Below are example screenshots of the FlexiLeave application. These images are st
 ### Leave Reports Page
 
 ![Leave History](frontend/public/ex-3.png)
+![Leave History](frontend/public/ex-8.png)
 
 ### Admin Dashboard-Approval and Rejection
 
