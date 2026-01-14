@@ -52,7 +52,8 @@ Below are example screenshots of the FlexiLeave application. These images are st
 
 ### Admin Dashboard-Approval and Rejection
 
-![Admin Dashboard](frontend/public/ex-1.png)
+![Admin Dashboard](frontend/public/ex-1.png
+![Admin Dashboard](frontend/public/ex-9.png)
 
 ---
 
