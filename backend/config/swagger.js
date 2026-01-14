@@ -5,13 +5,13 @@ const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Digititan Leave App API",
+      title: "FlexiLeave App API",
       version: "1.0.0",
       description:
-        "API documentation for the Digititan Leave Management App. <br><strong>Note:</strong> Authentication is handled via HttpOnly cookies. Login first via the auth endpoints to get authenticated.",
+        "API documentation for the FlexiLeave Leave Management App. <br><strong>Note:</strong> Authentication is handled via HttpOnly cookies. Login first via the auth endpoints to get authenticated.",
       contact: {
         name: "API Support",
-        email: "support@digititan.com",
+        email: "support@flexileave.com",
       },
     },
     servers: [
@@ -20,6 +20,7 @@ const options = {
         description: "Development server",
       },
       {
+        // 🔒 Production URL intentionally unchanged
         url: "https://digititan-leave-app.onrender.com",
         description: "Production server",
       },
@@ -99,7 +100,6 @@ const options = {
             userId: {
               type: "string",
               format: "uuid",
-              example: "123e4567-e89b-12d3-a456-426614174000",
             },
             type: {
               type: "string",
@@ -234,13 +234,7 @@ const options = {
           description: "Authentication token is missing or invalid",
           content: {
             "application/json": {
-              schema: {
-                $ref: "#/components/schemas/Error",
-              },
-              example: {
-                success: false,
-                message: "Authentication required",
-              },
+              schema: { $ref: "#/components/schemas/Error" },
             },
           },
         },
@@ -248,13 +242,7 @@ const options = {
           description: "Insufficient permissions",
           content: {
             "application/json": {
-              schema: {
-                $ref: "#/components/schemas/Error",
-              },
-              example: {
-                success: false,
-                message: "Insufficient permissions",
-              },
+              schema: { $ref: "#/components/schemas/Error" },
             },
           },
         },
@@ -262,13 +250,7 @@ const options = {
           description: "Resource not found",
           content: {
             "application/json": {
-              schema: {
-                $ref: "#/components/schemas/Error",
-              },
-              example: {
-                success: false,
-                message: "User not found",
-              },
+              schema: { $ref: "#/components/schemas/Error" },
             },
           },
         },
@@ -276,37 +258,28 @@ const options = {
           description: "Validation error",
           content: {
             "application/json": {
-              schema: {
-                $ref: "#/components/schemas/Error",
-              },
-              example: {
-                success: false,
-                message: "Validation failed",
-                error: "Email is required",
-              },
+              schema: { $ref: "#/components/schemas/Error" },
             },
           },
         },
       },
     },
-    // No global security requirement since we use HttpOnly cookies
   },
   apis: ["./routes/*.js"],
 };
 
 const specs = swaggerJsdoc(options);
 
-// Custom Swagger UI options to include HttpOnly cookies
+// Swagger UI configuration for HttpOnly cookie auth
 const swaggerUiOptions = {
   swaggerOptions: {
     persistAuthorization: true,
     requestInterceptor: (req) => {
-      // This ensures HttpOnly cookies are sent with requests from Swagger UI
       req.credentials = "include";
       return req;
     },
   },
-  customSiteTitle: "Digititan Leave App API Documentation",
+  customSiteTitle: "FlexiLeave App API Documentation",
   customCss: ".swagger-ui .topbar { display: none }",
 };
 
