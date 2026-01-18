@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useApiInterceptors } from "../api/web-api-service";
 
-// ✅ Lazy load all pages for faster initial paint
+// Lazy load all pages for faster initial paint
 const LoginPage = lazy(() => import("../pages/Login"));
 const DashboardLayout = lazy(() => import("../components/DashboardLayout"));
 const LeaveHistory = lazy(() => import("../pages/leave/LeaveHistory"));
@@ -20,14 +20,14 @@ const TeamCalender = lazy(() => import("../pages/administrator/TeamCalender"));
 const ForgotPasswordPage = lazy(() => import("../pages/ForgotPassword"));
 const NewLeaveRequest = lazy(() => import("../components/NewLeaveRequest"));
 
-// ✅ Global Loading Spinner
+//Global Loading Spinner
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
   </div>
 );
 
-// ✅ Route Guards
+// Route Guards
 const PublicRoute = ({ children }) => {
   const { isLoggedIn, loading } = useAuth();
   if (loading) return <LoadingSpinner />;
@@ -50,7 +50,7 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
-// ✅ Role-Based Rendering
+// Role-Based Rendering
 const RoleBased = ({ user, userComponent, adminComponent }) =>
   user?.role === "admin" ? adminComponent : userComponent;
 
@@ -60,7 +60,7 @@ const AppRoutes = () => {
   // Initialize API interceptors
   useApiInterceptors();
 
-  // ⚡ Prevent white flash when auth is initializing
+  // Prevent white flash when auth is initializing
   if (loading) return <LoadingSpinner />;
 
   return (
