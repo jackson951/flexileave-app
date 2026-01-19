@@ -154,12 +154,6 @@ The app should now be running locally 🎉
 
 ---
 
-## 📄 License
-
-This project is open-source and available under the **MIT License**.
-
----
-
 ## 👤 Author
 
 **Jackson Khuto**
