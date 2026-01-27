@@ -7,10 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+////////////////////////
+// TENANT (COMPANY)
+////////////////////////
+model Tenant {
+  id            Int             @id @default(autoincrement())
+  name          String
+  code          String          @unique
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+
+  users         User[]
+  leaves        Leave[]
+  notifications Notification[]
+
+  @@map("tenants")
+}
+
+////////////////////////
+// USER
+////////////////////////
 model User {
-  id                     Int            @id @default(autoincrement())
+  id                     Int             @id @default(autoincrement())
+  tenantId               Int
+  tenant                 Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   name                   String
-  email                  String         @unique
+  email                  String
   phone                  String?
   department             String?
   position               String?
@@ -19,38 +42,58 @@ model User {
   role                   String
   avatar                 String?
   password               String
-  createdAt              DateTime       @default(now())
-  refreshToken           String?
-  actionedLeaves         Leave[]        @relation("LeaveActionedBy")
-  leaves                 Leave[]
-  notificationsReceived  Notification[] @relation("NotificationRecipient")
-  notificationsTriggered Notification[] @relation("NotificationTriggeredBy")
 
+  refreshToken           String?
+  createdAt              DateTime        @default(now())
+
+  leaves                 Leave[]
+  actionedLeaves         Leave[]          @relation("LeaveActionedBy")
+
+  notificationsReceived  Notification[]  @relation("NotificationRecipient")
+  notificationsTriggered Notification[]  @relation("NotificationTriggeredBy")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
   @@map("users")
 }
 
+////////////////////////
+// LEAVE
+////////////////////////
 model Leave {
-  id               Int            @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
+  tenantId         Int
+  tenant           Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   leaveType        String
   startDate        DateTime
   endDate          DateTime
   days             Int
   reason           String
-  status           String         @default("pending")
-  submittedAt      DateTime       @default(now())
+  status           String          @default("pending")
+  submittedAt      DateTime        @default(now())
+
   rejectionReason  String?
   emergencyContact String?
   emergencyPhone   String?
+
   userId           Int
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   actionedBy       Int?
+  actionedByUser   User?           @relation("LeaveActionedBy", fields: [actionedBy], references: [id])
+
   attachments      File[]
-  actionedByUser   User?          @relation("LeaveActionedBy", fields: [actionedBy], references: [id])
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   notifications    Notification[]
 
+  @@index([tenantId])
+  @@index([userId])
   @@map("leaves")
 }
 
+////////////////////////
+// FILE ATTACHMENTS
+////////////////////////
 model File {
   id         Int      @id @default(autoincrement())
   name       String
@@ -58,32 +101,46 @@ model File {
   size       Int
   type       String
   uploadedAt DateTime @default(now())
+
   leaveId    Int?
-  leave      Leave?   @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  leave      Leave?  @relation(fields: [leaveId], references: [id], onDelete: Cascade)
 
   @@map("files")
 }
 
+////////////////////////
+// NOTIFICATIONS
+////////////////////////
 model Notification {
   id            Int              @id @default(autoincrement())
+  tenantId      Int
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   type          NotificationType
   title         String
   message       String
   isRead        Boolean          @default(false)
   createdAt     DateTime         @default(now())
+
   recipientId   Int
-  triggeredById Int?
-  leaveId       Int?
-  metadata      Json?
-  leave         Leave?           @relation(fields: [leaveId], references: [id], onDelete: Cascade)
   recipient     User             @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  triggeredById Int?
   triggeredBy   User?            @relation("NotificationTriggeredBy", fields: [triggeredById], references: [id])
 
-  @@index([recipientId, isRead])
-  @@index([recipientId, createdAt])
+  leaveId       Int?
+  leave         Leave?           @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+
+  metadata      Json?
+
+  @@index([tenantId, recipientId, isRead])
+  @@index([tenantId, createdAt])
   @@map("notifications")
 }
 
+////////////////////////
+// ENUMS
+////////////////////////
 enum NotificationType {
   leave_submitted
   leave_approved
