@@ -17,7 +17,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "https://flexileave.vercel.app",
   "http://localhost:5000", // swagger/testing
-  "https://digititan-leave-app.onrender.com",
+  "https://flexileave-api.onrender.com", // swagger/testing
 ];
 
 const corsOptions = {
