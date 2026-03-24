@@ -12,13 +12,21 @@ export const useAuth = () => {
   return context;
 };
 
-// ⭐ Reads the non-httpOnly cookie the backend sets on login/refresh.
-// Returns true only if "auth_session=1" is present in document.cookie.
-// Since this cookie has no sensitive data, reading it is perfectly safe.
+// ⭐ localStorage key — holds "1" when a session exists, absent otherwise.
+// Unlike the cookie approach, this always lives on the frontend domain
+// so it's readable regardless of where the API is hosted.
+const SESSION_HINT_KEY = "auth_session";
+
 const hasSessionHint = () => {
-  return document.cookie
-    .split(";")
-    .some((c) => c.trim().startsWith("auth_session="));
+  return localStorage.getItem(SESSION_HINT_KEY) === "1";
+};
+
+const setSessionHint = () => {
+  localStorage.setItem(SESSION_HINT_KEY, "1");
+};
+
+const clearSessionHint = () => {
+  localStorage.removeItem(SESSION_HINT_KEY);
 };
 
 export const AuthProvider = ({ children }) => {
@@ -32,9 +40,7 @@ export const AuthProvider = ({ children }) => {
   // -------------------- INITIAL AUTH CHECK --------------------
   useEffect(() => {
     const checkAuthStatus = async () => {
-      // ⭐ Gate: if the hint cookie is absent, we know for certain no
-      // httpOnly accessToken was set by our backend — skip the network
-      // call entirely and resolve immediately as logged-out.
+      // ⭐ No hint = definitely not logged in, skip the network call
       if (!hasSessionHint()) {
         setIsLoggedIn(false);
         setUser(null);
@@ -42,7 +48,6 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // Hint exists → accessToken *probably* exists → confirm with backend
       try {
         const response = await ApiService.get("/auth/verify", {
           withCredentials: true,
@@ -52,14 +57,17 @@ export const AuthProvider = ({ children }) => {
           setIsLoggedIn(true);
           setUser(response.data.user);
         } else {
-          // Backend said token is invalid (e.g. tampered) — clear state
+          // Backend invalidated the session (e.g. token tampered)
+          clearSessionHint();
           setIsLoggedIn(false);
           setUser(null);
         }
       } catch (error) {
-        // 401 = accessToken missing/expired, 403 = invalid token
-        // In both cases, treat the user as logged out
-        console.error("Auth check failed:", error);
+        // 401/403 means the httpOnly accessToken is missing or expired.
+        // Clear the stale hint so we don't loop on next refresh.
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          clearSessionHint();
+        }
         setIsLoggedIn(false);
         setUser(null);
       } finally {
@@ -71,9 +79,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // -------------------- LOGIN --------------------
-  // userData comes from the POST /auth/login response.
-  // The hint cookie is already set by the backend at this point.
   const login = async ({ userData }) => {
+    // ⭐ Backend has already set the httpOnly cookies — we just stamp
+    // the localStorage hint so the next page load knows to call /verify
+    setSessionHint();
     setUser(userData);
     setIsLoggedIn(true);
   };
@@ -83,11 +92,14 @@ export const AuthProvider = ({ children }) => {
     setLogoutLoading(true);
 
     try {
-      // Backend clears accessToken, refreshToken, AND auth_session cookies
+      // Backend clears httpOnly cookies
       await ApiService.post("/auth/logout", {}, { withCredentials: true });
     } catch (err) {
       console.warn("Logout request failed:", err.message);
     } finally {
+      // ⭐ Always clear the hint even if the backend call fails,
+      // otherwise the user stays "stuck" calling /verify forever
+      clearSessionHint();
       setUser(null);
       setIsLoggedIn(false);
       setLogoutLoading(false);
