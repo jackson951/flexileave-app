@@ -21,7 +21,7 @@ const options = {
       },
       {
         // 🔒 Production URL intentionally unchanged
-        url: "https://digititan-leave-app.onrender.com",
+        url: "https://flexileave-api.onrender.com",
         description: "Production server",
       },
     ],
