@@ -27,7 +27,7 @@ const getAccessTokenCookieOptions = () => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 24 * 60 * 60 * 1000,
+    maxAge: 24 * 60 * 60 * 1000, // 24h
   };
   if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
     options.domain = process.env.COOKIE_DOMAIN;
@@ -40,7 +40,23 @@ const getRefreshTokenCookieOptions = () => {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
+  };
+  if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
+    options.domain = process.env.COOKIE_DOMAIN;
+  }
+  return options;
+};
+
+// ⭐ Session hint cookie — NOT httpOnly so JS can read it.
+// Holds zero sensitive data ("1"), just signals a session may exist.
+// Its maxAge matches the accessToken so they expire together.
+const getSessionHintCookieOptions = () => {
+  const options = {
+    httpOnly: false, // Must be readable by JS
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+    maxAge: 24 * 60 * 60 * 1000, // Match accessToken (24h)
   };
   if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
     options.domain = process.env.COOKIE_DOMAIN;
@@ -107,6 +123,8 @@ router.post("/login", async (req, res) => {
 
     res.cookie("accessToken", accessToken, getAccessTokenCookieOptions());
     res.cookie("refreshToken", refreshToken, getRefreshTokenCookieOptions());
+    // ⭐ Set the JS-readable hint so the frontend knows a session exists
+    res.cookie("auth_session", "1", getSessionHintCookieOptions());
 
     const { password: _, refreshToken: __, ...userData } = user;
     res.json({ message: "Login successful", user: userData });
@@ -155,6 +173,8 @@ router.post("/refresh", async (req, res) => {
 
     res.cookie("accessToken", newAccessToken, getAccessTokenCookieOptions());
     res.cookie("refreshToken", newRefreshToken, getRefreshTokenCookieOptions());
+    // ⭐ Re-stamp the hint on every token refresh so it stays alive
+    res.cookie("auth_session", "1", getSessionHintCookieOptions());
 
     res.json({ message: "Tokens refreshed successfully" });
   } catch (err) {
@@ -191,6 +211,8 @@ router.post("/logout", async (req, res) => {
 
   res.clearCookie("accessToken", getAccessTokenCookieOptions());
   res.clearCookie("refreshToken", getRefreshTokenCookieOptions());
+  // ⭐ Clear the hint so the frontend skips /auth/verify on next load
+  res.clearCookie("auth_session", getSessionHintCookieOptions());
 
   res.json({ message: "Logged out successfully" });
 });
