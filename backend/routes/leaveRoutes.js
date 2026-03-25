@@ -1,12 +1,18 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 const express = require("express");
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const { body, validationResult } = require("express-validator");
 const multer = require("multer");
-const jwt = require("jsonwebtoken");
 const cloudinary = require("cloudinary").v2;
+const {
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles,
+} = require("../middleware/auth");
+
+const requireAdminOrManager = authorizeRoles("OWNER", "ADMIN", "MANAGER");
 
 // -------------------- CLOUDINARY CONFIG -------------------- //
 cloudinary.config({
@@ -38,39 +44,13 @@ const upload = multer({
   },
 });
 
-// -------------------- MIDDLEWARE -------------------- //
-const authenticateToken = (req, res, next) => {
-  const token = req.cookies.accessToken;
-
-  if (!token) {
-    return res.status(401).json({ message: "Access token required" });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: "Invalid or expired token" });
-    }
-    req.user = user;
-    next();
-  });
-};
-
-const isAdminOrManager = (req, res, next) => {
-  if (req.user.role !== "admin" && req.user.role !== "manager") {
-    return res
-      .status(403)
-      .json({ message: "Admin or manager access required" });
-  }
-  next();
-};
-
 // Helper function to get leave balance
 const getLeaveBalance = (leaveBalances, leaveType) => {
   if (!leaveBalances) return 0;
   return leaveBalances[leaveType] || 0;
 };
 
-// ✅ FIXED: Robust Cloudinary upload with correct resource_type
+// ? FIXED: Robust Cloudinary upload with correct resource_type
 const uploadToCloudinary = (
   fileBuffer,
   fileName,
@@ -109,7 +89,7 @@ const uploadToCloudinary = (
     const baseName = cleanName.replace(/^.*[\\/]/, "").replace(/\.[^/.]+$/, "");
     const public_id = `leave_${Date.now()}_${baseName}`;
 
-    // Upload options — this fixes PDFs and DOCX not opening correctly
+    // Upload options � this fixes PDFs and DOCX not opening correctly
     const uploadOptions = {
       folder,
       resource_type,
@@ -118,7 +98,7 @@ const uploadToCloudinary = (
       invalidate: true,
     };
 
-    // ✅ Add file format for non-images
+    // ? Add file format for non-images
     if (!imageExts.has(ext) && ext) {
       uploadOptions.format = ext;
     }
@@ -128,10 +108,10 @@ const uploadToCloudinary = (
       uploadOptions,
       (error, result) => {
         if (error) {
-          console.error("❌ Cloudinary upload error:", error.message);
+          console.error("? Cloudinary upload error:", error.message);
           reject(new Error(`Upload failed: ${error.message}`));
         } else {
-          console.log("✅ Uploaded to Cloudinary:", result.secure_url);
+          console.log("? Uploaded to Cloudinary:", result.secure_url);
           resolve(result);
         }
       }
@@ -142,7 +122,7 @@ const uploadToCloudinary = (
   });
 };
 
-// ✅ FIXED: Reliable deletion using regex-based public_id extraction
+// ? FIXED: Reliable deletion using regex-based public_id extraction
 const deleteFromCloudinary = async (fileUrl) => {
   try {
     // Extract public_id from secure_url (handles versioned URLs like /v12345/)
@@ -157,14 +137,14 @@ const deleteFromCloudinary = async (fileUrl) => {
       resource_type,
     });
     console.log(
-      "🗑️ Deleted from Cloudinary:",
+      "??? Deleted from Cloudinary:",
       publicId,
       "| Result:",
       result.result
     );
     return result;
   } catch (error) {
-    console.error("❌ Cloudinary delete error:", error.message);
+    console.error("? Cloudinary delete error:", error.message);
     throw error;
   }
 };
@@ -189,6 +169,89 @@ const cleanupOrphanedFiles = async () => {
     console.error("Orphan cleanup error:", error);
     throw error;
   }
+};
+
+const NOTIFICATION_TYPES = {
+  SUBMITTED: "leave_submitted",
+  APPROVED: "leave_approved",
+  REJECTED: "leave_rejected",
+};
+
+const ADMIN_NOTIFICATION_ROLES = ["ADMIN", "MANAGER"];
+
+const formatDateOnly = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toISOString().split("T")[0];
+};
+
+const formatLeaveDateRange = (leave) =>
+  `${formatDateOnly(leave.startDate)} to ${formatDateOnly(leave.endDate)}`;
+
+const buildLeaveNotificationMetadata = (leave, status) => ({
+  leaveId: leave.id,
+  status,
+  leaveType: leave.leaveType,
+  startDate: leave.startDate,
+  endDate: leave.endDate,
+});
+
+const notifyTenantRoles = async ({
+  tenantId,
+  roles,
+  leave,
+  triggeredById,
+  type,
+  title,
+  message,
+  status,
+}) => {
+  if (!roles || roles.length === 0) return;
+
+  const recipients = await prisma.user.findMany({
+    where: {
+      tenantId,
+      role: { in: roles },
+    },
+    select: { id: true },
+  });
+
+  if (!recipients.length) return;
+
+  const metadataTemplate = buildLeaveNotificationMetadata(leave, status);
+
+  await prisma.notification.createMany({
+    data: recipients.map((recipient) => ({
+      recipientId: recipient.id,
+      triggeredById,
+      leaveId: leave.id,
+      type,
+      title,
+      message,
+      metadata: { ...metadataTemplate },
+    })),
+  });
+};
+
+const sendNotificationToUser = async ({
+  recipientId,
+  leave,
+  triggeredById,
+  type,
+  title,
+  message,
+  status,
+}) => {
+  await prisma.notification.create({
+    data: {
+      recipientId,
+      triggeredById,
+      leaveId: leave.id,
+      type,
+      title,
+      message,
+      metadata: buildLeaveNotificationMetadata(leave, status),
+    },
+  });
 };
 
 // Schedule cleanup every hour
@@ -240,8 +303,8 @@ setInterval(async () => {
  *           example: "+1234567890"
  *         status:
  *           type: string
- *           enum: [pending, approved, rejected, cancelled]
- *           example: pending
+ *           enum: [PENDING, APPROVED, REJECTED, CANCELLED]
+ *           example: PENDING
  *         rejectionReason:
  *           type: string
  *           example: null
@@ -519,6 +582,7 @@ router.delete("/file/:fileId", authenticateToken, async (req, res) => {
 router.post(
   "/",
   authenticateToken,
+  tenantGuard,
   [
     body("leaveType").trim().notEmpty().withMessage("Leave type is required"),
     body("startDate")
@@ -583,7 +647,7 @@ router.post(
         where: {
           userId: req.user.userId,
           AND: [{ startDate: { lte: end } }, { endDate: { gte: start } }],
-          status: { notIn: ["rejected", "cancelled"] },
+          status: { notIn: ["REJECTED", "CANCELLED"] },
         },
       });
 
@@ -617,16 +681,37 @@ router.post(
           emergencyContact,
           emergencyPhone,
           userId: req.user.userId,
+          status: "PENDING",
           attachments:
             fileIds?.length > 0
               ? { connect: fileIds.map((id) => ({ id })) }
               : undefined,
-        },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-          attachments: true,
-        },
-      });
+          },
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+            attachments: true,
+          },
+        });
+
+      try {
+        const dateRange = formatLeaveDateRange(newLeave);
+        const leaveMessage = `${user.name} submitted ${newLeave.leaveType} for ${dateRange}.`;
+        await notifyTenantRoles({
+          tenantId: req.user.tenantId,
+          roles: ADMIN_NOTIFICATION_ROLES,
+          leave: newLeave,
+          triggeredById: req.user.userId,
+          type: NOTIFICATION_TYPES.SUBMITTED,
+          title: "New leave request submitted",
+          message: leaveMessage,
+          status: "PENDING",
+        });
+      } catch (notificationError) {
+        console.error(
+          "Failed to notify tenant admins about new leave",
+          notificationError
+        );
+      }
 
       res.status(201).json(newLeave);
     } catch (error) {
@@ -649,7 +734,7 @@ router.post(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, approved, rejected, cancelled]
+ *           enum: [PENDING, APPROVED, REJECTED, CANCELLED]
  *       - in: query
  *         name: userId
  *         schema:
@@ -674,7 +759,12 @@ router.post(
  *       500:
  *         description: Internal server error
  */
-router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
+router.get(
+  "/",
+  authenticateToken,
+  tenantGuard,
+  requireAdminOrManager,
+  async (req, res) => {
   try {
     const { status, userId, leaveType } = req.query;
     const whereClause = {};
@@ -683,7 +773,10 @@ router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
     if (leaveType) whereClause.leaveType = leaveType;
 
     const leaves = await prisma.leave.findMany({
-      where: whereClause,
+      where: {
+        ...whereClause,
+        user: { tenantId: req.user.tenantId },
+      },
       include: {
         user: {
           select: {
@@ -730,7 +823,7 @@ router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, approved, rejected, cancelled]
+ *           enum: [PENDING, APPROVED, REJECTED, CANCELLED]
  *     responses:
  *       200:
  *         description: List of user's leaves
@@ -747,7 +840,7 @@ router.get("/", authenticateToken, isAdminOrManager, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-router.get("/my", authenticateToken, async (req, res) => {
+router.get("/my", authenticateToken, tenantGuard, async (req, res) => {
   try {
     const { status } = req.query;
     const whereClause = { userId: req.user.userId };
@@ -821,7 +914,14 @@ router.get("/:id", authenticateToken, async (req, res) => {
     const leave = await prisma.leave.findUnique({
       where: { id: leaveId },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            tenantId: true,
+          },
+        },
         actionedByUser: {
           select: {
             id: true,
@@ -838,6 +938,10 @@ router.get("/:id", authenticateToken, async (req, res) => {
 
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
+    }
+
+    if (leave.user?.tenantId !== req.user.tenantId) {
+      return res.status(403).json({ message: "Unauthorized access" });
     }
 
     if (
@@ -915,7 +1019,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Leave'
  *       400:
- *         description: Validation error or cannot update approved/rejected leave
+ *         description: Validation error or cannot update APPROVED/REJECTED leave
  *       401:
  *         description: Access token required
  *       403:
@@ -956,20 +1060,32 @@ router.put(
 
       const leave = await prisma.leave.findUnique({
         where: { id: leaveId },
-        include: { attachments: true },
+        include: {
+          attachments: true,
+          user: {
+            select: {
+              id: true,
+              tenantId: true,
+            },
+          },
+        },
       });
       if (!leave) {
         return res.status(404).json({ message: "Leave not found" });
+      }
+
+      if (leave.user?.tenantId !== req.user.tenantId) {
+        return res.status(403).json({ message: "Unauthorized access" });
       }
 
       if (leave.userId !== req.user.userId && req.user.role !== "admin") {
         return res.status(403).json({ message: "Unauthorized access" });
       }
 
-      if (leave.status !== "pending") {
+      if (leave.status !== "PENDING") {
         return res
           .status(400)
-          .json({ message: "Cannot update approved/rejected leave" });
+          .json({ message: "Cannot update leaves that are APPROVED or REJECTED" });
       }
 
       const {
@@ -1011,7 +1127,7 @@ router.put(
               { startDate: { lte: newEnd } },
               { endDate: { gte: newStart } },
             ],
-            status: { not: "rejected" },
+            status: { not: "REJECTED" },
           },
         });
 
@@ -1127,7 +1243,7 @@ router.put(
  *                 leave:
  *                   $ref: '#/components/schemas/Leave'
  *       400:
- *         description: Only pending leaves can be approved or insufficient balance
+ *         description: Only PENDING leaves can be APPROVED or insufficient balance
  *       401:
  *         description: Access token required
  *       403:
@@ -1140,7 +1256,8 @@ router.put(
 router.put(
   "/:id/approve",
   authenticateToken,
-  isAdminOrManager,
+  tenantGuard,
+  requireAdminOrManager,
   async (req, res) => {
     try {
       const leaveId = parseInt(req.params.id);
@@ -1150,16 +1267,34 @@ router.put(
 
       const leave = await prisma.leave.findUnique({
         where: { id: leaveId },
-        include: { user: true, attachments: true },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              leaveBalances: true,
+              avatar: true,
+              position: true,
+              department: true,
+              tenantId: true,
+            },
+          },
+          attachments: true,
+        },
       });
       if (!leave) {
         return res.status(404).json({ message: "Leave not found" });
       }
 
-      if (leave.status !== "pending") {
+      if (leave.user?.tenantId !== req.user.tenantId) {
+        return res.status(403).json({ message: "Unauthorized access" });
+      }
+
+      if (leave.status !== "PENDING") {
         return res
           .status(400)
-          .json({ message: "Only pending leaves can be approved" });
+          .json({ message: "OnlyPENDING leaves can beAPPROVED" });
       }
 
       const currentBalance = getLeaveBalance(
@@ -1185,7 +1320,7 @@ router.put(
       const updatedLeave = await prisma.leave.update({
         where: { id: leaveId },
         data: {
-          status: "approved",
+          status: "APPROVED",
           rejectionReason: null,
           actionedBy: req.user.userId,
         },
@@ -1215,11 +1350,30 @@ router.put(
         },
       });
 
+      try {
+        const approvedRange = formatLeaveDateRange(updatedLeave);
+        const approvalMessage = `Your ${updatedLeave.leaveType} request for ${approvedRange} has been approved.`;
+        await sendNotificationToUser({
+          recipientId: updatedLeave.user.id,
+          leave: updatedLeave,
+          triggeredById: req.user.userId,
+          type: NOTIFICATION_TYPES.APPROVED,
+          title: "Leave approved",
+          message: approvalMessage,
+          status: updatedLeave.status,
+        });
+      } catch (notificationError) {
+        console.error(
+          "Failed to notify employee after leave approval",
+          notificationError
+        );
+      }
+
       res.json({
         message:
           leave.leaveType === "UnpaidLeave"
-            ? "Unpaid leave approved successfully"
-            : `Leave approved and ${leave.days} days deducted from ${leave.leaveType} balance`,
+            ? "Unpaid leaveAPPROVED successfully"
+            : `LeaveAPPROVED and ${leave.days} days deducted from ${leave.leaveType} balance`,
         leave: updatedLeave,
       });
     } catch (error) {
@@ -1258,7 +1412,7 @@ router.put(
  *                 example: "Insufficient documentation"
  *     responses:
  *       200:
- *         description: Leave rejected successfully
+ *         description: LeaveREJECTED successfully
  *         content:
  *           application/json:
  *             schema:
@@ -1277,7 +1431,8 @@ router.put(
 router.put(
   "/:id/reject",
   authenticateToken,
-  isAdminOrManager,
+  tenantGuard,
+  requireAdminOrManager,
   async (req, res) => {
     try {
       const leaveId = parseInt(req.params.id);
@@ -1292,10 +1447,32 @@ router.put(
           .json({ message: "Rejection reason is required" });
       }
 
-      const leave = await prisma.leave.update({
+      const leave = await prisma.leave.findUnique({
+        where: { id: leaveId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              tenantId: true,
+            },
+          },
+        },
+      });
+
+      if (!leave) {
+        return res.status(404).json({ message: "Leave not found" });
+      }
+
+      if (leave.user?.tenantId !== req.user.tenantId) {
+        return res.status(403).json({ message: "Unauthorized access" });
+      }
+
+      const updatedLeave = await prisma.leave.update({
         where: { id: leaveId },
         data: {
-          status: "rejected",
+          status: "REJECTED",
           rejectionReason: rejectionReason.trim(),
           actionedBy: req.user.userId,
         },
@@ -1315,7 +1492,26 @@ router.put(
         },
       });
 
-      res.json(leave);
+      try {
+        const rejectionRange = formatLeaveDateRange(updatedLeave);
+        const rejectionMessage = `Your ${updatedLeave.leaveType} request for ${rejectionRange} was rejected. Reason: ${updatedLeave.rejectionReason}`;
+        await sendNotificationToUser({
+          recipientId: updatedLeave.user.id,
+          leave: updatedLeave,
+          triggeredById: req.user.userId,
+          type: NOTIFICATION_TYPES.REJECTED,
+          title: "Leave rejected",
+          message: rejectionMessage,
+          status: updatedLeave.status,
+        });
+      } catch (notificationError) {
+        console.error(
+          "Failed to notify employee after leave rejection",
+          notificationError
+        );
+      }
+
+      res.json(updatedLeave);
     } catch (error) {
       console.error("Reject leave error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -1346,7 +1542,7 @@ router.put(
  *             schema:
  *               $ref: '#/components/schemas/Leave'
  *       400:
- *         description: Only pending leaves can be cancelled
+ *         description: Only PENDING leaves can be CANCELLED
  *       401:
  *         description: Access token required
  *       403:
@@ -1363,22 +1559,35 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
       return res.status(400).json({ message: "Invalid leave ID" });
     }
 
-    const leave = await prisma.leave.findUnique({ where: { id: leaveId } });
+    const leave = await prisma.leave.findUnique({
+      where: { id: leaveId },
+      include: {
+        user: {
+          select: {
+            tenantId: true,
+          },
+        },
+      },
+    });
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
+    }
+
+    if (leave.user?.tenantId !== req.user.tenantId) {
+      return res.status(403).json({ message: "Unauthorized access" });
     }
 
     if (leave.userId !== req.user.userId && req.user.role !== "admin") {
       return res.status(403).json({ message: "Unauthorized access" });
     }
 
-    if (leave.status !== "pending") {
+    if (leave.status !== "PENDING") {
       return res
         .status(400)
-        .json({ message: "Only pending leaves can be cancelled" });
+        .json({ message: "OnlyPENDING leaves can beCANCELLED" });
     }
 
-    const cancelledLeave = await prisma.leave.update({
+    constCANCELLEDLeave = await prisma.leave.update({
       where: { id: leaveId },
       data: { status: "cancelled" },
       include: {
@@ -1432,7 +1641,12 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
+router.delete(
+  "/:id",
+  authenticateToken,
+  tenantGuard,
+  requireAdminOrManager,
+  async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
     if (isNaN(leaveId)) {
@@ -1441,25 +1655,40 @@ router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
 
     const leave = await prisma.leave.findUnique({
       where: { id: leaveId },
-      include: { attachments: true },
+      include: {
+        attachments: true,
+        user: {
+          select: {
+            id: true,
+            tenantId: true,
+            leaveBalances: true,
+          },
+        },
+      },
     });
 
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
     }
 
-    // Restore leave balance if approved
-    if (leave.status === "approved") {
-      const user = await prisma.user.findUnique({
-        where: { id: leave.userId },
-      });
-      if (user) {
+    if (leave.user?.tenantId !== req.user.tenantId) {
+      return res.status(403).json({ message: "Unauthorized access" });
+    }
+
+    // Restore leave balance ifAPPROVED
+    if (leave.status === "APPROVED") {
+      const userForBalances =
+        leave.user ||
+        (await prisma.user.findUnique({
+          where: { id: leave.userId },
+        }));
+      if (userForBalances) {
         const currentBalance = getLeaveBalance(
-          user.leaveBalances,
+          userForBalances.leaveBalances,
           leave.leaveType
         );
         const updatedLeaveBalances = {
-          ...user.leaveBalances,
+          ...userForBalances.leaveBalances,
           [leave.leaveType]: currentBalance + leave.days,
         };
         await prisma.user.update({
@@ -1518,7 +1747,8 @@ router.delete("/:id", authenticateToken, isAdminOrManager, async (req, res) => {
 router.post(
   "/cleanup-orphaned-files",
   authenticateToken,
-  isAdminOrManager,
+  tenantGuard,
+  requireAdminOrManager,
   async (req, res) => {
     try {
       const count = await cleanupOrphanedFiles();

@@ -3,34 +3,27 @@ const express = require("express");
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
-const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { body, validationResult } = require("express-validator");
+const crypto = require("crypto");
+const { DEFAULT_LEAVE_BALANCES } = require("../constants/leaveBalances");
+const {
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles,
+} = require("../middleware/auth");
 
-// Middleware to verify JWT token
-const authenticateToken = (req, res, next) => {
-  const token = req.cookies.accessToken;
+const INVITE_EXPIRY_HOURS = parseInt(
+  process.env.INVITE_EXPIRY_HOURS ?? "48",
+  10
+);
+const INVITE_EXPIRY_MS = Math.max(INVITE_EXPIRY_HOURS, 1) * 60 * 60 * 1000;
+const TENANT_ADMIN_ROLES = ["OWNER", "ADMIN", "MANAGER"];
+const INVITE_ROLES = ["ADMIN", "MANAGER", "EMPLOYEE"];
+const VALID_ROLES = [...INVITE_ROLES, "OWNER"];
+const VALID_STATUSES = ["ACTIVE", "INACTIVE"];
 
-  if (!token) {
-    return res.status(401).json({ message: "Access token required" });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: "Invalid or expired token" });
-    }
-    req.user = user;
-    next();
-  });
-};
-
-// Middleware to check if user is admin
-const isAdmin = (req, res, next) => {
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ message: "Admin access required" });
-  }
-  next();
-};
+const generateInviteToken = () => crypto.randomBytes(32).toString("hex");
 
 // Validator for leaveBalances object
 const validateLeaveBalances = body("leaveBalances").custom((value) => {
@@ -178,9 +171,193 @@ const validateLeaveBalances = body("leaveBalances").custom((value) => {
  *       500:
  *         description: Internal server error
  */
-router.get("/", authenticateToken, isAdmin, async (req, res) => {
+router.get(
+  "/",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
+    try {
+      const users = await prisma.user.findMany({
+        where: { tenantId: req.user.tenantId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          department: true,
+          position: true,
+          joinDate: true,
+          leaveBalances: true,
+          role: true,
+          avatar: true,
+          createdAt: true,
+        },
+      });
+
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res
+        .status(500)
+        .json({ message: "Internal server error", error: error.message });
+    }
+  }
+);
+
+router.post(
+  "/invite",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
+    const {
+      email,
+      role,
+      name,
+      department,
+      position,
+      phone,
+      joinDate,
+      password,
+    } = req.body;
+
+    if (!email || !role || !name) {
+      return res.status(400).json({
+        message: "Name, email, and role are required for invitations",
+      });
+    }
+
+    const trimmedName = name.toString().trim();
+    if (!trimmedName) {
+      return res.status(400).json({
+        message: "Name must be provided",
+      });
+    }
+
+    const normalizedRole = role.toUpperCase();
+    if (!INVITE_ROLES.includes(normalizedRole)) {
+      return res.status(400).json({
+        message: `Role must be one of ${INVITE_ROLES.join(", ")}`,
+      });
+    }
+
+    if (password && password.length < 8) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 8 characters" });
+    }
+
+    try {
+      const normalizedEmail = email.toLowerCase().trim();
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          tenantId: req.user.tenantId,
+          email: normalizedEmail,
+        },
+      });
+      if (existingUser) {
+        return res
+          .status(409)
+          .json({ message: "User already exists for this tenant" });
+      }
+
+      const existingInvite = await prisma.userInvitation.findFirst({
+        where: {
+          tenantId: req.user.tenantId,
+          email: normalizedEmail,
+          used: false,
+          expiresAt: {
+            gt: new Date(),
+          },
+        },
+      });
+      if (existingInvite) {
+        return res.status(409).json({
+          message: "An active invitation already exists for this email",
+        });
+      }
+
+      const resolvedJoinDate = joinDate ? new Date(joinDate) : null;
+      const joinDateIso =
+        resolvedJoinDate && !Number.isNaN(resolvedJoinDate.getTime())
+          ? resolvedJoinDate.toISOString()
+          : null;
+
+      const metadata = {
+        name: trimmedName,
+        department: department?.trim() || null,
+        position: position?.trim() || null,
+        phone: phone?.trim() || null,
+        joinDate: joinDateIso,
+      };
+
+      const passwordHash = password
+        ? await bcrypt.hash(password, 10)
+        : null;
+
+      const invitation = await prisma.userInvitation.create({
+        data: {
+          email: normalizedEmail,
+          role: normalizedRole,
+          token: generateInviteToken(),
+          tenantId: req.user.tenantId,
+          expiresAt: new Date(Date.now() + INVITE_EXPIRY_MS),
+          metadata,
+          passwordHash,
+        },
+      });
+
+      res.status(201).json({
+        message: "Invitation created",
+        token: invitation.token,
+        expiresAt: invitation.expiresAt,
+      });
+    } catch (error) {
+      console.error("Invite creation error:", error);
+      res.status(500).json({ message: "Failed to create invitation" });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get user by ID
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the user to retrieve
+ *     responses:
+ *       200:
+ *         description: User details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Unauthorized access
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get("/me", authenticateToken, tenantGuard, async (req, res) => {
   try {
-    const users = await prisma.user.findMany({
+    const user = await prisma.user.findFirst({
+      where: {
+        id: req.user.userId,
+        tenantId: req.user.tenantId,
+      },
       select: {
         id: true,
         name: true,
@@ -193,15 +370,35 @@ router.get("/", authenticateToken, isAdmin, async (req, res) => {
         role: true,
         avatar: true,
         createdAt: true,
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
       },
     });
 
-    res.json(users);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      user: {
+        ...user,
+        leaveBalances: user.leaveBalances || {
+          AnnualLeave: 0,
+          SickLeave: 0,
+          FamilyResponsibility: 0,
+          UnpaidLeave: 0,
+          Other: 0,
+        },
+      },
+    });
   } catch (error) {
-    console.error("Error fetching users:", error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    console.error("Error fetching current user:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -236,17 +433,21 @@ router.get("/", authenticateToken, isAdmin, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-router.get("/:id", authenticateToken, async (req, res) => {
+router.get("/:id", authenticateToken, tenantGuard, async (req, res) => {
   try {
     const { id } = req.params;
     const requestingUserId = req.user.userId;
 
-    if (parseInt(id) !== requestingUserId && req.user.role !== "admin") {
+    const normalizedRole = req.user.role?.toUpperCase();
+    if (
+      parseInt(id) !== requestingUserId &&
+      !TENANT_ADMIN_ROLES.includes(normalizedRole)
+    ) {
       return res.status(403).json({ message: "Unauthorized access" });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) },
+    const user = await prisma.user.findFirst({
+      where: { id: parseInt(id), tenantId: req.user.tenantId },
       select: {
         id: true,
         name: true,
@@ -348,7 +549,8 @@ router.get("/:id", authenticateToken, async (req, res) => {
 router.post(
   "/",
   authenticateToken,
-  isAdmin,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
   [
     body("name").trim().notEmpty().withMessage("Name is required"),
     body("email").isEmail().normalizeEmail().withMessage("Invalid email"),
@@ -359,7 +561,7 @@ router.post(
     body("position").trim().notEmpty().withMessage("Position is required"),
     validateLeaveBalances,
     body("role")
-      .isIn(["employee", "manager", "admin"])
+      .isIn(VALID_ROLES.map((r) => r.toLowerCase()))
       .withMessage("Invalid role"),
   ],
   async (req, res) => {
@@ -369,16 +571,26 @@ router.post(
     }
 
     try {
-      const { password, ...userData } = req.body;
+      const { password, joinDate, email, ...rest } = req.body;
 
       // Hash the password
       const hashedPassword = await bcrypt.hash(password, 10);
 
+      const requestedRole = rest.role
+        ? rest.role.toUpperCase()
+        : "EMPLOYEE";
+      rest.role = requestedRole;
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const resolvedJoinDate = joinDate ? new Date(joinDate) : new Date();
+
       const newUser = await prisma.user.create({
         data: {
-          ...userData,
+          ...rest,
+          email: normalizedEmail,
           password: hashedPassword,
-          joinDate: new Date(userData.joinDate) || new Date(),
+          tenantId: req.user.tenantId,
+          joinDate: resolvedJoinDate,
         },
         select: {
           id: true,
@@ -401,6 +613,102 @@ router.post(
       if (error.code === "P2002") {
         return res.status(400).json({ message: "Email already exists" });
       }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+router.put(
+  "/:id/role",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
+    const { id } = req.params;
+    const { role } = req.body;
+    if (!role) {
+      return res.status(400).json({ message: "Role is required" });
+    }
+    const normalizedRole = role.toUpperCase();
+    if (!VALID_ROLES.includes(normalizedRole)) {
+      return res.status(400).json({
+        message: `Role must be one of ${VALID_ROLES.join(", ")}`,
+      });
+    }
+
+    try {
+      const targetUser = await prisma.user.findFirst({
+        where: { id: parseInt(id), tenantId: req.user.tenantId },
+      });
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: targetUser.id },
+        data: { role: normalizedRole },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      });
+
+      res.json({
+        message: "User role updated",
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+router.put(
+  "/:id/status",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({ message: "Status is required" });
+    }
+    const normalizedStatus = status.toUpperCase();
+    if (!VALID_STATUSES.includes(normalizedStatus)) {
+      return res.status(400).json({
+        message: `Status must be one of ${VALID_STATUSES.join(", ")}`,
+      });
+    }
+
+    try {
+      const targetUser = await prisma.user.findFirst({
+        where: { id: parseInt(id), tenantId: req.user.tenantId },
+      });
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: targetUser.id },
+        data: { status: normalizedStatus },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+        },
+      });
+
+      res.json({
+        message: "User status updated",
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("Error updating user status:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
@@ -482,6 +790,7 @@ router.post(
 router.put(
   "/:id",
   authenticateToken,
+  tenantGuard,
   [
     body("name")
       .optional()
@@ -506,7 +815,7 @@ router.put(
     validateLeaveBalances.optional(),
     body("role")
       .optional()
-      .isIn(["employee", "manager", "admin"])
+      .isIn(VALID_ROLES.map((r) => r.toLowerCase()))
       .withMessage("Invalid role"),
     body("joinDate")
       .optional()
@@ -527,7 +836,15 @@ router.put(
         return res.status(403).json({ message: "Unauthorized access" });
       }
 
-      const { password, joinDate, ...updateData } = req.body;
+      const targetUser = await prisma.user.findFirst({
+        where: { id: parseInt(id), tenantId: req.user.tenantId },
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { password, joinDate, email, ...updateData } = req.body;
 
       if (password) {
         updateData.password = await bcrypt.hash(password, 10);
@@ -535,6 +852,10 @@ router.put(
 
       if (joinDate) {
         updateData.joinDate = new Date(joinDate);
+      }
+
+      if (email) {
+        updateData.email = email.toLowerCase().trim();
       }
 
       const updatedUser = await prisma.user.update({
@@ -606,7 +927,12 @@ router.put(
  *       500:
  *         description: Internal server error
  */
-router.delete("/:id", authenticateToken, isAdmin, async (req, res) => {
+router.delete(
+  "/:id",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -616,8 +942,16 @@ router.delete("/:id", authenticateToken, isAdmin, async (req, res) => {
         .json({ message: "Cannot delete your own account" });
     }
 
+    const targetUser = await prisma.user.findFirst({
+      where: { id: parseInt(id), tenantId: req.user.tenantId },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     await prisma.user.delete({
-      where: { id: parseInt(id) },
+      where: { id: targetUser.id },
     });
 
     res.json({ message: "User deleted successfully" });
@@ -692,6 +1026,7 @@ router.get("/admins/list", authenticateToken, async (req, res) => {
     const admins = await prisma.user.findMany({
       where: {
         role: "admin",
+        tenantId: req.user.tenantId,
       },
       select: {
         id: true,

@@ -17,6 +17,7 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ArrowPathIcon,
+  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../contexts/AuthContext";
 import digititanLogo from "../assets/digititan-logo.jpg";
@@ -40,6 +41,11 @@ const DashboardLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const tenantManagementRoles = ["admin", "manager", "owner"];
+  const canAccessDashboard =
+    authUser?.role &&
+    tenantManagementRoles.includes(authUser.role.toLowerCase());
+
   // Initialize API interceptors
   useApiInterceptors();
 
@@ -47,6 +53,11 @@ const DashboardLayout = () => {
   const fetchNotifications = async () => {
     try {
       setLoadingNotifications(true);
+      if (!authUser?.userId) {
+        setNotifications([]);
+        setLoadingNotifications(false);
+        return;
+      }
       const response = await ApiService.get("/notifications");
       setNotifications(response.data.data);
     } catch (error) {
@@ -59,6 +70,10 @@ const DashboardLayout = () => {
   // Fetch unread count from API
   const fetchUnreadCount = async () => {
     try {
+      if (!authUser?.userId) {
+        setUnreadCount(0);
+        return;
+      }
       const response = await ApiService.get("/notifications/unread-count");
       setUnreadCount(response.data.data.count);
     } catch (error) {
@@ -144,47 +159,61 @@ const DashboardLayout = () => {
 
   // Fetch notifications and unread count on mount
   useEffect(() => {
+    if (!authUser?.userId) return;
     fetchNotifications();
     fetchUnreadCount();
-  }, []);
+  }, [authUser?.userId]);
 
-  const navigation = [
+  const normalizedRole = authUser?.role?.toLowerCase();
+    const navigation = [
+      {
+        name: "Dashboard",
+        href: "/dashboard/stats",
+        icon: ChartBarIcon,
+        show: canAccessDashboard,
+      },
+      {
+        name: "Leaves",
+        href: "/dashboard/leave",
+        icon: DocumentTextIcon,
+        show: true,
+      },
+        {
+          name: "Employees",
+          href: "/dashboard/users",
+          icon: UserGroupIcon,
+          show: ["admin", "manager", "owner"].includes(normalizedRole),
+        },
     {
-      name: "Leave Requests",
-      href: "/dashboard/leave",
-      icon: DocumentTextIcon,
-      show: true,
-    },
-    {
-      name: "New Request",
-      href: "/dashboard/leave/new",
-      icon: DocumentTextIcon,
+      name: "Notifications",
+      href: "/dashboard/notifications",
+      icon: BellIcon,
       show: true,
     },
     {
       name: "Team Calendar",
       href: "/dashboard/calendar",
       icon: CalendarDaysIcon,
-      show: authUser?.role === "admin" || authUser?.role === "manager",
+      show: ["admin", "manager", "owner"].includes(normalizedRole),
     },
-    {
-      name: "Reports",
-      href: "/dashboard/reports",
-      icon: ChartBarIcon,
-      show: authUser?.role === "admin" || authUser?.role === "manager",
-    },
-    {
-      name: "Employees",
-      href: "/dashboard/users",
-      icon: UserGroupIcon,
-      show: authUser?.role === "admin" || authUser?.role === "manager",
-    },
-    {
-      name: "Profile Settings",
-      href: "/dashboard/profile",
-      icon: Cog6ToothIcon,
-      show: true,
-    },
+        {
+          name: "Reports",
+          href: "/dashboard/reports",
+          icon: ChartBarIcon,
+          show: ["admin", "manager", "owner"].includes(normalizedRole),
+        },
+        {
+          name: "My Profile",
+          href: "/dashboard/profile",
+          icon: UserCircleIcon,
+          show: true,
+        },
+        {
+          name: "Settings",
+          href: "/dashboard/settings",
+          icon: Cog6ToothIcon,
+          show: canAccessDashboard,
+        },
   ].map((item) => ({
     ...item,
     current: location.pathname === item.href,

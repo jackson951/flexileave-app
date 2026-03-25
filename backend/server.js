@@ -50,11 +50,14 @@ const userRoutes = require("./routes/userRoutes");
 const authRoutes = require("./routes/auth");
 const leaveRoutes = require("./routes/leaveRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const tenantRoutes = require("./routes/tenantRoutes");
+const startExpiredInvitationCleanup = require("./jobs/cleanupExpiredInvites");
 
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/tenants", tenantRoutes);
 
 // ------------------- Health Check -------------------
 app.get("/api/health", (req, res) => {
@@ -92,4 +95,5 @@ app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`✅ Accepting requests from: ${allowedOrigins.join(", ")}`);
   console.log(`📄 Swagger UI available at http://localhost:${PORT}/api-docs`);
+  startExpiredInvitationCleanup();
 });

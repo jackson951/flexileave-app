@@ -7,16 +7,15 @@ import {
   EyeSlashIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../contexts/AuthContext";
-import axios from "axios";
 import { Helmet } from "react-helmet-async";
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
-
+  const { login, tenantSlug: storedTenantSlug } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    tenantSlug: storedTenantSlug,
     rememberMe: false,
   });
 
@@ -47,9 +46,15 @@ const LoginPage = () => {
         ...prev,
         email: savedEmail,
         rememberMe: true,
+        tenantSlug: storedTenantSlug || prev.tenantSlug,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        tenantSlug: storedTenantSlug || prev.tenantSlug,
       }));
     }
-  }, []);
+  }, [storedTenantSlug]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -62,6 +67,8 @@ const LoginPage = () => {
       newErrors.password = "Password is required";
     else if (formData.password.length < 8)
       newErrors.password = "Password must be at least 8 characters";
+    if (!formData.tenantSlug.trim())
+      newErrors.tenantSlug = "Tenant slug is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -82,16 +89,11 @@ const LoginPage = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(
-        `${BASE_URL}/auth/login`,
-        {
-          email: formData.email,
-          password: formData.password,
-        },
-        { withCredentials: true }
-      );
-
-      const userData = response.data.user;
+      await login({
+        email: formData.email,
+        password: formData.password,
+        tenantSlug: formData.tenantSlug,
+      });
 
       if (formData.rememberMe) {
         localStorage.setItem("flexileave_email", formData.email);
@@ -101,13 +103,7 @@ const LoginPage = () => {
         localStorage.removeItem("flexileave_rememberMe");
       }
 
-      await login({
-        token: response.data.token,
-        userData,
-        rememberMe: formData.rememberMe,
-      });
-
-      navigate("/dashboard/leave");
+      navigate("/dashboard/stats");
     } catch (error) {
       setErrors({
         submit: error.response?.data?.message || "Login failed",
@@ -171,22 +167,41 @@ const LoginPage = () => {
 
             <form onSubmit={handleSubmit} className="px-8 space-y-6">
               {/* Email */}
-              <div>
-                <label className="text-sm font-medium">Email</label>
-                <div className="relative">
-                  <EnvelopeIcon className="h-5 w-5 absolute left-3 top-3.5 text-gray-400" />
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="pl-10 w-full py-3 rounded-xl border"
-                    placeholder="employee@flexileave.com"
-                    required
-                  />
-                </div>
+            <div>
+              <label className="text-sm font-medium">Email</label>
+              <div className="relative">
+                <EnvelopeIcon className="h-5 w-5 absolute left-3 top-3.5 text-gray-400" />
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="pl-10 w-full py-3 rounded-xl border"
+                  placeholder="employee@flexileave.com"
+                  required
+                />
               </div>
+              {errors.email && (
+                <p className="mt-1 text-xs text-red-600">{errors.email}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Tenant Slug</label>
+              <input
+                type="text"
+                name="tenantSlug"
+                value={formData.tenantSlug}
+                onChange={handleChange}
+                className="mt-1 w-full rounded-xl border px-3 py-2"
+                placeholder="company-name"
+                required
+              />
+              {errors.tenantSlug && (
+                <p className="mt-1 text-xs text-red-600">{errors.tenantSlug}</p>
+              )}
+            </div>
 
               {/* Password */}
               <div>
@@ -236,9 +251,23 @@ const LoginPage = () => {
               >
                 {isLoading ? "Signing in..." : "Sign In"}
               </button>
+              {errors.submit && (
+                <p className="mt-2 text-center text-sm text-red-600">
+                  {errors.submit}
+                </p>
+              )}
             </form>
 
-            <div className="px-8 py-4 text-center text-xs text-gray-500">
+            <div className="px-8 py-2 text-center text-xs text-gray-500">
+              Need an account?{" "}
+              <a
+                href="/register"
+                className="font-semibold text-indigo-600 hover:text-indigo-500"
+              >
+                Register your company
+              </a>
+            </div>
+            <div className="px-8 py-2 text-center text-xs text-gray-500">
               © {new Date().getFullYear()} FlexiLeave. All rights reserved.
             </div>
           </div>

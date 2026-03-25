@@ -2,27 +2,14 @@ require("dotenv").config();
 const express = require("express");
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient({
-  log: ["query", "info", "warn", "error"], // Enable detailed logging
-});
-const jwt = require("jsonwebtoken");
+const prisma = new PrismaClient();
+const {
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles,
+} = require("../middleware/auth");
 
-// -------------------- MIDDLEWARE -------------------- //
-const authenticateToken = (req, res, next) => {
-  const token = req.cookies.accessToken;
-
-  if (!token) {
-    return res.status(401).json({ message: "Access token required" });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: "Invalid or expired token" });
-    }
-    req.user = user;
-    next();
-  });
-};
+const TENANT_ADMIN_NOTIFICATION_ROLES = ["ADMIN", "MANAGER"];
 
 const validateNotificationInput = (req, res, next) => {
   const { userId, message, type, title } = req.body;
@@ -164,7 +151,7 @@ const validateNotificationInput = (req, res, next) => {
  *       500:
  *         description: Internal server error
  */
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", authenticateToken, tenantGuard, async (req, res) => {
   try {
     console.log(`Fetching notifications for user ${req.user.userId}`);
 
@@ -253,7 +240,7 @@ router.get("/", authenticateToken, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-router.get("/unread-count", authenticateToken, async (req, res) => {
+router.get("/unread-count", authenticateToken, tenantGuard, async (req, res) => {
   try {
     const count = await prisma.notification.count({
       where: {
@@ -315,7 +302,7 @@ router.get("/unread-count", authenticateToken, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-router.put("/:id/read", authenticateToken, async (req, res) => {
+router.put("/:id/read", authenticateToken, tenantGuard, async (req, res) => {
   try {
     const notificationId = parseInt(req.params.id);
 
@@ -398,7 +385,7 @@ router.put("/:id/read", authenticateToken, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-router.put("/mark-all-read", authenticateToken, async (req, res) => {
+const markAllNotificationsRead = async (req, res) => {
   try {
     const result = await prisma.notification.updateMany({
       where: {
@@ -421,7 +408,10 @@ router.put("/mark-all-read", authenticateToken, async (req, res) => {
       error: error.message,
     });
   }
-});
+};
+
+router.put("/mark-all-read", authenticateToken, tenantGuard, markAllNotificationsRead);
+router.put("/read-all", authenticateToken, tenantGuard, markAllNotificationsRead);
 
 /**
  * @swagger
@@ -463,7 +453,7 @@ router.put("/mark-all-read", authenticateToken, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-router.delete("/:id", authenticateToken, async (req, res) => {
+router.delete("/:id", authenticateToken, tenantGuard, async (req, res) => {
   try {
     const notificationId = parseInt(req.params.id);
 
@@ -545,7 +535,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-router.delete("/read/all", authenticateToken, async (req, res) => {
+router.delete("/read/all", authenticateToken, tenantGuard, async (req, res) => {
   try {
     const result = await prisma.notification.deleteMany({
       where: {
@@ -633,26 +623,40 @@ router.delete("/read/all", authenticateToken, async (req, res) => {
 router.post(
   "/",
   authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_NOTIFICATION_ROLES),
   validateNotificationInput,
   async (req, res) => {
     try {
       const { userId, message, type, leaveId, title } = req.body;
+      const recipientId = parseInt(userId, 10);
 
-      // Additional check for title (though validator should catch this)
-      if (!title) {
+      if (Number.isNaN(recipientId)) {
         return res.status(400).json({
           success: false,
-          message: "Title is required for notifications",
+          message: "userId must be a valid integer",
+        });
+      }
+
+      const recipient = await prisma.user.findFirst({
+        where: { id: recipientId, tenantId: req.user.tenantId },
+        select: { id: true },
+      });
+
+      if (!recipient) {
+        return res.status(404).json({
+          success: false,
+          message: "Recipient not found in your tenant",
         });
       }
 
       const notification = await prisma.notification.create({
         data: {
-          recipientId: parseInt(userId),
+          recipientId: recipient.id,
           title,
           message,
           type,
-          leaveId: leaveId ? parseInt(leaveId) : null,
+          leaveId: leaveId ? parseInt(leaveId, 10) : null,
           triggeredById: req.user.userId,
         },
       });

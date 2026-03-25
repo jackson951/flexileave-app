@@ -22,6 +22,10 @@ import { ApiService, useApiInterceptors } from "../../api/web-api-service";
 
 const LeaveHistory = () => {
   const { user } = useAuth();
+  const dashboardRoute =
+    user?.role?.toUpperCase() === "EMPLOYEE"
+      ? "/dashboard/leave"
+      : "/dashboard/stats";
   const [leaveHistory, setLeaveHistory] = useState([]);
   const [filteredLeaves, setFilteredLeaves] = useState([]);
   const [expandedRequest, setExpandedRequest] = useState(null);
@@ -588,7 +592,7 @@ const LeaveHistory = () => {
       {user?.role === "admin" && (
         <div className="mb-6">
           <a
-            href="/dashboard/leave"
+            href={dashboardRoute}
             className="inline-flex items-center text-indigo-600 hover:text-indigo-500 transition-colors duration-200"
           >
             <ArrowLeftIcon className="h-5 w-5 mr-1" />

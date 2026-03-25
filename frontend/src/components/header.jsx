@@ -118,7 +118,7 @@ const Header = ({ variant = "default" }) => {
                     Login
                   </Link>
                   <Link
-                    to="/signup"
+                    to="/register"
                     className="text-indigo-600 hover:text-indigo-500 font-medium"
                   >
                     Request Access

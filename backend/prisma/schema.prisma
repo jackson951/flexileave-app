@@ -39,12 +39,11 @@ model User {
   position               String?
   joinDate               DateTime
   leaveBalances          Json
-  role                   String
+  role                   Role           @default(EMPLOYEE)
   avatar                 String?
   password               String
-
+  createdAt              DateTime       @default(now())
   refreshToken           String?
-  createdAt              DateTime        @default(now())
 
   leaves                 Leave[]
   actionedLeaves         Leave[]          @relation("LeaveActionedBy")
@@ -57,9 +56,6 @@ model User {
   @@map("users")
 }
 
-////////////////////////
-// LEAVE
-////////////////////////
 model Leave {
   id               Int             @id @default(autoincrement())
   tenantId         Int
@@ -70,9 +66,8 @@ model Leave {
   endDate          DateTime
   days             Int
   reason           String
-  status           String          @default("pending")
-  submittedAt      DateTime        @default(now())
-
+  status           LeaveStatus    @default(PENDING)
+  submittedAt      DateTime       @default(now())
   rejectionReason  String?
   emergencyContact String?
   emergencyPhone   String?
@@ -146,4 +141,19 @@ enum NotificationType {
   leave_approved
   leave_rejected
   system
+}
+
+enum Role {
+  SUPER_ADMIN
+  OWNER
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }

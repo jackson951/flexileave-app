@@ -4,64 +4,21 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
+const {
+  getAccessTokenCookieOptions,
+  getRefreshTokenCookieOptions,
+  getSessionHintCookieOptions,
+} = require("../utils/cookies");
+const { generateAccessToken, generateRefreshToken } = require("../utils/jwt");
+const { DEFAULT_LEAVE_BALANCES } = require("../constants/leaveBalances");
 const prisma = new PrismaClient();
 
-// -------------------- TOKEN HELPERS --------------------
-const generateAccessToken = (user) => {
-  return jwt.sign(
-    { userId: user.id, email: user.email, role: user.role, name: user.name },
-    process.env.JWT_SECRET,
-    { expiresIn: "24h" }
-  );
-};
-
-const generateRefreshToken = (user) => {
-  return jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: "7d",
-  });
-};
-
-// -------------------- COOKIE OPTIONS --------------------
-const getAccessTokenCookieOptions = () => {
-  const options = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 24 * 60 * 60 * 1000, // 24h
-  };
-  if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
-    options.domain = process.env.COOKIE_DOMAIN;
-  }
-  return options;
-};
-
-const getRefreshTokenCookieOptions = () => {
-  const options = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
-  };
-  if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
-    options.domain = process.env.COOKIE_DOMAIN;
-  }
-  return options;
-};
-
-// ⭐ Session hint cookie — NOT httpOnly so JS can read it.
-// Holds zero sensitive data ("1"), just signals a session may exist.
-// Its maxAge matches the accessToken so they expire together.
-const getSessionHintCookieOptions = () => {
-  const options = {
-    httpOnly: false, // Must be readable by JS
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 24 * 60 * 60 * 1000, // Match accessToken (24h)
-  };
-  if (process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN) {
-    options.domain = process.env.COOKIE_DOMAIN;
-  }
-  return options;
+const resolveTenantSlug = (inputSlug) => {
+  const slug = inputSlug?.toString().trim().toLowerCase();
+  if (slug) return slug;
+  const defaultSlug = process.env.DEFAULT_TENANT_SLUG;
+  if (defaultSlug) return defaultSlug.toString().trim().toLowerCase();
+  return null;
 };
 
 // -------------------- LOGIN --------------------
@@ -98,13 +55,47 @@ const getSessionHintCookieOptions = () => {
  *         description: Internal server error
  */
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, tenantSlug: tenantSlugInput } = req.body;
   if (!email || !password)
     return res.status(400).json({ message: "Email and password required." });
 
+  const tenantSlug = resolveTenantSlug(tenantSlugInput);
+  if (!tenantSlug) {
+    return res.status(400).json({
+      message:
+        "Tenant slug is required. Provide it in the request body or set DEFAULT_TENANT_SLUG.",
+    });
+  }
+
   try {
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+    });
+
+    if (!tenant) {
+      return res
+        .status(400)
+        .json({ message: "Tenant not found. Check tenantSlug." });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: {
+        tenantId_email: {
+          tenantId: tenant.id,
+          email: normalizedEmail,
+        },
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
     });
 
     if (!user) return res.status(401).json({ message: "Invalid credentials." });
@@ -113,8 +104,16 @@ router.post("/login", async (req, res) => {
     if (!passwordValid)
       return res.status(401).json({ message: "Invalid credentials." });
 
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
+    const accessToken = generateAccessToken({
+      id: user.id,
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      tenantId: user.tenantId,
+      tenantSlug: user.tenant.slug,
+    });
+    const refreshToken = generateRefreshToken(user.id);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -158,13 +157,30 @@ router.post("/refresh", async (req, res) => {
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
     });
 
     if (!user || user.refreshToken !== refreshToken)
       return res.status(403).json({ message: "Invalid refresh token" });
 
-    const newAccessToken = generateAccessToken(user);
-    const newRefreshToken = generateRefreshToken(user);
+    const newAccessToken = generateAccessToken({
+      id: user.id,
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      tenantId: user.tenantId,
+      tenantSlug: user.tenant.slug,
+    });
+    const newRefreshToken = generateRefreshToken(user.id);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -180,6 +196,157 @@ router.post("/refresh", async (req, res) => {
   } catch (err) {
     console.error("Refresh error:", err);
     res.status(403).json({ message: "Invalid or expired refresh token" });
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/accept-invite:
+ *   post:
+ *     summary: Accept a tenant invitation
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - name
+ *               - password
+ *             properties:
+ *               token:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Invitation accepted and logged in
+ *       400:
+ *         description: Missing fields or invalid token
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/accept-invite", async (req, res) => {
+  const { token, name, password } = req.body;
+  if (!token) {
+    return res.status(400).json({ message: "Token is required" });
+  }
+
+  try {
+    const invitation = await prisma.userInvitation.findUnique({
+      where: { token },
+    });
+
+    if (
+      !invitation ||
+      invitation.used ||
+      new Date(invitation.expiresAt) < new Date()
+    ) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    const normalizedEmail = invitation.email.toLowerCase().trim();
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        tenantId: invitation.tenantId,
+        email: normalizedEmail,
+      },
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ message: "User already exists" });
+    }
+
+    const normalizedName =
+      name?.toString().trim() || invitation.metadata?.name || null;
+
+    if (!normalizedName) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+
+    const resolvedJoinDate = invitation.metadata?.joinDate
+      ? new Date(invitation.metadata.joinDate)
+      : new Date();
+
+    if (resolvedJoinDate && Number.isNaN(resolvedJoinDate.getTime())) {
+      return res.status(400).json({ message: "Invalid join date" });
+    }
+
+    const finalPasswordHash = password
+      ? await bcrypt.hash(password, 10)
+      : invitation.passwordHash;
+
+    if (!finalPasswordHash) {
+      return res.status(400).json({ message: "Password is required" });
+    }
+
+    const newUser = await prisma.user.create({
+      data: {
+        name: normalizedName,
+        email: normalizedEmail,
+        password: finalPasswordHash,
+        tenantId: invitation.tenantId,
+        role: invitation.role,
+        joinDate: resolvedJoinDate,
+        status: "ACTIVE",
+        leaveBalances: { ...DEFAULT_LEAVE_BALANCES },
+        department: invitation.metadata?.department || undefined,
+        position: invitation.metadata?.position || undefined,
+        phone: invitation.metadata?.phone || undefined,
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
+
+    await prisma.userInvitation.update({
+      where: { id: invitation.id },
+      data: { used: true, usedAt: new Date() },
+    });
+
+    const accessToken = generateAccessToken({
+      id: newUser.id,
+      userId: newUser.id,
+      email: newUser.email,
+      role: newUser.role,
+      name: newUser.name,
+      tenantId: newUser.tenantId,
+      tenantSlug: newUser.tenant.slug,
+    });
+    const refreshToken = generateRefreshToken(newUser.id);
+
+    await prisma.user.update({
+      where: { id: newUser.id },
+      data: { refreshToken },
+    });
+
+    res.cookie("accessToken", accessToken, getAccessTokenCookieOptions());
+    res.cookie("refreshToken", refreshToken, getRefreshTokenCookieOptions());
+    res.cookie("auth_session", "1", getSessionHintCookieOptions());
+
+    res.status(201).json({
+      message: "Invitation accepted",
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        tenantId: newUser.tenantId,
+      },
+    });
+  } catch (error) {
+    console.error("Accept invite error:", error);
+    res.status(500).json({ message: "Failed to accept invite" });
   }
 });
 
@@ -247,10 +414,11 @@ function authenticateToken(req, res, next) {
  */
 router.get("/verify", authenticateToken, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
+    const user = await prisma.user.findFirst({
+      where: { id: req.user.userId, tenantId: req.user.tenantId },
       select: {
         id: true,
+        tenantId: true,
         name: true,
         email: true,
         phone: true,
@@ -261,6 +429,13 @@ router.get("/verify", authenticateToken, async (req, res) => {
         role: true,
         avatar: true,
         createdAt: true,
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
       },
     });
 

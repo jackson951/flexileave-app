@@ -12,21 +12,20 @@ export const useAuth = () => {
   return context;
 };
 
-// ⭐ localStorage key — holds "1" when a session exists, absent otherwise.
-// Unlike the cookie approach, this always lives on the frontend domain
-// so it's readable regardless of where the API is hosted.
 const SESSION_HINT_KEY = "auth_session";
+const TENANT_SLUG_KEY = "flexileave_tenantSlug";
 
-const hasSessionHint = () => {
-  return localStorage.getItem(SESSION_HINT_KEY) === "1";
-};
+const hasSessionHint = () => localStorage.getItem(SESSION_HINT_KEY) === "1";
+const setSessionHint = () => localStorage.setItem(SESSION_HINT_KEY, "1");
+const clearSessionHint = () => localStorage.removeItem(SESSION_HINT_KEY);
 
-const setSessionHint = () => {
-  localStorage.setItem(SESSION_HINT_KEY, "1");
-};
-
-const clearSessionHint = () => {
-  localStorage.removeItem(SESSION_HINT_KEY);
+const getStoredTenantSlug = () => localStorage.getItem(TENANT_SLUG_KEY) || "";
+const persistTenantSlug = (slug) => {
+  if (slug) {
+    localStorage.setItem(TENANT_SLUG_KEY, slug);
+  } else {
+    localStorage.removeItem(TENANT_SLUG_KEY);
+  }
 };
 
 export const AuthProvider = ({ children }) => {
@@ -34,13 +33,12 @@ export const AuthProvider = ({ children }) => {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
+  const [tenantSlug, setTenantSlugState] = useState(getStoredTenantSlug());
   const [loading, setLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  // -------------------- INITIAL AUTH CHECK --------------------
   useEffect(() => {
     const checkAuthStatus = async () => {
-      // ⭐ No hint = definitely not logged in, skip the network call
       if (!hasSessionHint()) {
         setIsLoggedIn(false);
         setUser(null);
@@ -56,15 +54,16 @@ export const AuthProvider = ({ children }) => {
         if (response.data.valid) {
           setIsLoggedIn(true);
           setUser(response.data.user);
+          if (response.data.user?.tenant?.slug) {
+            setTenantSlugState(response.data.user.tenant.slug);
+            persistTenantSlug(response.data.user.tenant.slug);
+          }
         } else {
-          // Backend invalidated the session (e.g. token tampered)
           clearSessionHint();
           setIsLoggedIn(false);
           setUser(null);
         }
       } catch (error) {
-        // 401/403 means the httpOnly accessToken is missing or expired.
-        // Clear the stale hint so we don't loop on next refresh.
         if (error?.response?.status === 401 || error?.response?.status === 403) {
           clearSessionHint();
         }
@@ -78,36 +77,62 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
-  // -------------------- LOGIN --------------------
-  const login = async ({ userData }) => {
-    // ⭐ Backend has already set the httpOnly cookies — we just stamp
-    // the localStorage hint so the next page load knows to call /verify
-    setSessionHint();
+  const handleAuthSuccess = (userData, slug) => {
     setUser(userData);
     setIsLoggedIn(true);
+    setSessionHint();
+    const persistedSlug =
+      slug || userData?.tenant?.slug || getStoredTenantSlug() || "";
+    setTenantSlugState(persistedSlug);
+    persistTenantSlug(persistedSlug);
   };
 
-  // -------------------- LOGOUT --------------------
+  const login = async ({ email, password, tenantSlug: slug }) => {
+    const response = await ApiService.post(
+      "/auth/login",
+      { email, password, tenantSlug: slug },
+      { withCredentials: true }
+    );
+    handleAuthSuccess(response.data.user, slug);
+    return response.data.user;
+  };
+
+  const registerTenant = async (payload) => {
+    const response = await ApiService.post("/tenants/register", payload, {
+      withCredentials: true,
+    });
+    const slugFromResponse = response.data.user?.tenant?.slug;
+    handleAuthSuccess(response.data.user, slugFromResponse || payload.tenantSlug);
+    return response.data;
+  };
+
+  const acceptInvite = async (payload) => {
+    const response = await ApiService.post("/auth/accept-invite", payload, {
+      withCredentials: true,
+    });
+    const slugFromResponse = response.data.user?.tenant?.slug;
+    handleAuthSuccess(response.data.user, slugFromResponse);
+    return response.data;
+  };
+
   const logout = async () => {
     setLogoutLoading(true);
 
     try {
-      // Backend clears httpOnly cookies
       await ApiService.post("/auth/logout", {}, { withCredentials: true });
     } catch (err) {
       console.warn("Logout request failed:", err.message);
     } finally {
-      // ⭐ Always clear the hint even if the backend call fails,
-      // otherwise the user stays "stuck" calling /verify forever
       clearSessionHint();
       setUser(null);
       setIsLoggedIn(false);
       setLogoutLoading(false);
+      setTenantSlugState("");
+      persistTenantSlug("");
       navigate("/login");
     }
   };
 
-  // -------------------- UPDATE PROFILE --------------------
   const updateUserProfile = async (id, updatedData) => {
     const response = await ApiService.put(`/users/${id}`, updatedData, {
       withCredentials: true,
@@ -117,16 +142,17 @@ export const AuthProvider = ({ children }) => {
     return updatedUser;
   };
 
-  // -------------------- PROVIDER VALUE --------------------
   const value = {
     isLoggedIn,
     user,
+    tenantSlug,
     loading,
     logoutLoading,
     login,
     logout,
+    registerTenant,
+    acceptInvite,
     updateUserProfile,
-    setUser,
   };
 
   return (
