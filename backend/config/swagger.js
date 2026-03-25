@@ -27,211 +27,198 @@ const options = {
     ],
     components: {
       schemas: {
+        LeaveBalances: {
+          type: "object",
+          properties: {
+            AnnualLeave: { type: "number", example: 15 },
+            SickLeave: { type: "number", example: 10 },
+            FamilyResponsibility: { type: "number", example: 5 },
+            UnpaidLeave: { type: "number", example: 2 },
+            Other: { type: "number", example: 0 },
+          },
+        },
+        Tenant: {
+          type: "object",
+          properties: {
+            id: { type: "integer", example: 1 },
+            name: { type: "string", example: "FlexiLeave" },
+            slug: { type: "string", example: "flexileave" },
+            createdAt: { type: "string", format: "date-time" },
+          },
+        },
         User: {
           type: "object",
           properties: {
-            id: {
-              type: "string",
-              format: "uuid",
-              example: "123e4567-e89b-12d3-a456-426614174000",
-            },
-            email: {
-              type: "string",
-              format: "email",
-              example: "user@example.com",
-            },
-            firstName: {
-              type: "string",
-              example: "John",
-            },
-            lastName: {
-              type: "string",
-              example: "Doe",
-            },
-            phone: {
-              type: "string",
-              example: "+1234567890",
-            },
-            profileImage: {
-              type: "string",
-              nullable: true,
-              example: "https://example.com/profile.jpg",
-            },
+            id: { type: "integer", example: 1 },
+            name: { type: "string", example: "Jackson Khuto" },
+            email: { type: "string", format: "email", example: "jacksonk@digititan.co.za" },
+            phone: { type: "string", example: "+27 661802747" },
+            department: { type: "string", example: "IT" },
+            position: { type: "string", example: "Administrator" },
+            joinDate: { type: "string", format: "date" },
+            leaveBalances: { $ref: "#/components/schemas/LeaveBalances" },
             role: {
               type: "string",
-              enum: ["SUPER_ADMIN", "ADMIN", "MANAGER", "USER"],
-              example: "USER",
+              enum: ["SUPER_ADMIN", "OWNER", "ADMIN", "MANAGER", "EMPLOYEE"],
             },
-            isActive: {
-              type: "boolean",
-              example: true,
-            },
-            isVerified: {
-              type: "boolean",
-              example: true,
-            },
-            emailVerified: {
-              type: "boolean",
-              example: true,
-            },
-            lastLogin: {
+            status: {
               type: "string",
-              format: "date-time",
-              nullable: true,
+              enum: ["ACTIVE", "INACTIVE"],
             },
-            createdAt: {
-              type: "string",
-              format: "date-time",
-            },
-            updatedAt: {
-              type: "string",
-              format: "date-time",
-            },
+            avatar: { type: "string", nullable: true },
+            tenantId: { type: "integer" },
+            tenant: { $ref: "#/components/schemas/Tenant" },
+            createdAt: { type: "string", format: "date-time" },
+            refreshToken: { type: "string", nullable: true },
+          },
+        },
+        UserInvitation: {
+          type: "object",
+          properties: {
+            id: { type: "integer" },
+            email: { type: "string", format: "email" },
+            role: { type: "string" },
+            token: { type: "string" },
+            tenantId: { type: "integer" },
+            expiresAt: { type: "string", format: "date-time" },
+            createdAt: { type: "string", format: "date-time" },
           },
         },
         Leave: {
           type: "object",
           properties: {
-            id: {
+            id: { type: "integer", example: 101 },
+            leaveType: {
               type: "string",
-              format: "uuid",
-              example: "123e4567-e89b-12d3-a456-426614174000",
+              example: "AnnualLeave",
             },
-            userId: {
-              type: "string",
-              format: "uuid",
-            },
-            type: {
-              type: "string",
-              enum: [
-                "ANNUAL",
-                "SICK",
-                "MATERNITY",
-                "PATERNITY",
-                "UNPAID",
-                "OTHER",
-              ],
-              example: "ANNUAL",
-            },
-            startDate: {
-              type: "string",
-              format: "date",
-              example: "2024-01-15",
-            },
-            endDate: {
-              type: "string",
-              format: "date",
-              example: "2024-01-20",
-            },
-            days: {
-              type: "number",
-              example: 5,
-            },
-            reason: {
-              type: "string",
-              example: "Family vacation",
-            },
+            startDate: { type: "string", format: "date" },
+            endDate: { type: "string", format: "date" },
+            days: { type: "integer" },
+            reason: { type: "string" },
             status: {
               type: "string",
-              enum: ["PENDING", "APPROVED", "REJECTED", "CANCELLED"],
-              example: "PENDING",
+              enum: ["PENDING", "APPROVED", "REJECTED"],
             },
-            document: {
-              type: "string",
-              nullable: true,
-              example: "medical_certificate.pdf",
+            submittedAt: { type: "string", format: "date-time" },
+            rejectionReason: { type: "string", nullable: true },
+            emergencyContact: { type: "string", nullable: true },
+            emergencyPhone: { type: "string", nullable: true },
+            userId: { type: "integer" },
+            actionedBy: { type: "integer", nullable: true },
+            attachments: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "integer" },
+                  name: { type: "string" },
+                  url: { type: "string" },
+                  size: { type: "integer" },
+                  type: { type: "string" },
+                  uploadedAt: { type: "string", format: "date-time" },
+                },
+              },
             },
-            approvedById: {
-              type: "string",
-              format: "uuid",
-              nullable: true,
-            },
-            approvedAt: {
-              type: "string",
-              format: "date-time",
-              nullable: true,
-            },
-            rejectionReason: {
-              type: "string",
-              nullable: true,
-            },
-            createdAt: {
-              type: "string",
-              format: "date-time",
-            },
-            updatedAt: {
-              type: "string",
-              format: "date-time",
-            },
+            user: { $ref: "#/components/schemas/User" },
+            actionedByUser: { $ref: "#/components/schemas/User" },
           },
         },
         Notification: {
           type: "object",
           properties: {
-            id: {
-              type: "string",
-              format: "uuid",
-            },
-            userId: {
-              type: "string",
-              format: "uuid",
-            },
-            title: {
-              type: "string",
-            },
-            message: {
-              type: "string",
-            },
+            id: { type: "integer" },
             type: {
               type: "string",
-              enum: ["INFO", "SUCCESS", "WARNING", "ERROR"],
+              enum: ["leave_submitted", "leave_approved", "leave_rejected", "system"],
             },
-            isRead: {
-              type: "boolean",
-            },
-            createdAt: {
-              type: "string",
-              format: "date-time",
+            title: { type: "string" },
+            message: { type: "string" },
+            isRead: { type: "boolean" },
+            createdAt: { type: "string", format: "date-time" },
+            recipientId: { type: "integer" },
+            triggeredById: { type: "integer", nullable: true },
+            leaveId: { type: "integer", nullable: true },
+            metadata: { type: "object", additionalProperties: true },
+          },
+        },
+        TenantStats: {
+          type: "object",
+          properties: {
+            stats: {
+              type: "object",
+              properties: {
+                users: {
+                  type: "object",
+                  properties: {
+                    total: { type: "integer" },
+                    active: { type: "integer" },
+                    inactive: { type: "integer" },
+                    departments: {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  },
+                },
+                leaves: {
+                  type: "object",
+                  properties: {
+                    total: { type: "integer" },
+                    pending: { type: "integer" },
+                    approved: { type: "integer" },
+                    rejected: { type: "integer" },
+                    thisMonth: { type: "integer" },
+                    lastMonth: { type: "integer" },
+                    monthlyTrends: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          label: { type: "string" },
+                          total: { type: "integer" },
+                          breakdown: {
+                            type: "object",
+                            properties: {
+                              pending: { type: "integer" },
+                              approved: { type: "integer" },
+                              rejected: { type: "integer" },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    leaveTypeBreakdown: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          leaveType: { type: "string" },
+                          count: { type: "integer" },
+                        },
+                      },
+                    },
+                    recentLeaves: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/Leave" },
+                    },
+                  },
+                },
+              },
             },
           },
         },
         Error: {
           type: "object",
           properties: {
-            success: {
-              type: "boolean",
-              example: false,
-            },
-            message: {
-              type: "string",
-              example: "Error message",
-            },
-            error: {
-              type: "string",
-              example: "Detailed error description",
-            },
-          },
-        },
-        Success: {
-          type: "object",
-          properties: {
-            success: {
-              type: "boolean",
-              example: true,
-            },
-            message: {
-              type: "string",
-              example: "Success message",
-            },
-            data: {
-              type: "object",
-            },
+            success: { type: "boolean", example: false },
+            message: { type: "string", example: "Error message" },
+            error: { type: "string", example: "Detailed error description" },
           },
         },
       },
       responses: {
         UnauthorizedError: {
-          description: "Authentication token is missing or invalid",
+          description: "Authentication token missing or invalid",
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/Error" },
@@ -255,7 +242,7 @@ const options = {
           },
         },
         ValidationError: {
-          description: "Validation error",
+          description: "Input validation failed",
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/Error" },

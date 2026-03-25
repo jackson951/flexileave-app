@@ -6,14 +6,20 @@ import { useApiInterceptors } from "../api/web-api-service";
 // Lazy load all pages for faster initial paint
 const LoginPage = lazy(() => import("../pages/Login"));
 const DashboardLayout = lazy(() => import("../components/DashboardLayout"));
-const LeaveHistory = lazy(() => import("../pages/leave/LeaveHistory"));
-const LeaveApprovals = lazy(() =>
-  import("../pages/administrator/LeaveApproval")
+const LeaveWorkspace = lazy(() => import("../pages/leaves/LeaveWorkspace"));
+const NotificationsList = lazy(() =>
+  import("../pages/notifications/NotificationsList")
 );
-const UserManagement = lazy(() =>
-  import("../pages/administrator/UserManagement")
+const EmployeeManagement = lazy(() =>
+  import("../pages/employees/EmployeeManagement")
 );
 const ReportsPage = lazy(() => import("../pages/administrator/ExportReports"));
+const TenantDashboardPage = lazy(() =>
+  import("../pages/administrator/TenantDashboard")
+);
+const TenantRegisterPage = lazy(() => import("../pages/TenantRegister"));
+const AcceptInvitePage = lazy(() => import("../pages/AcceptInvite"));
+const SettingsPage = lazy(() => import("../pages/settings/SettingsPage"));
 const ProfilePage = lazy(() => import("../pages/profilePage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 const TeamCalender = lazy(() => import("../pages/administrator/TeamCalender"));
@@ -31,7 +37,7 @@ const LoadingSpinner = () => (
 const PublicRoute = ({ children }) => {
   const { isLoggedIn, loading } = useAuth();
   if (loading) return <LoadingSpinner />;
-  if (isLoggedIn) return <Navigate to="/dashboard/leave" replace />;
+  if (isLoggedIn) return <Navigate to="/dashboard/stats" replace />;
   return children;
 };
 
@@ -46,13 +52,32 @@ const AdminRoute = ({ children }) => {
   const { isLoggedIn, user, loading } = useAuth();
   if (loading) return <LoadingSpinner />;
   if (!isLoggedIn) return <Navigate to="/login" replace />;
-  if (user?.role !== "admin") return <Navigate to="/dashboard/leave" replace />;
+  const privileged = ["admin", "owner", "manager"];
+  if (!privileged.includes(user?.role?.toLowerCase() || "")) {
+    return <Navigate to="/dashboard/leave" replace />;
+  }
+  return children;
+};
+
+const ManagementRoute = ({ children }) => {
+  const { isLoggedIn, user, loading } = useAuth();
+  const allowed = ["admin", "manager", "owner"];
+  if (loading) return <LoadingSpinner />;
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  if (!allowed.includes(user?.role?.toLowerCase() || "")) {
+    return <Navigate to="/dashboard/leave" replace />;
+  }
   return children;
 };
 
 // Role-Based Rendering
-const RoleBased = ({ user, userComponent, adminComponent }) =>
-  user?.role === "admin" ? adminComponent : userComponent;
+const RoleBased = ({ user, userComponent, adminComponent }) => {
+  const adminRoles = ["admin", "owner"];
+  if (adminRoles.includes(user?.role?.toLowerCase() || "")) {
+    return adminComponent;
+  }
+  return userComponent;
+};
 
 const AppRoutes = () => {
   const { user, logout, loading } = useAuth();
@@ -83,6 +108,22 @@ const AppRoutes = () => {
             </PublicRoute>
           }
         />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <TenantRegisterPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/accept-invite"
+          element={
+            <PublicRoute>
+              <AcceptInvitePage />
+            </PublicRoute>
+          }
+        />
 
         {/* Root Redirect */}
         <Route path="/" element={<Navigate to="/dashboard/leave" replace />} />
@@ -100,28 +141,33 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         >
-          {/* Dashboard home */}
+          <Route path="stats" element={
+              <ManagementRoute>
+                <TenantDashboardPage />
+              </ManagementRoute>
+            } />
           <Route
             index
-            element={
-              <RoleBased
-                user={user}
-                userComponent={<LeaveHistory />}
-                adminComponent={<LeaveApprovals />}
-              />
-            }
+            element={<LeaveWorkspace />}
           />
 
-          {/* Leave */}
           <Route path="leave/new" element={<NewLeaveRequest />} />
+          <Route path="leave" element={<LeaveWorkspace />} />
+          <Route path="notifications" element={<NotificationsList />} />
           <Route
-            path="leave"
+            path="users"
             element={
-              <RoleBased
-                user={user}
-                userComponent={<LeaveHistory />}
-                adminComponent={<LeaveApprovals />}
-              />
+              <ManagementRoute>
+                <EmployeeManagement />
+              </ManagementRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <ManagementRoute>
+                <SettingsPage />
+              </ManagementRoute>
             }
           />
 
@@ -142,15 +188,6 @@ const AppRoutes = () => {
               </AdminRoute>
             }
           />
-          <Route
-            path="users"
-            element={
-              <AdminRoute>
-                <UserManagement />
-              </AdminRoute>
-            }
-          />
-
           {/* Profile */}
           <Route path="profile" element={<ProfilePage user={user} />} />
 

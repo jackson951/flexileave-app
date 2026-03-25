@@ -18,6 +18,7 @@ import {
   InformationCircleIcon,
   SparklesIcon,
 } from "@heroicons/react/24/outline";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { ApiService, useApiInterceptors } from "../api/web-api-service";
 
@@ -43,6 +44,7 @@ const ProfilePage = () => {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestType, setRequestType] = useState(""); // 'department' or 'position'
   const [requestDetails, setRequestDetails] = useState("");
+  const navigate = useNavigate();
 
   // Initialize interceptors
   useApiInterceptors();
@@ -202,21 +204,6 @@ const ProfilePage = () => {
     });
   };
 
-  // Get department color based on department name
-  const getDepartmentColor = (department) => {
-    const colors = {
-      Engineering: "bg-blue-100 text-blue-800",
-      Marketing: "bg-purple-100 text-purple-800",
-      Sales: "bg-green-100 text-green-800",
-      HR: "bg-pink-100 text-pink-800",
-      Finance: "bg-indigo-100 text-indigo-800",
-      Operations: "bg-orange-100 text-orange-800",
-      IT: "bg-gray-100 text-gray-800",
-      "Customer Support": "bg-teal-100 text-teal-800",
-    };
-    return colors[department] || "bg-gray-100 text-gray-800";
-  };
-
   // Calculate total leave balance
   const calculateTotalLeaveBalance = (leaveBalances) => {
     if (!leaveBalances) return 0;
@@ -262,17 +249,33 @@ const ProfilePage = () => {
     }
   };
 
+  if (!user) return null;
+
+  const dashboardRoute =
+    user.role?.toUpperCase() === "EMPLOYEE"
+      ? "/dashboard/leave"
+      : "/dashboard/stats";
+
+  const totalLeaveBalance = calculateTotalLeaveBalance(user.leaveBalances);
+  const leaveBalanceSummary =
+    totalLeaveBalance > 20
+      ? "Excellent balance!"
+      : totalLeaveBalance > 10
+      ? "Good balance"
+      : "Consider planning your time off";
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back Button */}
-      <div className="mb-8">
-        <a
-          href="/dashboard/leave"
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
+      <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => navigate(dashboardRoute)}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-full bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition"
         >
-          <ArrowLeftIcon className="h-5 w-5 mr-2" />
+          <ArrowLeftIcon className="h-4 w-4 text-gray-500" />
           Back to Dashboard
-        </a>
+        </button>
       </div>
 
       {/* Header */}
@@ -289,133 +292,121 @@ const ProfilePage = () => {
         <div className="lg:col-span-2">
           <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-200">
             {/* Profile Header */}
-            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-8 text-white relative overflow-hidden">
-              <div className="absolute inset-0 bg-black bg-opacity-10"></div>
-              <div className="relative z-10">
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-                  <div className="relative">
-                    {formData.avatar ? (
-                      <img
-                        src={formData.avatar}
-                        alt={formData.name}
-                        className="h-32 w-32 rounded-full object-cover border-4 border-white shadow-2xl transition-transform duration-300 hover:scale-105"
-                        onError={(e) => {
-                          e.target.src =
-                            "https://via.placeholder.com/150?text=User";
-                        }}
-                      />
-                    ) : (
-                      <div className="h-32 w-32 rounded-full bg-white bg-opacity-20 flex items-center justify-center backdrop-blur-sm">
-                        <UserIcon className="h-16 w-16" />
-                      </div>
-                    )}
-                    {isEditing && (
-                      <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg border-2 border-gray-100">
-                        <PencilIcon className="h-5 w-5 text-gray-700" />
-                      </div>
-                    )}
-                  </div>
+            <div className="p-8 border-b border-gray-100 bg-gray-50">
+              <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
+                <div className="relative">
+                  {formData.avatar ? (
+                    <img
+                      src={formData.avatar}
+                      alt={formData.name}
+                      className="h-32 w-32 rounded-full object-cover border-2 border-gray-200 shadow-sm transition-transform duration-300 hover:scale-105"
+                      onError={(e) => {
+                        e.target.src =
+                          "https://via.placeholder.com/150?text=User";
+                      }}
+                    />
+                  ) : (
+                    <div className="h-32 w-32 rounded-full bg-gray-100 flex items-center justify-center">
+                      <UserIcon className="h-16 w-16 text-gray-500" />
+                    </div>
+                  )}
+                  {isEditing && (
+                    <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg border border-gray-200">
+                      <PencilIcon className="h-5 w-5 text-gray-700" />
+                    </div>
+                  )}
+                </div>
 
-                  <div className="text-center md:text-left flex-1">
-                    <h2 className="text-3xl font-bold mb-2">
-                      {formData.name || "User Name"}
-                    </h2>
-                    <p className="text-indigo-100 text-lg mb-4">
-                      {user?.email || "Email not available"}
-                    </p>
+                <div className="flex-1 space-y-2 text-center md:text-left">
+                  <h2 className="text-3xl font-bold text-gray-900">
+                    {formData.name || "User Name"}
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {user?.email || "Email not available"}
+                  </p>
+                  {user?.role && (
+                    <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start text-sm text-gray-600">
+                      <span className="rounded-full border border-gray-300 px-4 py-1 text-xs font-semibold text-gray-700">
+                        {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                      </span>
+                      <span className="text-xs uppercase tracking-wide text-gray-400">
+                        • {formatDate(formData.joinDate)}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-                    {user?.role && (
-                      <div className="inline-flex items-center space-x-2 mb-6">
-                        <span
-                          className={`inline-block px-4 py-2 rounded-full text-sm font-medium ${
-                            user.role === "admin"
-                              ? "bg-yellow-500 text-white"
-                              : user.role === "manager"
-                              ? "bg-purple-500 text-white"
-                              : "bg-blue-500 text-white"
-                          }`}
-                        >
-                          {user.role.charAt(0).toUpperCase() +
-                            user.role.slice(1)}
-                        </span>
-                        <span className="text-indigo-100 text-sm">
-                          • {formatDate(formData.joinDate)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="md:ml-auto">
-                    {!isEditing ? (
+                <div className="md:ml-auto">
+                  {!isEditing ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="inline-flex items-center px-6 py-3 border border-gray-300 rounded-full bg-white text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition"
+                    >
+                      <PencilIcon className="h-5 w-5 mr-2 text-gray-500" />
+                      Edit Profile
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap gap-3">
                       <button
-                        onClick={() => setIsEditing(true)}
-                        className="inline-flex items-center px-6 py-3 bg-white bg-opacity-20 backdrop-blur-sm text-white rounded-lg hover:bg-opacity-30 transition-all duration-200 font-medium transform hover:scale-105 hover:shadow-lg"
+                        type="button"
+                        onClick={handleReset}
+                        className="px-6 py-3 rounded-full border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition"
                       >
-                        <PencilIcon className="h-5 w-5 mr-2" />
-                        Edit Profile
+                        Cancel
                       </button>
-                    ) : (
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={handleReset}
-                          className="px-6 py-3 bg-white bg-opacity-20 backdrop-blur-sm text-white rounded-lg hover:bg-opacity-30 transition-all duration-200 font-medium hover:scale-105"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleSubmit}
-                          disabled={loading}
-                          className="px-6 py-3 bg-white text-indigo-600 rounded-lg hover:bg-gray-100 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 hover:shadow-lg"
-                        >
-                          {loading ? (
-                            <div className="flex items-center">
-                              <svg
-                                className="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-600"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                              >
-                                <circle
-                                  className="opacity-25"
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  stroke="currentColor"
-                                  strokeWidth="4"
-                                ></circle>
-                                <path
-                                  className="opacity-75"
-                                  fill="currentColor"
-                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                ></path>
-                              </svg>
-                              Saving...
-                            </div>
-                          ) : (
-                            "Save Changes"
-                          )}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-6 py-3 rounded-full border border-transparent bg-gray-900 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? (
+                          <div className="flex items-center gap-2">
+                            <svg
+                              className="h-5 w-5 animate-spin text-white"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            Saving...
+                          </div>
+                        ) : (
+                          "Save Changes"
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* Profile Details */}
+          {/* Profile Details */}
             <div className="p-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Left Column - Personal Information */}
                 <div>
                   <h3 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
-                    <UserIcon className="h-6 w-6 mr-3 text-indigo-600" />
+                    <UserIcon className="h-6 w-6 mr-3 text-gray-500" />
                     Personal Information
                   </h3>
 
                   <div className="space-y-6">
                     <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-indigo-100 rounded-xl flex items-center justify-center group-hover:bg-indigo-200 transition-colors duration-200">
-                        <UserIcon className="h-6 w-6 text-indigo-600" />
+                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                      <UserIcon className="h-6 w-6 text-gray-500" />
                       </div>
                       <div className="ml-4 flex-1">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -427,7 +418,7 @@ const ProfilePage = () => {
                             name="name"
                             value={formData.name}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 shadow-sm"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
                             placeholder="Enter your full name"
                             autoFocus
                           />
@@ -440,8 +431,8 @@ const ProfilePage = () => {
                     </div>
 
                     <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center group-hover:bg-blue-200 transition-colors duration-200">
-                        <EnvelopeIcon className="h-6 w-6 text-blue-600" />
+                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                      <EnvelopeIcon className="h-6 w-6 text-gray-500" />
                       </div>
                       <div className="ml-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -457,8 +448,8 @@ const ProfilePage = () => {
                     </div>
 
                     <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-green-100 rounded-xl flex items-center justify-center group-hover:bg-green-200 transition-colors duration-200">
-                        <PhoneIcon className="h-6 w-6 text-green-600" />
+                    <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                      <PhoneIcon className="h-6 w-6 text-gray-500" />
                       </div>
                       <div className="ml-4 flex-1">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -470,7 +461,7 @@ const ProfilePage = () => {
                             name="phone"
                             value={formData.phone}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 shadow-sm"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
                             placeholder="Enter your phone number"
                           />
                         ) : (
@@ -490,7 +481,7 @@ const ProfilePage = () => {
                             id="updatePassword"
                             checked={updatePassword}
                             onChange={handlePasswordCheckboxChange}
-                            className="h-5 w-5 text-indigo-600 focus:ring-2 focus:ring-indigo-500 border-gray-300 rounded"
+                            className="h-5 w-5 text-gray-900 focus:ring-2 focus:ring-gray-200 border-gray-300 rounded"
                           />
                           <label
                             htmlFor="updatePassword"
@@ -503,8 +494,8 @@ const ProfilePage = () => {
                         {updatePassword && (
                           <div className="space-y-4">
                             <div className="flex items-start group">
-                              <div className="flex-shrink-0 h-12 w-12 bg-red-100 rounded-xl flex items-center justify-center group-hover:bg-red-200 transition-colors duration-200">
-                                <LockClosedIcon className="h-6 w-6 text-red-600" />
+                              <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                                <LockClosedIcon className="h-6 w-6 text-gray-500" />
                               </div>
                               <div className="ml-4 flex-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -516,7 +507,7 @@ const ProfilePage = () => {
                                     name="password"
                                     value={formData.password}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 shadow-sm"
+                                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
                                     placeholder="Enter new password (min 8 characters)"
                                   />
                                   <button
@@ -540,8 +531,8 @@ const ProfilePage = () => {
                             </div>
 
                             <div className="flex items-start group">
-                              <div className="flex-shrink-0 h-12 w-12 bg-red-100 rounded-xl flex items-center justify-center group-hover:bg-red-200 transition-colors duration-200">
-                                <LockClosedIcon className="h-6 w-6 text-red-600" />
+                              <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                                <LockClosedIcon className="h-6 w-6 text-gray-500" />
                               </div>
                               <div className="ml-4 flex-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -555,7 +546,7 @@ const ProfilePage = () => {
                                     name="confirmPassword"
                                     value={formData.confirmPassword}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 shadow-sm"
+                                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
                                     placeholder="Confirm new password"
                                   />
                                   <button
@@ -586,7 +577,7 @@ const ProfilePage = () => {
                 {/* Right Column - Employment Details */}
                 <div>
                   <h3 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
-                    <BuildingOfficeIcon className="h-6 w-6 mr-3 text-indigo-600" />
+                    <BuildingOfficeIcon className="h-6 w-6 mr-3 text-gray-500" />
                     Employment Details
                   </h3>
 
@@ -605,7 +596,7 @@ const ProfilePage = () => {
                             name="joinDate"
                             value={formData.joinDate}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 shadow-sm"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
                           />
                         ) : (
                           <p className="text-gray-900 text-lg font-medium">
@@ -616,23 +607,23 @@ const ProfilePage = () => {
                     </div>
 
                     <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-yellow-100 rounded-xl flex items-center justify-center group-hover:bg-yellow-200 transition-colors duration-200">
-                        <ShieldCheckIcon className="h-6 w-6 text-yellow-600" />
+                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                        <ShieldCheckIcon className="h-6 w-6 text-gray-500" />
                       </div>
                       <div className="ml-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Status
                         </label>
-                        <span className="inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                          <CheckCircleIcon className="h-4 w-4 mr-2" />
+                        <span className="inline-flex items-center px-4 py-2 border border-gray-200 rounded-full text-sm font-medium text-gray-700">
+                          <CheckCircleIcon className="h-4 w-4 mr-2 text-gray-400" />
                           Active
                         </span>
                       </div>
                     </div>
 
                     <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:bg-purple-200 transition-colors duration-200">
-                        <BuildingOfficeIcon className="h-6 w-6 text-purple-600" />
+                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                        <BuildingOfficeIcon className="h-6 w-6 text-gray-500" />
                       </div>
                       <div className="ml-4 flex-1">
                         <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
@@ -653,21 +644,17 @@ const ProfilePage = () => {
                             <button
                               type="button"
                               onClick={() => handleRequestUpdate("department")}
-                              className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 transition-colors duration-200"
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-full hover:bg-gray-200 transition duration-200"
                             >
                               Request Update
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center">
-                            <span
-                              className={`px-4 py-2 rounded-full text-sm font-medium ${getDepartmentColor(
-                                formData.department
-                              )}`}
-                            >
-                              {formData.department || "Not specified"}
-                            </span>
-                          </div>
+                        <div className="flex items-center">
+                          <span className="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 text-gray-700">
+                            {formData.department || "Not specified"}
+                          </span>
+                        </div>
                         )}
                         <p className="text-xs text-gray-500 mt-2 flex items-center">
                           <InformationCircleIcon className="h-4 w-4 mr-1" />
@@ -677,8 +664,8 @@ const ProfilePage = () => {
                     </div>
 
                     <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-orange-100 rounded-xl flex items-center justify-center group-hover:bg-orange-200 transition-colors duration-200">
-                        <BriefcaseIcon className="h-6 w-6 text-orange-600" />
+                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                        <BriefcaseIcon className="h-6 w-6 text-gray-500" />
                       </div>
                       <div className="ml-4 flex-1">
                         <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
@@ -699,7 +686,7 @@ const ProfilePage = () => {
                             <button
                               type="button"
                               onClick={() => handleRequestUpdate("position")}
-                              className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 transition-colors duration-200"
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-full hover:bg-gray-200 transition duration-200"
                             >
                               Request Update
                             </button>
@@ -717,8 +704,8 @@ const ProfilePage = () => {
                     </div>
 
                     <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-indigo-100 rounded-xl flex items-center justify-center group-hover:bg-indigo-200 transition-colors duration-200">
-                        <SparklesIcon className="h-6 w-6 text-indigo-600" />
+                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                        <SparklesIcon className="h-6 w-6 text-gray-500" />
                       </div>
                       <div className="ml-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
@@ -744,8 +731,8 @@ const ProfilePage = () => {
                     </div>
 
                     <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center group-hover:bg-blue-200 transition-colors duration-200">
-                        <PencilIcon className="h-6 w-6 text-blue-600" />
+                    <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                        <PencilIcon className="h-6 w-6 text-gray-500" />
                       </div>
                       <div className="ml-4 flex-1">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -757,7 +744,7 @@ const ProfilePage = () => {
                             name="avatar"
                             value={formData.avatar}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 shadow-sm"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
                             placeholder="https://example.com/avatar.jpg"
                           />
                         ) : (
@@ -794,146 +781,103 @@ const ProfilePage = () => {
               </div>
 
               {/* Success/Error Messages */}
-              {successMessage && (
-                <div className="mt-8 p-5 bg-green-50 border border-green-200 rounded-xl animate-fade-in">
-                  <div className="flex items-center">
-                    <CheckCircleIcon className="h-6 w-6 text-green-500 mr-3" />
-                    <p className="text-green-800 text-base font-medium">
-                      {successMessage}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {errorMessage && (
-                <div className="mt-8 p-5 bg-red-50 border border-red-200 rounded-xl animate-fade-in">
-                  <div className="flex items-center">
-                    <XMarkIcon className="h-6 w-6 text-red-500 mr-3" />
-                    <p className="text-red-800 text-base font-medium">
-                      {errorMessage}
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
-          </div>
+
+            {successMessage && (
+              <div className="mt-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
+                <div className="flex items-center gap-3">
+                  <CheckCircleIcon className="h-6 w-6 text-gray-400" />
+                  <p className="text-gray-700 text-base font-medium">
+                    {successMessage}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="mt-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
+                <div className="flex items-center gap-3">
+                  <XMarkIcon className="h-6 w-6 text-gray-400" />
+                  <p className="text-gray-700 text-base font-medium">
+                    {errorMessage}
+                  </p>
+                </div>
+              </div>
+            )}
+        </div>
         </div>
 
         {/* Right Column - Leave Balance Section */}
         <div className="space-y-6">
-          {/* Leave Balance Card */}
-          <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-200">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white">
-              <div className="flex items-center">
-                <ChartBarIcon className="h-7 w-7 mr-3" />
-                <h3 className="text-2xl font-bold">Leave Balances</h3>
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <ChartBarIcon className="h-7 w-7 text-gray-500" />
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Leave Balances</p>
+                  <h3 className="text-2xl font-semibold text-gray-900">Available days</h3>
+                </div>
               </div>
             </div>
-            <div className="p-6">
+            <div className="p-6 space-y-5">
               {user?.leaveBalances ? (
-                <div className="space-y-6">
-                  {/* Total Balance */}
-                  <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-lg font-medium text-gray-700">
-                        Total Available Days
-                      </span>
-                      <span className="text-3xl font-bold text-indigo-600">
-                        {calculateTotalLeaveBalance(user.leaveBalances)}
+                <>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 space-y-2">
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <span>Total Available Days</span>
+                      <span className="text-2xl font-semibold text-gray-900">
+                        {totalLeaveBalance}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div className="h-2.5 rounded-full bg-gray-200">
                       <div
-                        className="h-3 rounded-full bg-gradient-to-r from-indigo-500 to-blue-500"
+                        className="h-full rounded-full bg-gray-500 transition-all duration-500"
                         style={{
-                          width: `${Math.min(
-                            (calculateTotalLeaveBalance(user.leaveBalances) /
-                              30) *
-                              100,
-                            100
-                          )}%`,
+                          width: `${Math.min((totalLeaveBalance / 30) * 100, 100)}%`,
                         }}
-                      ></div>
+                      />
                     </div>
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      {calculateTotalLeaveBalance(user.leaveBalances) > 20
-                        ? "Excellent balance!"
-                        : calculateTotalLeaveBalance(user.leaveBalances) > 10
-                        ? "Good balance"
-                        : "Consider planning your time off"}
+                    <p className="text-xs text-gray-500">
+                      {leaveBalanceSummary}
                     </p>
                   </div>
 
-                  {/* Individual Leave Types */}
-                  {Object.entries(user.leaveBalances).map(
-                    ([leaveType, balance]) => (
+                  <div className="space-y-4">
+                    {Object.entries(user.leaveBalances).map(([leaveType, balance]) => (
                       <div
                         key={leaveType}
-                        className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all duration-300 group"
+                        className="rounded-xl border border-gray-200 p-4"
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <h4 className="font-semibold text-gray-900 text-lg">
-                              {formatLeaveType(leaveType)}
-                            </h4>
-                            <p className="text-sm text-gray-500 mt-1">
-                              {balance} day{balance !== 1 ? "s" : ""} remaining
-                            </p>
-                          </div>
-                          <div
-                            className={`px-4 py-2 rounded-full text-sm font-medium ${
-                              balance > 5
-                                ? "bg-green-100 text-green-800"
-                                : balance > 0
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {balance} days
-                          </div>
+                        <div className="flex items-center justify-between text-sm text-gray-500">
+                          <p className="font-medium text-gray-900">
+                            {formatLeaveType(leaveType)}
+                          </p>
+                          <p className="font-semibold text-gray-900">
+                            {balance} day{balance !== 1 ? "s" : ""}
+                          </p>
                         </div>
-
-                        {/* Progress bar */}
-                        <div className="w-full bg-gray-100 rounded-full h-2.5">
+                        <div className="mt-2 h-2 rounded-full bg-gray-200">
                           <div
-                            className={`h-2.5 rounded-full transition-all duration-500 ease-out ${
-                              balance > 5
-                                ? "bg-green-500"
-                                : balance > 0
-                                ? "bg-yellow-500"
-                                : "bg-red-500"
-                            }`}
+                            className="h-full rounded-full bg-gray-500 transition-all duration-500"
                             style={{
                               width: `${Math.min((balance / 15) * 100, 100)}%`,
                             }}
-                          ></div>
+                          />
                         </div>
-
-                        {/* Usage tip */}
                         {balance === 0 && (
-                          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <p className="text-xs text-red-700 font-medium flex items-center">
-                              <InformationCircleIcon className="h-4 w-4 mr-2" />
-                              Contact HR to request additional{" "}
-                              {formatLeaveType(leaveType)} days
-                            </p>
-                          </div>
+                          <p className="mt-2 text-xs italic text-gray-500">
+                            Contact HR to request additional {formatLeaveType(leaveType)} days.
+                          </p>
                         )}
                       </div>
-                    )
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="mx-auto h-16 w-16 text-gray-300 mb-4">
-                    <ChartBarIcon className="h-16 w-16" />
+                    ))}
                   </div>
-                  <p className="text-gray-500 text-lg">
-                    No leave balance information available
-                  </p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    Contact HR for assistance
-                  </p>
+                </>
+              ) : (
+                <div className="space-y-2 py-10 text-center text-sm text-gray-500">
+                  <ChartBarIcon className="mx-auto h-12 w-12 text-gray-300" />
+                  <p>No leave balance information available</p>
+                  <p className="text-xs text-gray-400">Contact HR for assistance</p>
                 </div>
               )}
             </div>
@@ -969,7 +913,7 @@ const ProfilePage = () => {
                 <textarea
                   value={requestDetails}
                   onChange={(e) => setRequestDetails(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 shadow-sm"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
                   rows="4"
                   placeholder={`Why do you want to change your ${requestType}? Please provide details...`}
                 />
@@ -978,13 +922,13 @@ const ProfilePage = () => {
               <div className="flex justify-end space-x-4">
                 <button
                   onClick={() => setShowRequestModal(false)}
-                  className="px-6 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
+                className="px-6 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-150"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={submitUpdateRequest}
-                  className="px-6 py-3 border border-transparent rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
+                className="px-6 py-3 border border-transparent rounded-lg text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-150"
                 >
                   Submit Request
                 </button>
@@ -998,3 +942,4 @@ const ProfilePage = () => {
 };
 
 export default ProfilePage;
+
