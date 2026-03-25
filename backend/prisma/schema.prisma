@@ -13,13 +13,14 @@ datasource db {
 model Tenant {
   id            Int             @id @default(autoincrement())
   name          String
-  code          String          @unique
+  slug          String          @unique
   isActive      Boolean         @default(true)
   createdAt     DateTime        @default(now())
 
   users         User[]
   leaves        Leave[]
   notifications Notification[]
+  invitations   UserInvitation[]
 
   @@map("tenants")
 }
@@ -29,6 +30,7 @@ model Tenant {
 ////////////////////////
 model User {
   id                     Int             @id @default(autoincrement())
+
   tenantId               Int
   tenant                 Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -39,14 +41,15 @@ model User {
   position               String?
   joinDate               DateTime
   leaveBalances          Json
-  role                   Role           @default(EMPLOYEE)
+  role                   Role            @default(EMPLOYEE)
   avatar                 String?
   password               String
-  createdAt              DateTime       @default(now())
+  createdAt              DateTime        @default(now())
   refreshToken           String?
+  status                 String          @default("ACTIVE")
 
   leaves                 Leave[]
-  actionedLeaves         Leave[]          @relation("LeaveActionedBy")
+  actionedLeaves         Leave[]         @relation("LeaveActionedBy")
 
   notificationsReceived  Notification[]  @relation("NotificationRecipient")
   notificationsTriggered Notification[]  @relation("NotificationTriggeredBy")
@@ -56,8 +59,12 @@ model User {
   @@map("users")
 }
 
+////////////////////////
+// LEAVE
+////////////////////////
 model Leave {
   id               Int             @id @default(autoincrement())
+
   tenantId         Int
   tenant           Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -66,8 +73,8 @@ model Leave {
   endDate          DateTime
   days             Int
   reason           String
-  status           LeaveStatus    @default(PENDING)
-  submittedAt      DateTime       @default(now())
+  status           LeaveStatus     @default(PENDING)
+  submittedAt      DateTime        @default(now())
   rejectionReason  String?
   emergencyContact String?
   emergencyPhone   String?
@@ -87,6 +94,29 @@ model Leave {
 }
 
 ////////////////////////
+// USER INVITATIONS
+////////////////////////
+model UserInvitation {
+  id           Int      @id @default(autoincrement())
+
+  email        String
+  token        String   @unique
+  role         Role
+
+  tenantId     Int
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  expiresAt    DateTime
+  used         Boolean  @default(false)
+  passwordHash String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, email])
+  // ❌ REMOVED @@map("user_invitations")
+}
+
+////////////////////////
 // FILE ATTACHMENTS
 ////////////////////////
 model File {
@@ -98,7 +128,7 @@ model File {
   uploadedAt DateTime @default(now())
 
   leaveId    Int?
-  leave      Leave?  @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  leave      Leave?   @relation(fields: [leaveId], references: [id], onDelete: Cascade)
 
   @@map("files")
 }
@@ -108,6 +138,7 @@ model File {
 ////////////////////////
 model Notification {
   id            Int              @id @default(autoincrement())
+
   tenantId      Int
   tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
