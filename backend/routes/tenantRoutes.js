@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const { PrismaClient } = require("@prisma/client");
+const { getPrismaClient } = require("../utils/prismaClient");
 const {
   getAccessTokenCookieOptions,
   getRefreshTokenCookieOptions,
@@ -14,8 +14,9 @@ const {
   tenantGuard,
   authorizeRoles,
 } = require("../middleware/auth");
-
-const prisma = new PrismaClient();
+const upload = require("../utils/upload");
+const { uploadToCloudinary } = require("../utils/cloudinary");
+const prisma = getPrismaClient();
 const router = express.Router();
 
 const normalizeSlug = (value) => {
@@ -76,13 +77,15 @@ const DASHBOARD_ROLES = ["OWNER", "ADMIN", "MANAGER"];
  *       500:
  *         description: Registration failed
  */
-router.post("/register", async (req, res) => {
+router.post("/register", upload.single("logo"), async (req, res) => {
   const {
     tenantName,
     tenantSlug,
     ownerName,
     ownerEmail,
     ownerPassword,
+    primaryColor,
+    secondaryColor,
   } = req.body;
 
   if (!tenantName || !ownerName || !ownerEmail || !ownerPassword) {
@@ -102,6 +105,15 @@ router.post("/register", async (req, res) => {
 
   const normalizedOwnerEmail = ownerEmail.toLowerCase().trim();
 
+  // Validate colors if provided
+  const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+  if (primaryColor && !colorRegex.test(primaryColor)) {
+    return res.status(400).json({ message: "Invalid primary color format" });
+  }
+  if (secondaryColor && !colorRegex.test(secondaryColor)) {
+    return res.status(400).json({ message: "Invalid secondary color format" });
+  }
+
   try {
     const existingTenant = await prisma.tenant.findUnique({
       where: { slug: safeSlug },
@@ -112,8 +124,33 @@ router.post("/register", async (req, res) => {
         .json({ message: "Tenant slug already exists. Choose another slug." });
     }
 
+    // Prepare tenant data with branding
+    const tenantData = {
+      name: tenantName.trim(),
+      slug: safeSlug,
+      ...(primaryColor && { primaryColor }),
+      ...(secondaryColor && { secondaryColor }),
+    };
+
+    // Handle logo upload
+    if (req.file?.buffer) {
+      try {
+        const uploadResult = await uploadToCloudinary(
+          req.file.buffer,
+          req.file.originalname,
+          "tenant_logos"
+        );
+        tenantData.logoUrl = uploadResult.secure_url;
+      } catch (uploadError) {
+        console.error("Tenant logo upload failed:", uploadError);
+        return res
+          .status(500)
+          .json({ message: "Failed to upload tenant logo" });
+      }
+    }
+
     const tenant = await prisma.tenant.create({
-      data: { name: tenantName.trim(), slug: safeSlug },
+      data: tenantData,
     });
 
     const hashedPassword = await bcrypt.hash(ownerPassword, 10);
@@ -130,7 +167,7 @@ router.post("/register", async (req, res) => {
       },
       include: {
         tenant: {
-          select: { id: true, name: true, slug: true },
+          select: { id: true, name: true, slug: true, logoUrl: true, primaryColor: true, secondaryColor: true },
         },
       },
     });
@@ -152,23 +189,30 @@ router.post("/register", async (req, res) => {
     });
 
     res.cookie("accessToken", accessToken, getAccessTokenCookieOptions());
-  res.cookie("refreshToken", refreshToken, getRefreshTokenCookieOptions());
-  res.cookie("auth_session", "1", getSessionHintCookieOptions());
+    res.cookie("refreshToken", refreshToken, getRefreshTokenCookieOptions());
+    res.cookie("auth_session", "1", getSessionHintCookieOptions());
 
-  res.status(201).json({
-    message: "Tenant registered successfully",
-    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
-    user: {
-      id: owner.id,
-      name: owner.name,
-      email: owner.email,
-      role: owner.role,
-      tenantId: owner.tenantId,
-    },
-  });
-} catch (error) {
-  console.error("Tenant registration error:", error);
-  res.status(500).json({ message: "Failed to register tenant" });
+    res.status(201).json({
+      message: "Tenant registered successfully",
+      tenant: { 
+        id: tenant.id, 
+        name: tenant.name, 
+        slug: tenant.slug,
+        logoUrl: tenant.logoUrl,
+        primaryColor: tenant.primaryColor,
+        secondaryColor: tenant.secondaryColor,
+      },
+      user: {
+        id: owner.id,
+        name: owner.name,
+        email: owner.email,
+        role: owner.role,
+        tenantId: owner.tenantId,
+      },
+    });
+  } catch (error) {
+    console.error("Tenant registration error:", error);
+    res.status(500).json({ message: "Failed to register tenant" });
   }
 });
 
@@ -244,6 +288,109 @@ const intersectDateRanges = (baseRange, overrideRange) => {
 
   return range;
 };
+
+// GET /api/tenants/me
+// Returns current tenant details for authenticated user
+router.get(
+  "/me",
+  authenticateToken,
+  tenantGuard,
+  async (req, res) => {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ message: "Missing tenant context" });
+    }
+
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          primaryColor: true,
+          secondaryColor: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      res.json({ tenant });
+    } catch (error) {
+      console.error("Get tenant error:", error);
+      res.status(500).json({ message: "Failed to fetch tenant details" });
+    }
+  }
+);
+
+// PUT /api/tenants/update
+// Allows OWNER or ADMIN to update tenant branding
+router.put(
+  "/update",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles("OWNER", "ADMIN"),
+  upload.single("logo"),
+  async (req, res) => {
+    const tenantId = req.user?.tenantId;
+    const { name, primaryColor, secondaryColor } = req.body;
+
+    if (!tenantId) {
+      return res.status(400).json({ message: "Missing tenant context" });
+    }
+
+    // Validate colors if provided
+    const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+    if (primaryColor && !colorRegex.test(primaryColor)) {
+      return res.status(400).json({ message: "Invalid primary color format" });
+    }
+    if (secondaryColor && !colorRegex.test(secondaryColor)) {
+      return res.status(400).json({ message: "Invalid secondary color format" });
+    }
+
+    try {
+      const updateData = {
+        ...(name && { name: name.trim() }),
+        ...(primaryColor && { primaryColor }),
+        ...(secondaryColor && { secondaryColor }),
+      };
+
+      // Handle logo upload
+      if (req.file) {
+        const logoUrl = `/uploads/${req.file.filename}`;
+        updateData.logoUrl = logoUrl;
+      }
+
+      const updatedTenant = await prisma.tenant.update({
+        where: { id: tenantId },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          primaryColor: true,
+          secondaryColor: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      res.json({
+        message: "Tenant updated successfully",
+        tenant: updatedTenant,
+      });
+    } catch (error) {
+      console.error("Update tenant error:", error);
+      res.status(500).json({ message: "Failed to update tenant" });
+    }
+  }
+);
 
 router.get(
   "/stats",

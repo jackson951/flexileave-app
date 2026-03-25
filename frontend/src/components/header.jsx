@@ -4,6 +4,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import digititanLogo from "../assets/digititan-logo.jpg";
 
+const DEFAULT_PRIMARY_COLOR = "#4f46e5";
+const DEFAULT_SECONDARY_COLOR = "#7c3aed";
+
 const Header = ({ variant = "default" }) => {
   const { isLoggedIn, user, logout } = useAuth();
   const navigate = useNavigate();
@@ -13,6 +16,11 @@ const Header = ({ variant = "default" }) => {
     navigate("/login");
   };
 
+  const logoUrl = digititanLogo;
+  const companyName = "FlexiLeave";
+  const primaryColor = DEFAULT_PRIMARY_COLOR;
+  const secondaryColor = DEFAULT_SECONDARY_COLOR;
+
   return (
     <header
       className={`w-full ${
@@ -20,20 +28,34 @@ const Header = ({ variant = "default" }) => {
           ? "bg-white shadow-sm border-b border-gray-100"
           : "bg-white shadow-md"
       }`}
+      style={{
+        // Apply dynamic theme colors
+        '--primary-color': primaryColor,
+        '--secondary-color': secondaryColor,
+      }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Brand */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
+            <div
+              className="w-10 h-10 rounded-lg p-0.5 shadow-lg"
+              style={{
+                background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`
+              }}
+            >
               <img
-                src={digititanLogo}
-                alt="Digititan Logo"
+                src={logoUrl}
+                alt={`${companyName} Logo`}
                 className="w-full h-full object-cover rounded-lg"
+                onError={(e) => {
+                  // Fallback to default logo if tenant logo fails to load
+                  e.target.src = digititanLogo;
+                }}
               />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">FlexiLeave</h1>
+              <h1 className="text-xl font-bold text-gray-900">{companyName}</h1>
               <p className="text-xs text-gray-500 -mt-1">Leave Management</p>
             </div>
           </div>
@@ -43,19 +65,19 @@ const Header = ({ variant = "default" }) => {
             <nav className="hidden md:flex items-center space-x-8">
               <Link
                 to="/dashboard"
-                className="text-gray-700 hover:text-indigo-600 transition-colors duration-200"
+                className="nav-item"
               >
                 Dashboard
               </Link>
               <Link
                 to="/leaves"
-                className="text-gray-700 hover:text-indigo-600 transition-colors duration-200"
+                className="nav-item"
               >
                 My Leaves
               </Link>
               <Link
                 to="/calendar"
-                className="text-gray-700 hover:text-indigo-600 transition-colors duration-200"
+                className="nav-item"
               >
                 Calendar
               </Link>
@@ -73,11 +95,11 @@ const Header = ({ variant = "default" }) => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M15 17h5l-5 5v-5zM9 7H4l5-5v5zM12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
+                      d="M15 17h5l-5 5v-5zM9 7H4l5-5v-5zM12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
                     />
                   </svg>
                 </button>
-                <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                <div className="w-8 h-8 bg-[color:var(--primary-color)] rounded-full flex items-center justify-center text-white text-sm font-medium">
                   {user?.name
                     ? user.name
                         .split(" ")
@@ -91,7 +113,7 @@ const Header = ({ variant = "default" }) => {
                 <div className="absolute right-0 mt-12 w-48 bg-white border border-gray-200 shadow-lg rounded-lg py-2 z-50 hidden group-hover:block">
                   <Link
                     to="/profile"
-                    className="block px-4 py-2 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600"
+                    className="block px-4 py-2 text-gray-700 hover:bg-[color:var(--primary-50)] hover:text-[color:var(--primary-800)]"
                   >
                     Profile
                   </Link>

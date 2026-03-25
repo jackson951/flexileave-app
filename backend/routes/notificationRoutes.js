@@ -1,8 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 const router = express.Router();
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const { getPrismaClient } = require("../utils/prismaClient");
+const prisma = getPrismaClient();
 const {
   authenticateToken,
   tenantGuard,

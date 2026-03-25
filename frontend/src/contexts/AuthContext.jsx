@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { ApiService } from "../api/web-api-service";
 import { useNavigate } from "react-router-dom";
+import { useTenant } from "./TenantContext.jsx";
 
 const AuthContext = createContext();
 
@@ -36,12 +37,14 @@ export const AuthProvider = ({ children }) => {
   const [tenantSlug, setTenantSlugState] = useState(getStoredTenantSlug());
   const [loading, setLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const { updateTenant, fetchTenant } = useTenant();
 
   useEffect(() => {
     const checkAuthStatus = async () => {
       if (!hasSessionHint()) {
         setIsLoggedIn(false);
         setUser(null);
+        updateTenant(null);
         setLoading(false);
         return;
       }
@@ -54,6 +57,10 @@ export const AuthProvider = ({ children }) => {
         if (response.data.valid) {
           setIsLoggedIn(true);
           setUser(response.data.user);
+          updateTenant(response.data.user?.tenant || null);
+          await fetchTenant().catch((err) =>
+            console.warn("Unable to refresh tenant after verify:", err)
+          );
           if (response.data.user?.tenant?.slug) {
             setTenantSlugState(response.data.user.tenant.slug);
             persistTenantSlug(response.data.user.tenant.slug);
@@ -62,22 +69,24 @@ export const AuthProvider = ({ children }) => {
           clearSessionHint();
           setIsLoggedIn(false);
           setUser(null);
+          updateTenant(null);
         }
       } catch (error) {
-        if (error?.response?.status === 401 || error?.response?.status === 403) {
-          clearSessionHint();
-        }
-        setIsLoggedIn(false);
-        setUser(null);
-      } finally {
-        setLoading(false);
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        clearSessionHint();
       }
+      setIsLoggedIn(false);
+      setUser(null);
+      updateTenant(null);
+    } finally {
+      setLoading(false);
+    }
     };
 
     checkAuthStatus();
   }, []);
 
-  const handleAuthSuccess = (userData, slug) => {
+  const handleAuthSuccess = async (userData, slug) => {
     setUser(userData);
     setIsLoggedIn(true);
     setSessionHint();
@@ -85,6 +94,10 @@ export const AuthProvider = ({ children }) => {
       slug || userData?.tenant?.slug || getStoredTenantSlug() || "";
     setTenantSlugState(persistedSlug);
     persistTenantSlug(persistedSlug);
+    updateTenant(userData?.tenant || null);
+    await fetchTenant().catch((err) =>
+      console.warn("Unable to refresh tenant after auth change:", err)
+    );
   };
 
   const login = async ({ email, password, tenantSlug: slug }) => {
@@ -93,16 +106,22 @@ export const AuthProvider = ({ children }) => {
       { email, password, tenantSlug: slug },
       { withCredentials: true }
     );
-    handleAuthSuccess(response.data.user, slug);
+    await handleAuthSuccess(response.data.user, slug);
     return response.data.user;
   };
 
   const registerTenant = async (payload) => {
     const response = await ApiService.post("/tenants/register", payload, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
       withCredentials: true,
     });
     const slugFromResponse = response.data.user?.tenant?.slug;
-    handleAuthSuccess(response.data.user, slugFromResponse || payload.tenantSlug);
+    await handleAuthSuccess(
+      response.data.user,
+      slugFromResponse || payload.tenantSlug
+    );
     return response.data;
   };
 
@@ -111,7 +130,7 @@ export const AuthProvider = ({ children }) => {
       withCredentials: true,
     });
     const slugFromResponse = response.data.user?.tenant?.slug;
-    handleAuthSuccess(response.data.user, slugFromResponse);
+    await handleAuthSuccess(response.data.user, slugFromResponse);
     return response.data;
   };
 
@@ -129,6 +148,7 @@ export const AuthProvider = ({ children }) => {
       setLogoutLoading(false);
       setTenantSlugState("");
       persistTenantSlug("");
+      updateTenant(null);
       navigate("/login");
     }
   };

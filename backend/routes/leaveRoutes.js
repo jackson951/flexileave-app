@@ -1,11 +1,14 @@
 require("dotenv").config();
 const express = require("express");
 const router = express.Router();
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const { getPrismaClient } = require("../utils/prismaClient");
+const prisma = getPrismaClient();
 const { body, validationResult } = require("express-validator");
 const multer = require("multer");
-const cloudinary = require("cloudinary").v2;
+const {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+} = require("../utils/cloudinary");
 const {
   authenticateToken,
   tenantGuard,
@@ -13,13 +16,6 @@ const {
 } = require("../middleware/auth");
 
 const requireAdminOrManager = authorizeRoles("OWNER", "ADMIN", "MANAGER");
-
-// -------------------- CLOUDINARY CONFIG -------------------- //
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 // -------------------- MULTER CONFIG (Memory Storage) -------------------- //
 const storage = multer.memoryStorage();
@@ -48,105 +44,6 @@ const upload = multer({
 const getLeaveBalance = (leaveBalances, leaveType) => {
   if (!leaveBalances) return 0;
   return leaveBalances[leaveType] || 0;
-};
-
-// ? FIXED: Robust Cloudinary upload with correct resource_type
-const uploadToCloudinary = (
-  fileBuffer,
-  fileName,
-  folder = "leave_attachments"
-) => {
-  return new Promise((resolve, reject) => {
-    // Normalize and extract extension
-    const cleanName = fileName.trim();
-    const lowerName = cleanName.toLowerCase();
-    const lastDot = lowerName.lastIndexOf(".");
-    const ext = lastDot === -1 ? "" : lowerName.slice(lastDot + 1);
-
-    // Define image extensions
-    const imageExts = new Set([
-      "jpg",
-      "jpeg",
-      "jpe",
-      "jif",
-      "jfif",
-      "jfi",
-      "png",
-      "gif",
-      "webp",
-      "bmp",
-      "dib",
-      "tiff",
-      "tif",
-      "svg",
-      "ico",
-    ]);
-
-    // Determine resource type
-    const resource_type = imageExts.has(ext) ? "image" : "raw";
-
-    // Safe and unique public_id
-    const baseName = cleanName.replace(/^.*[\\/]/, "").replace(/\.[^/.]+$/, "");
-    const public_id = `leave_${Date.now()}_${baseName}`;
-
-    // Upload options � this fixes PDFs and DOCX not opening correctly
-    const uploadOptions = {
-      folder,
-      resource_type,
-      public_id,
-      overwrite: false,
-      invalidate: true,
-    };
-
-    // ? Add file format for non-images
-    if (!imageExts.has(ext) && ext) {
-      uploadOptions.format = ext;
-    }
-
-    // Upload stream
-    const uploadStream = cloudinary.uploader.upload_stream(
-      uploadOptions,
-      (error, result) => {
-        if (error) {
-          console.error("? Cloudinary upload error:", error.message);
-          reject(new Error(`Upload failed: ${error.message}`));
-        } else {
-          console.log("? Uploaded to Cloudinary:", result.secure_url);
-          resolve(result);
-        }
-      }
-    );
-
-    // End stream with file buffer
-    uploadStream.end(fileBuffer);
-  });
-};
-
-// ? FIXED: Reliable deletion using regex-based public_id extraction
-const deleteFromCloudinary = async (fileUrl) => {
-  try {
-    // Extract public_id from secure_url (handles versioned URLs like /v12345/)
-    const match = fileUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z0-9]+$/);
-    if (!match) {
-      throw new Error("Could not parse public_id from URL");
-    }
-    const publicId = match[1]; // e.g., "leave_attachments/leave_1712345678_report"
-    const resource_type = fileUrl.includes("/raw/upload/") ? "raw" : "image";
-
-    const result = await cloudinary.uploader.destroy(publicId, {
-      resource_type,
-    });
-    console.log(
-      "??? Deleted from Cloudinary:",
-      publicId,
-      "| Result:",
-      result.result
-    );
-    return result;
-  } catch (error) {
-    console.error("? Cloudinary delete error:", error.message);
-    throw error;
-  }
 };
 
 // Helper: Cleanup orphaned files
@@ -681,6 +578,7 @@ router.post(
           emergencyContact,
           emergencyPhone,
           userId: req.user.userId,
+          tenantId: req.user.tenantId,
           status: "PENDING",
           attachments:
             fileIds?.length > 0

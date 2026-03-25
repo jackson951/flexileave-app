@@ -1,6 +1,6 @@
-const { PrismaClient } = require("@prisma/client");
+const { getPrismaClient } = require("../utils/prismaClient");
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const CLEANUP_INTERVAL_MS = 15 * 60 * 1000; // every 15 minutes
 
 const cleanupExpiredInvites = async () => {

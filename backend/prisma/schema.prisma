@@ -15,6 +15,9 @@ model Tenant {
   name          String
   slug          String          @unique
   isActive      Boolean         @default(true)
+  logoUrl       String?
+  primaryColor  String?
+  secondaryColor String?
   createdAt     DateTime        @default(now())
 
   users         User[]

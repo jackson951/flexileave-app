@@ -1,5 +1,6 @@
 // src/services/auth.js
 import { jwtDecode } from "jwt-decode";
+import { ApiService } from "./web-api-service";
 
 /**
  * Check if stored JWT is still valid (not expired).
@@ -25,4 +26,16 @@ export const checkTokenExpiration = () => {
 export const logoutUser = () => {
   localStorage.removeItem("authToken");
   localStorage.removeItem("tokenExpiration"); // if you store it separately
+};
+
+export const authApi = {
+  login: (credentials) => ApiService.post("/auth/login", credentials),
+  register: (userData) => ApiService.post("/auth/register", userData),
+  registerTenant: (tenantData) => ApiService.post("/tenants/register", tenantData),
+  logout: () => ApiService.post("/auth/logout"),
+  refreshToken: () => ApiService.post("/auth/refresh"),
+  verify: () => ApiService.get("/auth/verify"),
+  forgotPassword: (email) => ApiService.post("/auth/forgot-password", { email }),
+  resetPassword: (token, password) =>
+    ApiService.post("/auth/reset-password", { token, password }),
 };

@@ -3,7 +3,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { PrismaClient } = require("@prisma/client");
+const { getPrismaClient } = require("../utils/prismaClient");
 const {
   getAccessTokenCookieOptions,
   getRefreshTokenCookieOptions,
@@ -11,7 +11,7 @@ const {
 } = require("../utils/cookies");
 const { generateAccessToken, generateRefreshToken } = require("../utils/jwt");
 const { DEFAULT_LEAVE_BALANCES } = require("../constants/leaveBalances");
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 const resolveTenantSlug = (inputSlug) => {
   const slug = inputSlug?.toString().trim().toLowerCase();
@@ -93,6 +93,9 @@ router.post("/login", async (req, res) => {
             id: true,
             name: true,
             slug: true,
+            logoUrl: true,
+            primaryColor: true,
+            secondaryColor: true,
           },
         },
       },
@@ -163,6 +166,9 @@ router.post("/refresh", async (req, res) => {
             id: true,
             name: true,
             slug: true,
+            logoUrl: true,
+            primaryColor: true,
+            secondaryColor: true,
           },
         },
       },
@@ -304,6 +310,9 @@ router.post("/accept-invite", async (req, res) => {
             id: true,
             name: true,
             slug: true,
+            logoUrl: true,
+            primaryColor: true,
+            secondaryColor: true,
           },
         },
       },
