@@ -13,10 +13,18 @@ ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true;
 UPDATE "tenants" SET "isActive" = true WHERE "isActive" IS NULL;
 ALTER TABLE "tenants" ALTER COLUMN "isActive" SET NOT NULL;
 
+-- Tenant branding colors
+ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;
+ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "primaryColor" TEXT;
+ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "secondaryColor" TEXT;
+
 -- Ensure default tenant exists
 INSERT INTO "tenants" ("id", "name", "slug", "isActive", "createdAt")
 VALUES (1, 'Default Tenant', 'default', true, NOW())
 ON CONFLICT ("id") DO NOTHING;
+
+-- Reset tenant ID sequence so future inserts don't clash with seeded rows
+SELECT setval(pg_get_serial_sequence('tenants', 'id'), (SELECT COALESCE(MAX("id"), 1) FROM "tenants"), true);
 
 -- Drop old indexes (will recreate after adjustments)
 DROP INDEX IF EXISTS "public"."notifications_recipientId_createdAt_idx";

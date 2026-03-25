@@ -1080,16 +1080,16 @@ const LeaveReportsPage = () => {
   const StatusBadge = ({ status }) => {
     if (!status) {
       return (
-        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
           Unknown
         </span>
       );
     }
 
     const colors = {
-      approved: "bg-green-100 text-green-800",
-      pending: "bg-yellow-100 text-yellow-800",
-      rejected: "bg-red-100 text-red-800",
+      approved: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+      pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+      rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
     };
 
     return (
@@ -1106,7 +1106,7 @@ const LeaveReportsPage = () => {
   // Progress bar component for utilization
   const ProgressBar = ({ percentage, color = "bg-blue-500" }) => {
     return (
-      <div className="w-full bg-gray-200 rounded-full h-2.5">
+      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
         <div
           className={`${color} h-2.5 rounded-full transition-all duration-300`}
           style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -1148,14 +1148,14 @@ const LeaveReportsPage = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Advanced Leave Reports
           </h1>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-gray-600 dark:text-gray-300">
             Generate and export comprehensive leave reports with advanced
             analytics
           </p>
@@ -1163,7 +1163,7 @@ const LeaveReportsPage = () => {
         <div className="flex space-x-3">
           <button
             onClick={() => setShowExportModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200"
           >
             <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
             Export Report
@@ -1172,14 +1172,14 @@ const LeaveReportsPage = () => {
       </div>
 
       {/* Report Type Tabs */}
-      <div className="mb-6 bg-white shadow rounded-lg p-4">
+      <div className="mb-6 bg-white dark:bg-gray-800 shadow rounded-lg p-4 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setReportType("detailed")}
             className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
               reportType === "detailed"
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-indigo-600 text-white dark:bg-indigo-500"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             }`}
           >
             <TableCellsIcon className="h-4 w-4 mr-2" />
@@ -1189,8 +1189,8 @@ const LeaveReportsPage = () => {
             onClick={() => setReportType("summary")}
             className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
               reportType === "summary"
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-indigo-600 text-white dark:bg-indigo-500"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             }`}
           >
             <ChartBarIcon className="h-4 w-4 mr-2" />
@@ -1200,8 +1200,8 @@ const LeaveReportsPage = () => {
             onClick={() => setReportType("balances")}
             className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
               reportType === "balances"
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-indigo-600 text-white dark:bg-indigo-500"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             }`}
           >
             <AcademicCapIcon className="h-4 w-4 mr-2" />
@@ -1211,8 +1211,8 @@ const LeaveReportsPage = () => {
             onClick={() => setReportType("department")}
             className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
               reportType === "department"
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-indigo-600 text-white dark:bg-indigo-500"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             }`}
           >
             <BuildingOfficeIcon className="h-4 w-4 mr-2" />
@@ -1223,7 +1223,7 @@ const LeaveReportsPage = () => {
 
       {/* Status Tabs (only for detailed report) */}
       {reportType === "detailed" && (
-        <div className="border-b border-gray-200 mb-6">
+        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
           <nav className="-mb-px flex space-x-8 overflow-x-auto">
             {["all", "pending", "approved", "rejected"].map((tab) => (
               <button
@@ -1231,12 +1231,12 @@ const LeaveReportsPage = () => {
                 onClick={() => setActiveTab(tab)}
                 className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === tab
-                    ? "border-indigo-500 text-indigo-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-300"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-300 dark:hover:text-white dark:hover:border-gray-500"
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                <span className="ml-1 bg-gray-200 text-gray-800 text-xs rounded-full px-2 py-0.5">
+                <span className="ml-1 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 text-xs rounded-full px-2 py-0.5">
                   {
                     filteredReports.filter((r) =>
                       tab === "all" ? true : r.status === tab
@@ -1250,7 +1250,7 @@ const LeaveReportsPage = () => {
       )}
 
       {/* Search and Filters */}
-      <div className="bg-white shadow rounded-lg mb-6">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg mb-6 border border-gray-200 dark:border-gray-700">
         <div className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Search */}
@@ -1263,7 +1263,7 @@ const LeaveReportsPage = () => {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
                   placeholder={
                     reportType === "detailed"
                       ? "Search by employee, ID, or reason..."
@@ -1277,7 +1277,7 @@ const LeaveReportsPage = () => {
             {/* Filter Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
             >
               <FunnelIcon className="h-4 w-4 mr-2" />
               Filters
@@ -1290,7 +1290,7 @@ const LeaveReportsPage = () => {
               {reportType === "detailed" && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                       Leave Type
                     </label>
                     <select
@@ -1298,7 +1298,7 @@ const LeaveReportsPage = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, type: e.target.value })
                       }
-                      className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-gray-900 dark:text-gray-100"
                     >
                       <option value="all">All Types</option>
                       {uniqueTypes.map((type) => (
@@ -1309,7 +1309,7 @@ const LeaveReportsPage = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                       Status
                     </label>
                     <select
@@ -1317,7 +1317,7 @@ const LeaveReportsPage = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, status: e.target.value })
                       }
-                      className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-gray-900 dark:text-gray-100"
                     >
                       <option value="all">All Statuses</option>
                       {uniqueStatuses.map((status) => (
@@ -1328,7 +1328,7 @@ const LeaveReportsPage = () => {
                     </select>
                   </div>
                   <div className="lg:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                       Date Range
                     </label>
                     <div className="flex space-x-2">
@@ -1338,9 +1338,9 @@ const LeaveReportsPage = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, dateFrom: e.target.value })
                         }
-                        className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                        className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-gray-900 dark:text-gray-100"
                       />
-                      <span className="flex items-center text-gray-500">
+                      <span className="flex items-center text-gray-500 dark:text-gray-300">
                         to
                       </span>
                       <input
@@ -1349,14 +1349,14 @@ const LeaveReportsPage = () => {
                         onChange={(e) =>
                           setFilters({ ...filters, dateTo: e.target.value })
                         }
-                        className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                        className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-gray-900 dark:text-gray-100"
                       />
                     </div>
                   </div>
                 </>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                   Department
                 </label>
                 <select
@@ -1364,7 +1364,7 @@ const LeaveReportsPage = () => {
                   onChange={(e) =>
                     setFilters({ ...filters, department: e.target.value })
                   }
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-gray-900 dark:text-gray-100"
                 >
                   <option value="all">All Departments</option>
                   {uniqueDepartments.map((dept) => (
@@ -1376,7 +1376,7 @@ const LeaveReportsPage = () => {
               </div>
               {reportType !== "department" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Employee
                   </label>
                   <select
@@ -1384,7 +1384,7 @@ const LeaveReportsPage = () => {
                     onChange={(e) =>
                       setFilters({ ...filters, employee: e.target.value })
                     }
-                    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-white dark:bg-gray-900 dark:text-gray-100"
                   >
                     <option value="all">All Employees</option>
                     {uniqueEmployees.map((emp) => (
@@ -1401,15 +1401,15 @@ const LeaveReportsPage = () => {
       </div>
 
       {/* Reports Table */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+      <div className="bg-white dark:bg-gray-900 shadow overflow-hidden sm:rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="overflow-x-auto">
           {reportType === "detailed" && (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("id")}
                   >
                     <div className="flex items-center">
@@ -1419,7 +1419,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("employeeName")}
                   >
                     <div className="flex items-center">
@@ -1429,7 +1429,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("department")}
                   >
                     <div className="flex items-center">
@@ -1439,7 +1439,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("type")}
                   >
                     <div className="flex items-center">
@@ -1449,7 +1449,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("startDate")}
                   >
                     <div className="flex items-center">
@@ -1459,7 +1459,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("days")}
                   >
                     <div className="flex items-center">
@@ -1469,7 +1469,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("status")}
                   >
                     <div className="flex items-center">
@@ -1482,27 +1482,27 @@ const LeaveReportsPage = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                 {paginatedReports.map((report, index) => (
                   <tr
                     key={`${report.id}-${index}`}
-                    className="hover:bg-gray-50"
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                       {report.id}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {report.employeeName}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       {report.department}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       {report.type}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       <div className="flex items-center">
-                        <CalendarIcon className="h-4 w-4 mr-2 text-gray-400" />
+                        <CalendarIcon className="h-4 w-4 mr-2 text-gray-400 dark:text-gray-400" />
                         {report.startDate
                           ? format(new Date(report.startDate), "MMM d")
                           : "N/A"}{" "}
@@ -1512,7 +1512,7 @@ const LeaveReportsPage = () => {
                           : "N/A"}
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       {report.days} {report.days === 1 ? "day" : "days"}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -1536,12 +1536,12 @@ const LeaveReportsPage = () => {
           )}
 
           {reportType === "summary" && (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("employeeName")}
                   >
                     <div className="flex items-center">
@@ -1551,7 +1551,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("department")}
                   >
                     <div className="flex items-center">
@@ -1561,7 +1561,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalRequests")}
                   >
                     <div className="flex items-center">
@@ -1571,7 +1571,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("approvedRequests")}
                   >
                     <div className="flex items-center">
@@ -1581,7 +1581,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("pendingRequests")}
                   >
                     <div className="flex items-center">
@@ -1591,7 +1591,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("rejectedRequests")}
                   >
                     <div className="flex items-center">
@@ -1601,7 +1601,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalDays")}
                   >
                     <div className="flex items-center">
@@ -1611,7 +1611,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("approvedDays")}
                   >
                     <div className="flex items-center">
@@ -1621,34 +1621,34 @@ const LeaveReportsPage = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                 {paginatedReports.map((report, index) => (
-                  <tr
-                    key={`${report.userId}-${index}`}
-                    className="hover:bg-gray-50"
-                  >
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <tr
+                      key={`${report.userId}-${index}`}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                       {report.employeeName}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       {report.department}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {report.totalRequests}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-300 font-medium">
                       {report.approvedRequests}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-400 font-medium">
                       {report.pendingRequests}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400 font-medium">
                       {report.rejectedRequests}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {report.totalDays}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-300 font-medium">
                       {report.approvedDays}
                     </td>
                   </tr>
@@ -1658,12 +1658,12 @@ const LeaveReportsPage = () => {
           )}
 
           {reportType === "balances" && (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("employeeName")}
                   >
                     <div className="flex items-center">
@@ -1673,7 +1673,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("department")}
                   >
                     <div className="flex items-center">
@@ -1683,7 +1683,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("position")}
                   >
                     <div className="flex items-center">
@@ -1693,7 +1693,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalOriginal")}
                   >
                     <div className="flex items-center">
@@ -1703,7 +1703,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalUsed")}
                   >
                     <div className="flex items-center">
@@ -1713,7 +1713,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalRemaining")}
                   >
                     <div className="flex items-center">
@@ -1731,28 +1731,28 @@ const LeaveReportsPage = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                 {paginatedReports.map((report, index) => (
-                  <tr
-                    key={`${report.employeeId}-${index}`}
-                    className="hover:bg-gray-50"
-                  >
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <tr
+                      key={`${report.employeeId}-${index}`}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                       {report.employeeName}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       {report.department}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       {report.position}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {report.totalOriginal}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400 font-medium">
                       {report.totalUsed}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-300 font-medium">
                       {report.totalRemaining}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -1769,7 +1769,7 @@ const LeaveReportsPage = () => {
                             }
                           />
                         </div>
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                           {report.percentageUsed}%
                         </span>
                       </div>
@@ -1781,12 +1781,12 @@ const LeaveReportsPage = () => {
           )}
 
           {reportType === "department" && (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("department")}
                   >
                     <div className="flex items-center">
@@ -1796,7 +1796,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalEmployees")}
                   >
                     <div className="flex items-center">
@@ -1806,7 +1806,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalRequests")}
                   >
                     <div className="flex items-center">
@@ -1816,7 +1816,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("approvedRequests")}
                   >
                     <div className="flex items-center">
@@ -1826,7 +1826,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("pendingRequests")}
                   >
                     <div className="flex items-center">
@@ -1836,7 +1836,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("rejectedRequests")}
                   >
                     <div className="flex items-center">
@@ -1846,7 +1846,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("totalDays")}
                   >
                     <div className="flex items-center">
@@ -1856,7 +1856,7 @@ const LeaveReportsPage = () => {
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                     onClick={() => handleSort("approvedDays")}
                   >
                     <div className="flex items-center">
@@ -1866,34 +1866,34 @@ const LeaveReportsPage = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                 {paginatedReports.map((report, index) => (
-                  <tr
-                    key={`${report.department}-${index}`}
-                    className="hover:bg-gray-50"
-                  >
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <tr
+                      key={`${report.department}-${index}`}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                       {report.department}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {report.totalEmployees}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {report.totalRequests}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-300 font-medium">
                       {report.approvedRequests}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-400 font-medium">
                       {report.pendingRequests}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400 font-medium">
                       {report.rejectedRequests}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {report.totalDays}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-300 font-medium">
                       {report.approvedDays}
                     </td>
                   </tr>
@@ -1906,12 +1906,12 @@ const LeaveReportsPage = () => {
           {filteredReports.length === 0 && (
             <div className="text-center py-12">
               <div className="flex justify-center mb-4">
-                <ChartBarIcon className="h-12 w-12 text-gray-400" />
+                <ChartBarIcon className="h-12 w-12 text-gray-400 dark:text-gray-400" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                 No data found
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-gray-500 dark:text-gray-300 mb-4">
                 Try adjusting your search or filter criteria
               </p>
             </div>
@@ -1920,28 +1920,28 @@ const LeaveReportsPage = () => {
 
         {/* Pagination */}
         {filteredReports.length > 0 && (
-          <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+          <div className="bg-white dark:bg-gray-900 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6">
             <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                disabled={currentPage === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                 Previous
               </button>
-              <button
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(p + 1, totalPages))
-                }
-                disabled={currentPage === totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(p + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                 Next
               </button>
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-gray-700 dark:text-gray-300">
                   Showing{" "}
                   <span className="font-medium">
                     {(currentPage - 1) * itemsPerPage + 1}
@@ -1963,7 +1963,7 @@ const LeaveReportsPage = () => {
                   <button
                     onClick={() => setCurrentPage(1)}
                     disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <span className="sr-only">First</span>
                     <ChevronUpIcon className="h-4 w-4 transform rotate-90" />
@@ -1971,11 +1971,11 @@ const LeaveReportsPage = () => {
                   <button
                     onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                     disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
-                  <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                  <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
                     Page {currentPage} of {totalPages}
                   </span>
                   <button
@@ -1983,14 +1983,14 @@ const LeaveReportsPage = () => {
                       setCurrentPage((p) => Math.min(p + 1, totalPages))
                     }
                     disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>
                   <button
                     onClick={() => setCurrentPage(totalPages)}
                     disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <span className="sr-only">Last</span>
                     <ChevronUpIcon className="h-4 w-4 transform -rotate-90" />
@@ -2005,15 +2005,15 @@ const LeaveReportsPage = () => {
       {/* View Details Modal */}
       {isViewModalOpen && selectedReport && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-3xl w-full shadow-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-lg max-w-3xl w-full shadow-xl max-h-[90vh] overflow-y-auto text-gray-900 dark:text-gray-100">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Leave Request Details
                 </h3>
                 <button
                   onClick={handleCloseViewModal}
-                  className="text-gray-400 hover:text-gray-500"
+                  className="text-gray-400 hover:text-gray-500 dark:text-gray-300 dark:hover:text-white"
                   aria-label="Close modal"
                 >
                   <XMarkIcon className="h-6 w-6" />
@@ -2021,77 +2021,77 @@ const LeaveReportsPage = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Leave ID
                   </label>
-                  <p className="text-gray-900 font-medium">
+                  <p className="text-gray-900 dark:text-gray-100 font-medium">
                     {selectedReport.id}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Employee
                   </label>
-                  <p className="text-gray-900 font-medium">
+                  <p className="text-gray-900 dark:text-gray-100 font-medium">
                     {selectedReport.employeeName}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Department
                   </label>
-                  <p className="text-gray-900">{selectedReport.department}</p>
+                  <p className="text-gray-900 dark:text-gray-100">{selectedReport.department}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Leave Type
                   </label>
-                  <p className="text-gray-900">{selectedReport.type}</p>
+                  <p className="text-gray-900 dark:text-gray-100">{selectedReport.type}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Start Date
                   </label>
-                  <p className="text-gray-900">
+                  <p className="text-gray-900 dark:text-gray-100">
                     {format(new Date(selectedReport.startDate), "MMM d, yyyy")}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     End Date
                   </label>
-                  <p className="text-gray-900">
+                  <p className="text-gray-900 dark:text-gray-100">
                     {format(new Date(selectedReport.endDate), "MMM d, yyyy")}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Duration
                   </label>
-                  <p className="text-gray-900">
+                  <p className="text-gray-900 dark:text-gray-100">
                     {selectedReport.days} day
                     {selectedReport.days !== 1 ? "s" : ""}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Status
                   </label>
                   <StatusBadge status={selectedReport.status} />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Reason
                   </label>
-                  <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
+                  <p className="text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 p-3 rounded-md">
                     {selectedReport.reason || "No reason provided"}
                   </p>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Submitted At
                   </label>
-                  <p className="text-gray-900">
+                  <p className="text-gray-900 dark:text-gray-100">
                     {selectedReport.submittedAt
                       ? format(
                           new Date(selectedReport.submittedAt),
@@ -2101,13 +2101,13 @@ const LeaveReportsPage = () => {
                   </p>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Approved By
                   </label>
                   <p className="text-gray-900">{selectedReport.approvedBy}</p>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                     Notes
                   </label>
                   <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
@@ -2115,10 +2115,10 @@ const LeaveReportsPage = () => {
                   </p>
                 </div>
               </div>
-              <div className="flex justify-end pt-4 border-t border-gray-200">
+                <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={handleCloseViewModal}
-                  className="px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                 >
                   Close
                 </button>
@@ -2131,10 +2131,10 @@ const LeaveReportsPage = () => {
       {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-lg w-full shadow-xl">
+          <div className="bg-white dark:bg-gray-900 rounded-lg max-w-lg w-full shadow-xl border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium text-gray-900">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                   Export{" "}
                   {reportType === "detailed"
                     ? "Detailed"
@@ -2147,7 +2147,7 @@ const LeaveReportsPage = () => {
                 </h3>
                 <button
                   onClick={() => setShowExportModal(false)}
-                  className="text-gray-400 hover:text-gray-500"
+                  className="text-gray-400 hover:text-gray-500 dark:text-gray-300 dark:hover:text-white"
                 >
                   <XMarkIcon className="h-6 w-6" />
                 </button>
@@ -2161,39 +2161,39 @@ const LeaveReportsPage = () => {
                     onClick={() => setExportFormat("pdf")}
                     className={`p-4 border-2 rounded-lg transition-colors ${
                       exportFormat === "pdf"
-                        ? "border-indigo-500 bg-indigo-50"
-                        : "border-gray-200 hover:border-gray-300"
+                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-600 text-indigo-700 dark:text-white"
+                        : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-500 text-gray-700 dark:text-gray-200"
                     }`}
                   >
                     <div className="flex flex-col items-center">
                       <DocumentTextIcon className="h-8 w-8 text-red-500" />
-                      <span className="mt-2 text-sm font-medium">PDF</span>
+                      <span className="mt-2 text-sm font-medium dark:text-gray-200">PDF</span>
                     </div>
                   </button>
                   <button
                     onClick={() => setExportFormat("csv")}
                     className={`p-4 border-2 rounded-lg transition-colors ${
                       exportFormat === "csv"
-                        ? "border-indigo-500 bg-indigo-50"
-                        : "border-gray-200 hover:border-gray-300"
+                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-600 text-indigo-700 dark:text-white"
+                        : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-500 text-gray-700 dark:text-gray-200"
                     }`}
                   >
                     <div className="flex flex-col items-center">
                       <DocumentTextIcon className="h-8 w-8 text-green-500" />
-                      <span className="mt-2 text-sm font-medium">CSV</span>
+                      <span className="mt-2 text-sm font-medium dark:text-gray-200">CSV</span>
                     </div>
                   </button>
                   <button
                     onClick={() => setExportFormat("excel")}
                     className={`p-4 border-2 rounded-lg transition-colors ${
                       exportFormat === "excel"
-                        ? "border-indigo-500 bg-indigo-50"
-                        : "border-gray-200 hover:border-gray-300"
+                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-600 text-indigo-700 dark:text-white"
+                        : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-500 text-gray-700 dark:text-gray-200"
                     }`}
                   >
                     <div className="flex flex-col items-center">
                       <ArrowDownTrayIcon className="h-8 w-8 text-green-600" />
-                      <span className="mt-2 text-sm font-medium">Excel</span>
+                      <span className="mt-2 text-sm font-medium dark:text-gray-200">Excel</span>
                     </div>
                   </button>
                 </div>

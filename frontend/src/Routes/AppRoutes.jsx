@@ -19,7 +19,7 @@ const TenantDashboardPage = lazy(() =>
 );
 const TenantRegisterPage = lazy(() => import("../pages/TenantRegister"));
 const AcceptInvitePage = lazy(() => import("../pages/AcceptInvite"));
-const SettingsPage = lazy(() => import("../pages/settings/SettingsPage"));
+const CompanySettings = lazy(() => import("../pages/settings/CompanySettings"));
 const ProfilePage = lazy(() => import("../pages/profilePage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 const TeamCalender = lazy(() => import("../pages/administrator/TeamCalender"));
@@ -166,7 +166,7 @@ const AppRoutes = () => {
             path="settings"
             element={
               <ManagementRoute>
-                <SettingsPage />
+                <CompanySettings />
               </ManagementRoute>
             }
           />

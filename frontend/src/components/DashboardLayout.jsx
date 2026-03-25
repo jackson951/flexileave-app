@@ -20,9 +20,10 @@ import {
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../contexts/AuthContext";
-import digititanLogo from "../assets/digititan-logo.jpg";
+import { useTenant } from "../contexts/TenantContext";
 import { ApiService, useApiInterceptors } from "../api/web-api-service";
 import { formatDistanceToNow } from "date-fns";
+import digititanLogo from "../assets/digititan-logo.jpg";
 
 const DashboardLayout = () => {
   const { user: authUser, logout, logoutLoading } = useAuth();
@@ -40,6 +41,7 @@ const DashboardLayout = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+  const { tenant } = useTenant();
 
   const tenantManagementRoles = ["admin", "manager", "owner"];
   const canAccessDashboard =
@@ -259,6 +261,19 @@ const DashboardLayout = () => {
     setNotificationsOpen(false);
   };
 
+  const logoUrl = tenant?.logoUrl || digititanLogo;
+  const companyName = tenant?.name || "FlexiLeave";
+  const primaryColor = tenant?.primaryColor || "#4f46e5";
+  const secondaryColor = tenant?.secondaryColor || "#7c3aed";
+  const brandGradient = {
+    background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+  };
+
+  const handleLogoError = (event) => {
+    event.currentTarget.onerror = null;
+    event.currentTarget.src = digititanLogo;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
       {/* Mobile sidebar */}
@@ -286,16 +301,20 @@ const DashboardLayout = () => {
               <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
                 <div className="flex-shrink-0 flex items-center px-4">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
+                    <div
+                      className="w-10 h-10 rounded-lg p-0.5 shadow-lg"
+                      style={brandGradient}
+                    >
                       <img
-                        src={digititanLogo}
-                        alt="Digititan Logo"
+                        src={logoUrl}
+                        alt={`${companyName} Logo`}
                         className="w-full h-full object-cover rounded-lg"
+                        onError={handleLogoError}
                       />
                     </div>
                     <div>
                       <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                       FlexiLeave
+                        {companyName}
                       </h1>
                       <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
                         Leave Management
@@ -378,16 +397,20 @@ const DashboardLayout = () => {
         <div className="flex flex-col w-64 border-r border-gray-200 dark:border-gray-700 pt-5 pb-4 bg-white dark:bg-gray-800 overflow-y-auto">
           <div className="flex items-center flex-shrink-0 px-4">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
+              <div
+                className="w-10 h-10 rounded-lg p-0.5 shadow-lg"
+                style={brandGradient}
+              >
                 <img
-                  src={digititanLogo}
-                  alt="Digititan Logo"
+                  src={logoUrl}
+                  alt={`${companyName} Logo`}
                   className="w-full h-full object-cover rounded-lg"
+                  onError={handleLogoError}
                 />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                 FlexiLeave
+                  {companyName}
                 </h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
                   Leave Management
@@ -479,15 +502,19 @@ const DashboardLayout = () => {
             <div className="flex-1 flex">
               <div className="w-full flex md:ml-0">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg">
+                  <div
+                    className="w-8 h-8 rounded-lg p-0.5 shadow-lg"
+                    style={brandGradient}
+                  >
                     <img
-                      src={digititanLogo}
-                      alt="Digititan Logo"
+                      src={logoUrl}
+                      alt={`${companyName} Logo`}
                       className="w-full h-full object-cover rounded-lg"
+                      onError={handleLogoError}
                     />
                   </div>
                   <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                   FlexiLeave
+                    {companyName}
                   </h1>
                 </div>
               </div>

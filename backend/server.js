@@ -3,13 +3,12 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const cookieParser = require("cookie-parser");
-const { PrismaClient } = require("@prisma/client");
+const { connectPrisma } = require("./utils/prismaClient");
 
 // Swagger configuration
 const { swaggerUi, specs, swaggerUiOptions } = require("./config/swagger");
 
 const app = express();
-const prisma = new PrismaClient();
 app.set("trust proxy", 1); // important for secure cookies
 
 // ------------------- CORS Setup -------------------
@@ -91,9 +90,21 @@ app.use((err, req, res, next) => {
 
 // ------------------- Start Server -------------------
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`✅ Accepting requests from: ${allowedOrigins.join(", ")}`);
-  console.log(`📄 Swagger UI available at http://localhost:${PORT}/api-docs`);
-  startExpiredInvitationCleanup();
-});
+
+const startServer = async () => {
+  try {
+    await connectPrisma();
+  } catch (error) {
+    console.error("Failed to initialize database connection:", error);
+    process.exit(1);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`✅ Accepting requests from: ${allowedOrigins.join(", ")}`);
+    console.log(`📄 Swagger UI available at http://localhost:${PORT}/api-docs`);
+    startExpiredInvitationCleanup();
+  });
+};
+
+startServer();
