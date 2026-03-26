@@ -25,6 +25,14 @@ const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 const TeamCalender = lazy(() => import("../pages/administrator/TeamCalender"));
 const ForgotPasswordPage = lazy(() => import("../pages/ForgotPassword"));
 const NewLeaveRequest = lazy(() => import("../components/NewLeaveRequest"));
+const HomePage = lazy(() => import("../pages/public/HomePage"));
+const FeaturesPage = lazy(() => import("../pages/public/FeaturesPage"));
+const AboutPage = lazy(() => import("../pages/public/AboutPage"));
+const ContactPage = lazy(() => import("../pages/public/ContactPage"));
+const PricingPage = lazy(() => import("../pages/public/PricingPage"));
+const PrivacyPage = lazy(() => import("../pages/public/PrivacyPage"));
+const TermsPage = lazy(() => import("../pages/public/TermsPage"));
+const PublicLayout = lazy(() => import("../components/PublicLayout"));
 
 //Global Loading Spinner
 const LoadingSpinner = () => (
@@ -88,45 +96,36 @@ const AppRoutes = () => {
   // Prevent white flash when auth is initializing
   if (loading) return <LoadingSpinner />;
 
+  const renderPublicPage = (page) => (
+    <PublicRoute>
+      <PublicLayout>{page}</PublicLayout>
+    </PublicRoute>
+  );
+
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <Routes>
         {/* Public Routes */}
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          }
-        />
+        <Route path="/login" element={renderPublicPage(<LoginPage />)} />
         <Route
           path="/forgot-password"
-          element={
-            <PublicRoute>
-              <ForgotPasswordPage />
-            </PublicRoute>
-          }
+          element={renderPublicPage(<ForgotPasswordPage />)}
         />
-        <Route
-          path="/register"
-          element={
-            <PublicRoute>
-              <TenantRegisterPage />
-            </PublicRoute>
-          }
-        />
+        <Route path="/register" element={renderPublicPage(<TenantRegisterPage />)} />
         <Route
           path="/accept-invite"
-          element={
-            <PublicRoute>
-              <AcceptInvitePage />
-            </PublicRoute>
-          }
+          element={renderPublicPage(<AcceptInvitePage />)}
         />
 
+        <Route path="/" element={renderPublicPage(<HomePage />)} />
+        <Route path="/features" element={renderPublicPage(<FeaturesPage />)} />
+        <Route path="/pricing" element={renderPublicPage(<PricingPage />)} />
+        <Route path="/about" element={renderPublicPage(<AboutPage />)} />
+        <Route path="/contact" element={renderPublicPage(<ContactPage />)} />
+        <Route path="/privacy" element={renderPublicPage(<PrivacyPage />)} />
+        <Route path="/terms" element={renderPublicPage(<TermsPage />)} />
+
         {/* Root Redirect */}
-        <Route path="/" element={<Navigate to="/dashboard/leave" replace />} />
 
         {/* Protected Dashboard Routes */}
         <Route
