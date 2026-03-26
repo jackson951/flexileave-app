@@ -7,6 +7,10 @@ const NotificationsList = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("all");
+  const filteredNotifications = notifications.filter((notification) =>
+    filter === "all" ? true : !notification.isRead
+  );
 
   const fetchNotifications = async () => {
     setLoading(true);
@@ -57,16 +61,42 @@ const NotificationsList = () => {
         </div>
       )}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setFilter("all")}
+          className={`text-xs font-semibold uppercase tracking-wide rounded-full px-3 py-1 transition ${
+            filter === "all"
+              ? "bg-indigo-600 text-white"
+              : "border border-indigo-200 text-indigo-600 hover:border-indigo-400 hover:text-indigo-700"
+          }`}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter("unread")}
+          className={`text-xs font-semibold uppercase tracking-wide rounded-full px-3 py-1 transition ${
+            filter === "unread"
+              ? "bg-indigo-600 text-white"
+              : "border border-indigo-200 text-indigo-600 hover:border-indigo-400 hover:text-indigo-700"
+          }`}
+        >
+          Unread
+        </button>
+      </div>
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
         {loading ? (
           <p className="py-6 text-center text-sm text-gray-500">Loading...</p>
-        ) : notifications.length === 0 ? (
+        ) : filteredNotifications.length === 0 ? (
           <p className="py-6 text-center text-sm text-gray-500">
-            No notifications yet.
+            {filter === "unread"
+              ? "No unread notifications."
+              : "No notifications yet."}
           </p>
         ) : (
           <div className="space-y-3">
-            {notifications.map((notification) => (
+            {filteredNotifications.map((notification) => (
               <div
                 key={notification.id}
                 className={`rounded-2xl border px-4 py-3 transition ${

@@ -12,6 +12,12 @@ const {
 const { generateAccessToken, generateRefreshToken } = require("../utils/jwt");
 const { DEFAULT_LEAVE_BALANCES } = require("../constants/leaveBalances");
 const prisma = getPrismaClient();
+const {
+  sendEmail,
+  buildSystemNotificationEmail,
+  FRONTEND_BASE_URL,
+} = require("../utils/emailer");
+const { createNotification } = require("../utils/notifications");
 
 const resolveTenantSlug = (inputSlug) => {
   const slug = inputSlug?.toString().trim().toLowerCase();
@@ -250,13 +256,23 @@ router.get("/invite", async (req, res) => {
         metadata: true,
         expiresAt: true,
         used: true,
-        approverId: true,
-        approver: {
+        reportsToId: true,
+        reportsTo: {
           select: {
             id: true,
             name: true,
             email: true,
             role: true,
+          },
+        },
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            primaryColor: true,
+            secondaryColor: true,
           },
         },
       },
@@ -278,8 +294,9 @@ router.get("/invite", async (req, res) => {
           email: invitation.email,
           name: invitation.metadata?.name || "",
           expiresAt: invitation.expiresAt,
-          approver: invitation.approver,
-          reportsTo: invitation.approver,
+          reportsToId: invitation.reportsToId,
+          reportsTo: invitation.reportsTo,
+          tenant: invitation.tenant || null,
         },
       });
   } catch (error) {
@@ -337,7 +354,15 @@ router.post("/accept-invite", async (req, res) => {
         used: true,
         passwordHash: true,
         metadata: true,
-        approverId: true,
+        reportsToId: true,
+        reportsTo: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
       },
     });
 
@@ -397,7 +422,7 @@ router.post("/accept-invite", async (req, res) => {
         department: invitation.metadata?.department || undefined,
         position: invitation.metadata?.position || undefined,
         phone: invitation.metadata?.phone || undefined,
-        reportsToId: invitation.approverId,
+        reportsToId: invitation.reportsToId,
       },
       include: {
         tenant: {
@@ -417,6 +442,50 @@ router.post("/accept-invite", async (req, res) => {
       where: { id: invitation.id },
       data: { used: true },
     });
+
+    if (invitation.reportsToId) {
+      const teamUrl = `${FRONTEND_BASE_URL}/dashboard/employees`;
+      try {
+        await createNotification({
+          type: "system",
+          title: "User Joined",
+          message: `${newUser.name} has joined your team`,
+          recipientId: invitation.reportsToId,
+          triggeredById: newUser.id,
+          tenantId: newUser.tenantId,
+        });
+      } catch (notificationError) {
+        console.error("Failed to create join notification", notificationError);
+      }
+
+      const managerEmail =
+        invitation.reportsTo?.email ||
+        (invitation.reportsToId
+          ? (await prisma.user.findUnique({
+              where: { id: invitation.reportsToId },
+              select: { email: true },
+            }))?.email
+          : null);
+
+      if (managerEmail) {
+        try {
+          const tenantInfo = newUser.tenant;
+          const emailPayload = buildSystemNotificationEmail({
+            title: "New Team Member",
+            message: `${newUser.name} now reports to you.`,
+            tenant: tenantInfo,
+            actionUrl: teamUrl,
+            actionLabel: "View team",
+          });
+          await sendEmail({
+            to: managerEmail,
+            ...emailPayload,
+          });
+        } catch (emailError) {
+          console.error("Failed to send team notification email", emailError);
+        }
+      }
+    }
 
     const accessToken = generateAccessToken({
       id: newUser.id,

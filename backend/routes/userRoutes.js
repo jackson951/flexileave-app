@@ -15,8 +15,10 @@ const {
 const {
   sendEmail,
   buildInvitationEmail,
+  buildSystemNotificationEmail,
   FRONTEND_BASE_URL,
 } = require("../utils/emailer");
+const { createNotification } = require("../utils/notifications");
 
 const INVITE_EXPIRY_HOURS = parseInt(
   process.env.INVITE_EXPIRY_HOURS ?? "48",
@@ -236,7 +238,7 @@ router.post(
     phone,
     joinDate,
     password,
-    approverId,
+    reportsToId,
   } = req.body;
 
   if (!email || !role || !name) {
@@ -309,24 +311,24 @@ router.post(
         joinDate: joinDateIso,
       };
 
-      let finalApproverId = null;
+      let finalReportsToId = null;
       if (normalizedRole !== "OWNER") {
-      if (approverId === undefined || approverId === null) {
-        return res.status(400).json({
-          message: "Reports To is required for non-owner invitations",
-        });
-      }
-      const parsedReportsToId = Number(approverId);
-      if (!Number.isInteger(parsedReportsToId)) {
-        return res
-          .status(400)
-          .json({ message: "Invalid Reports To selection" });
-      }
-      // if (parsedReportsToId === req.user.userId) {
-      //   return res
-      //     .status(400)
-      //       .json({ message: "User cannot report to themselves" });
-      //   }
+        if (reportsToId === undefined || reportsToId === null) {
+          return res.status(400).json({
+            message: "Reports To is required for non-owner invitations",
+          });
+        }
+        const parsedReportsToId = Number(reportsToId);
+        if (!Number.isInteger(parsedReportsToId)) {
+          return res
+            .status(400)
+            .json({ message: "Invalid Reports To selection" });
+        }
+        if (parsedReportsToId === req.user.userId) {
+          return res
+            .status(400)
+            .json({ message: "User cannot report to themselves" });
+        }
 
         const reportsToUser = await prisma.user.findUnique({
           where: { id: parsedReportsToId },
@@ -347,7 +349,7 @@ router.post(
           });
         }
 
-        finalApproverId = parsedReportsToId;
+        finalReportsToId = parsedReportsToId;
       }
 
       const passwordHash = password
@@ -363,7 +365,7 @@ router.post(
           expiresAt: new Date(Date.now() + INVITE_EXPIRY_MS),
           metadata,
           passwordHash,
-          approverId: finalApproverId,
+          reportsToId: finalReportsToId,
         },
       });
 
@@ -408,23 +410,22 @@ router.get(
   authorizeRoles(...TENANT_ADMIN_ROLES),
   async (req, res) => {
     try {
-      const invitations = await prisma.userInvitation.findMany({
-        where: {
-          tenantId: req.user.tenantId,
-        },
-        include: {
-          approver: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: true,
-            },
+    const invitations = await prisma.userInvitation.findMany({
+      where: { tenantId: req.user.tenantId },
+      include: {
+        reportsTo: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
           },
         },
-        orderBy: { createdAt: "desc" },
-      });
-      res.json(invitations);
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(invitations);
     } catch (error) {
       console.error("Fetch invitations error:", error);
       res
@@ -715,19 +716,25 @@ router.post(
       const resolvedJoinDate = joinDate ? new Date(joinDate) : new Date();
 
       let resolvedReportsToId = null;
+      let reportsToManager = null;
       if (reportsToId) {
-        const manager = await prisma.user.findFirst({
+        reportsToManager = await prisma.user.findFirst({
           where: {
             id: parseInt(reportsToId),
             tenantId: req.user.tenantId,
           },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
         });
-        if (!manager) {
+        if (!reportsToManager) {
           return res
             .status(400)
-            .json({ message: "Assigned approver not found" });
+            .json({ message: "Assigned manager not found" });
         }
-        resolvedReportsToId = manager.id;
+        resolvedReportsToId = reportsToManager.id;
       }
 
       const newUser = await prisma.user.create({
@@ -753,6 +760,55 @@ router.post(
           createdAt: true,
         },
       });
+
+      if (resolvedReportsToId) {
+        try {
+          await createNotification({
+            type: "system",
+            title: "New Team Member",
+            message: `${newUser.name} now reports to you`,
+            recipientId: resolvedReportsToId,
+            triggeredById: req.user.userId,
+            tenantId: req.user.tenantId,
+          });
+        } catch (notificationError) {
+          console.error(
+            "Failed to create team member notification",
+            notificationError
+          );
+        }
+
+        if (reportsToManager?.email) {
+          try {
+            const tenantInfo = await prisma.tenant.findUnique({
+              where: { id: req.user.tenantId },
+              select: {
+                id: true,
+                name: true,
+                primaryColor: true,
+                secondaryColor: true,
+                logoUrl: true,
+              },
+            });
+            const emailPayload = buildSystemNotificationEmail({
+              title: "New Team Member",
+              message: `${newUser.name} now reports to you.`,
+              tenant: tenantInfo,
+              actionUrl: `${FRONTEND_BASE_URL}/dashboard/employees`,
+              actionLabel: "View team",
+            });
+            await sendEmail({
+              to: reportsToManager.email,
+              ...emailPayload,
+            });
+          } catch (emailError) {
+            console.error(
+              "Failed to send team member notification email",
+              emailError
+            );
+          }
+        }
+      }
 
       res.status(201).json(newUser);
     } catch (error) {
@@ -1018,7 +1074,7 @@ router.put(
           if (!manager) {
             return res
               .status(400)
-              .json({ message: "Assigned approver not found" });
+            .json({ message: "Assigned manager not found" });
           }
           updateData.reportsToId = manager.id;
         }

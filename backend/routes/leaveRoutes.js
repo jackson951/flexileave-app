@@ -19,6 +19,7 @@ const {
   buildLeaveNotificationEmail,
   FRONTEND_BASE_URL,
 } = require("../utils/emailer");
+const { createNotification } = require("../utils/notifications");
 
 const requireAdminOrManager = authorizeRoles("OWNER", "ADMIN", "MANAGER");
 const DEFAULT_TENANT_NAME =
@@ -139,15 +140,25 @@ const notifyAssignedUser = async ({
 }) => {
   if (!recipient?.id) return;
 
-  await sendNotificationToUser({
-    recipientId: recipient.id,
-    triggeredById,
-    leave,
-    type,
-    title,
-    message,
-    status,
-  });
+  if (leave?.id) {
+    try {
+      await createNotification({
+        recipientId: recipient.id,
+        triggeredById,
+        tenantId,
+        leaveId: leave.id,
+        type,
+        title,
+        message,
+        metadata: buildLeaveNotificationMetadata(leave, status),
+      });
+    } catch (notificationError) {
+      console.error(
+        "Failed to create leave notification in DB",
+        notificationError
+      );
+    }
+  }
 
   if (!recipient.email) return;
 
@@ -169,28 +180,6 @@ const notifyAssignedUser = async ({
   } catch (emailError) {
     console.error("Failed to send leave notification email", emailError);
   }
-};
-
-const sendNotificationToUser = async ({
-  recipientId,
-  leave,
-  triggeredById,
-  type,
-  title,
-  message,
-  status,
-}) => {
-  await prisma.notification.create({
-    data: {
-      recipientId,
-      triggeredById,
-      leaveId: leave.id,
-      type,
-      title,
-      message,
-      metadata: buildLeaveNotificationMetadata(leave, status),
-    },
-  });
 };
 
 // Schedule cleanup every hour
