@@ -115,13 +115,17 @@ const AcceptInvite = () => {
         minute: "2-digit",
       })
     : "";
+  const tenantTheme = {
+    primary: inviteDetails?.tenant?.primaryColor || "#6366f1",
+    secondary: inviteDetails?.tenant?.secondaryColor || "#ec4899",
+  };
+  const tenantName = inviteDetails?.tenant?.name || "FlexiLeave";
 
-  const approver =
-    inviteDetails?.approver || inviteDetails?.reportsTo || null;
-  const reportsToLabel = approver
-    ? `${approver.name} (${approver.role.toLowerCase()})`
+  const reportsTo = inviteDetails?.reportsTo || null;
+  const reportsToLabel = reportsTo
+    ? `${reportsTo.name} (${reportsTo.role.toLowerCase()})`
     : "Not assigned yet";
-  const reportsToEmail = approver?.email || "";
+  const reportsToEmail = reportsTo?.email || "";
 
   const canSubmit =
     !inviteLoading && !inviteError && Boolean(inviteDetails) && !isLoading;
@@ -144,6 +148,35 @@ const AcceptInvite = () => {
                 ready to start using FlexiLeave.
               </p>
             </div>
+
+            {inviteDetails?.tenant && (
+              <div
+                className="mb-6 rounded-3xl p-5 text-white shadow-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${tenantTheme.primary}, ${tenantTheme.secondary})`,
+                }}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  {inviteDetails.tenant.logoUrl && (
+                    <img
+                      src={inviteDetails.tenant.logoUrl}
+                      alt={`${tenantName} logo`}
+                      className="h-12 w-auto object-contain"
+                    />
+                  )}
+                  <p className="text-sm uppercase tracking-[0.2em] text-white/80">
+                    {tenantName}
+                  </p>
+                  <p className="text-lg font-semibold">
+                    Welcome to {tenantName}
+                  </p>
+                  <p className="text-xs text-white/80">
+                    Your invitation is scoped to this organization and expires on{" "}
+                    {formattedExpiry || "the listed date"}.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {inviteLoading ? (
               <div className="flex flex-col items-center justify-center space-y-3 py-12">

@@ -1,5 +1,5 @@
 // src/components/NewLeaveRequest.jsx
-import React, { useEffect,useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { ApiService, useApiInterceptors } from "../api/web-api-service";
@@ -53,8 +53,6 @@ const NewLeaveRequestInner = () => {
     setEndDate,
     setErrors,
     setStep,
-    admins,
-    setAdmins,
   } = useLeaveRequest();
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -66,29 +64,6 @@ const NewLeaveRequestInner = () => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  // Fetch admins
-  useEffect(() => {
-    const fetchAdmins = async () => {
-      if (!user?.id) return;
-      try {
-        const response = await ApiService.get("/users/admins/list");
-        let users = [];
-        if (Array.isArray(response.data)) users = response.data;
-        else if (response.data && Array.isArray(response.data.data))
-          users = response.data.data;
-        else if (response.data && Array.isArray(response.data.users))
-          users = response.data.users;
-
-        const otherAdmins = users.filter((admin) => admin.id !== user.id);
-        setAdmins(otherAdmins);
-      } catch (error) {
-        console.error("Error fetching admins:", error);
-        setAdmins([]);
-      }
-    };
-    fetchAdmins();
-  }, [user?.id]);
 
   if (isSubmitted) {
     return (
@@ -104,11 +79,7 @@ const NewLeaveRequestInner = () => {
             Your leave request has been successfully submitted for approval.
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            {admins.length > 0
-              ? `Notification has been sent to ${admins.length} admin${
-                  admins.length !== 1 ? "s" : ""
-                } for review.`
-              : "Your request is pending admin review."}
+            A notification has been sent to your manager for review.
           </p>
           <div className="mt-8 space-x-4">
             <button

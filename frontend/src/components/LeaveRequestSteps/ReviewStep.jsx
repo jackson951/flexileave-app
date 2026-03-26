@@ -19,7 +19,6 @@ const ReviewStep = () => {
     formData,
     startDate,
     endDate,
-    admins,
     isSubmitting,
     setIsSubmitting,
     submitError,
@@ -68,27 +67,6 @@ const ReviewStep = () => {
     });
   };
 
-  const createAdminNotifications = async (leaveId, leaveData) => {
-    try {
-      const notificationPromises = admins.map((admin) =>
-        ApiService.post("/notifications", {
-          userId: admin.id,
-          type: "leave_submitted",
-          title: "New Leave Request Submitted",
-          message: `${user.name} has submitted a new ${
-            formData.leaveType
-          } request for ${calculateDays()} day${
-            calculateDays() !== 1 ? "s" : ""
-          } (${formatDate(startDate)} - ${formatDate(endDate)})`,
-          leaveId,
-        })
-      );
-      await Promise.all(notificationPromises);
-    } catch (error) {
-      console.error("Error creating admin notifications:", error);
-    }
-  };
-
   const handleSubmit = async () => {
     const requestedDays = calculateDays();
     if (
@@ -117,12 +95,7 @@ const ReviewStep = () => {
         fileIds: formData.supportingDocs.map((doc) => doc.id),
       };
 
-      const response = await ApiService.post("/leaves", leaveData);
-      const createdLeave = response.data;
-
-      if (admins.length > 0) {
-        await createAdminNotifications(createdLeave.id, leaveData);
-      }
+      await ApiService.post("/leaves", leaveData);
 
       setIsSubmitted(true);
     } catch (err) {

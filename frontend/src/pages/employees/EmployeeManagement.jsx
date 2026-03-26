@@ -26,7 +26,7 @@ const EmployeeManagement = () => {
     phone: "",
     joinDate: new Date().toISOString().split("T")[0],
     password: "",
-    approverId: "",
+    reportsToId: "",
   });
   const [inviteForm, setInviteForm] = useState(getInviteDefaults);
   const [reportsToFilter, setReportsToFilter] = useState("");
@@ -88,14 +88,14 @@ const EmployeeManagement = () => {
           "Add an owner, admin, or manager before inviting new employees."
         );
       }
-      if (!isOwnerInvite && !inviteForm.approverId) {
+      if (!isOwnerInvite && !inviteForm.reportsToId) {
         throw new Error("Select who the invitee should report to.");
       }
 
       const payload = {
         ...inviteForm,
-        approverId: inviteForm.approverId
-          ? Number(inviteForm.approverId)
+        reportsToId: inviteForm.reportsToId
+          ? Number(inviteForm.reportsToId)
           : undefined,
       };
 
@@ -253,7 +253,7 @@ const EmployeeManagement = () => {
                       setInviteForm((prev) => ({
                         ...prev,
                         role: event.target.value,
-                        approverId: "",
+                        reportsToId: "",
                       }))
                   }
                   className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -301,11 +301,11 @@ const EmployeeManagement = () => {
                 disabled={approverOptions.length === 0}
               />
               <select
-                value={inviteForm.approverId}
+                value={inviteForm.reportsToId}
                 onChange={(event) =>
                     setInviteForm((prev) => ({
                       ...prev,
-                      approverId: event.target.value,
+                      reportsToId: event.target.value,
                     }))
                 }
                 required={inviteForm.role !== "OWNER"}
@@ -550,13 +550,13 @@ const EmployeeManagement = () => {
                     <td className="px-4 py-3">{invite.email}</td>
                     <td className="px-4 py-3">{invite.role?.toLowerCase()}</td>
                     <td className="px-4 py-3">
-                      {invite.approver?.name ? (
+                      {invite.reportsTo?.name ? (
                         <div>
                           <p className="font-medium text-gray-900 dark:text-white">
-                            {invite.approver.name}
+                            {invite.reportsTo.name}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {invite.approver.role.toLowerCase()}
+                            {invite.reportsTo.role.toLowerCase()}
                           </p>
                         </div>
                       ) : (

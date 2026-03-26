@@ -154,6 +154,27 @@ const wrapHtml = ({
   `;
 };
 
+const buildSystemNotificationEmail = ({
+  title,
+  message,
+  tenant,
+  actionUrl,
+  actionLabel,
+}) => {
+  const html = wrapHtml({
+    heading: title,
+    message: `<p>${message}</p>`,
+    buttonLabel: actionLabel,
+    buttonUrl: actionUrl,
+    tenant,
+  });
+
+  return {
+    subject: `${tenant?.name || "FlexiLeave"} • ${title}`,
+    html,
+  };
+};
+
 // =============================
 // INVITATION EMAIL
 // =============================
@@ -240,5 +261,6 @@ module.exports = {
   sendEmail,
   buildInvitationEmail,
   buildLeaveNotificationEmail,
+  buildSystemNotificationEmail,
   FRONTEND_BASE_URL,
 };

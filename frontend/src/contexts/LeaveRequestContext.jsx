@@ -31,8 +31,6 @@ export const LeaveRequestProvider = ({ children }) => {
   const [submitError, setSubmitError] = useState("");
   const [step, setStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [admins, setAdmins] = useState([]);
-
   return (
     <LeaveRequestContext.Provider
       value={{
@@ -58,8 +56,6 @@ export const LeaveRequestProvider = ({ children }) => {
         setStep,
         isSubmitted,
         setIsSubmitted,
-        admins,
-        setAdmins,
       }}
     >
       {children}

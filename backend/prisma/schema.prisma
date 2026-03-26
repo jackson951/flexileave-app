@@ -46,7 +46,7 @@ model User {
   reportsToId         Int?
   reportsTo           User?            @relation("UserReportsTo", fields: [reportsToId], references: [id])
   subordinates        User[]           @relation("UserReportsTo")
-  incomingInvitations UserInvitation[] @relation("InvitationApprover")
+  invitedUsers        UserInvitation[] @relation("InvitationReportsTo")
   leaveBalances       Json
   role                Role             @default(EMPLOYEE)
   avatar              String?
@@ -117,8 +117,8 @@ model UserInvitation {
 
   tenantId   Int
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  approverId Int?
-  approver   User?  @relation("InvitationApprover", fields: [approverId], references: [id])
+  reportsToId Int?
+  reportsTo   User?  @relation("InvitationReportsTo", fields: [reportsToId], references: [id])
 
   expiresAt    DateTime
   used         Boolean  @default(false)
@@ -127,7 +127,7 @@ model UserInvitation {
   createdAt    DateTime @default(now())
   // ❌ REMOVED @@map("user_invitations")
 
-  @@index([tenantId, approverId])
+  @@index([tenantId, reportsToId])
   @@index([tenantId, email])
 }
 
