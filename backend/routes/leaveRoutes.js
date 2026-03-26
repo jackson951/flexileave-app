@@ -14,8 +14,15 @@ const {
   tenantGuard,
   authorizeRoles,
 } = require("../middleware/auth");
+const {
+  sendEmail,
+  buildLeaveNotificationEmail,
+  FRONTEND_BASE_URL,
+} = require("../utils/emailer");
 
 const requireAdminOrManager = authorizeRoles("OWNER", "ADMIN", "MANAGER");
+const DEFAULT_TENANT_NAME =
+  process.env.DEFAULT_TENANT_NAME || "FlexiLeave";
 
 // -------------------- MULTER CONFIG (Memory Storage) -------------------- //
 const storage = multer.memoryStorage();
@@ -74,8 +81,6 @@ const NOTIFICATION_TYPES = {
   REJECTED: "leave_rejected",
 };
 
-const ADMIN_NOTIFICATION_ROLES = ["ADMIN", "MANAGER"];
-
 const formatDateOnly = (value) => {
   const date = value instanceof Date ? value : new Date(value);
   return date.toISOString().split("T")[0];
@@ -92,41 +97,78 @@ const buildLeaveNotificationMetadata = (leave, status) => ({
   endDate: leave.endDate,
 });
 
-const notifyTenantRoles = async ({
-  tenantId,
-  roles,
+const getTenantInfo = async (tenantId) => {
+  if (!tenantId) {
+    return {
+      name: DEFAULT_TENANT_NAME,
+      primaryColor: "#4f46e5",
+      secondaryColor: "#7c3aed",
+    };
+  }
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: {
+      id: true,
+      name: true,
+      primaryColor: true,
+      secondaryColor: true,
+      logoUrl: true,
+    },
+  });
+  if (!tenant) {
+    return {
+      name: DEFAULT_TENANT_NAME,
+      primaryColor: "#4f46e5",
+      secondaryColor: "#7c3aed",
+    };
+  }
+  return tenant;
+};
+
+const notifyAssignedUser = async ({
+  recipient,
   leave,
-  triggeredById,
   type,
   title,
   message,
   status,
+  actionUrl,
+  actionLabel = "View",
+  tenantId,
+  triggeredById,
 }) => {
-  if (!roles || roles.length === 0) return;
+  if (!recipient?.id) return;
 
-  const recipients = await prisma.user.findMany({
-    where: {
-      tenantId,
-      role: { in: roles },
-    },
-    select: { id: true },
+  await sendNotificationToUser({
+    recipientId: recipient.id,
+    triggeredById,
+    leave,
+    type,
+    title,
+    message,
+    status,
   });
 
-  if (!recipients.length) return;
+  if (!recipient.email) return;
 
-  const metadataTemplate = buildLeaveNotificationMetadata(leave, status);
-
-  await prisma.notification.createMany({
-    data: recipients.map((recipient) => ({
-      recipientId: recipient.id,
-      triggeredById,
-      leaveId: leave.id,
-      type,
-      title,
+  try {
+    const tenant = await getTenantInfo(tenantId);
+    const emailPayload = buildLeaveNotificationEmail({
+      recipientName: recipient.name,
+      leave,
       message,
-      metadata: { ...metadataTemplate },
-    })),
-  });
+      tenant,
+      actionUrl,
+      actionLabel,
+    });
+
+    await sendEmail({
+      to: recipient.email,
+      ...emailPayload,
+    });
+  } catch (emailError) {
+    console.error("Failed to send leave notification email", emailError);
+  }
 };
 
 const sendNotificationToUser = async ({
@@ -528,6 +570,14 @@ router.post(
 
       const user = await prisma.user.findUnique({
         where: { id: req.user.userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          leaveBalances: true,
+          reportsToId: true,
+        },
       });
       if (!user) {
         return res.status(404).json({ message: "User not found" });
@@ -568,6 +618,14 @@ router.post(
         }
       }
 
+      const requiresApproval = user.role !== "OWNER";
+      if (requiresApproval && !user.reportsToId) {
+        return res.status(400).json({
+          message:
+            "Your reporting manager is not defined. Please ask an administrator to assign your approver.",
+        });
+      }
+
       const newLeave = await prisma.leave.create({
         data: {
           leaveType,
@@ -579,31 +637,46 @@ router.post(
           emergencyPhone,
           userId: req.user.userId,
           tenantId: req.user.tenantId,
-          status: "PENDING",
+          approverId: requiresApproval ? user.reportsToId : null,
+          status: requiresApproval ? "PENDING" : "APPROVED",
+          actionedBy: requiresApproval ? undefined : req.user.userId,
           attachments:
             fileIds?.length > 0
               ? { connect: fileIds.map((id) => ({ id })) }
               : undefined,
+        },
+        include: {
+          approver: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
-          include: {
-            user: { select: { id: true, name: true, email: true } },
-            attachments: true,
-          },
-        });
+          user: { select: { id: true, name: true, email: true } },
+          attachments: true,
+        },
+      });
 
       try {
-        const dateRange = formatLeaveDateRange(newLeave);
-        const leaveMessage = `${user.name} submitted ${newLeave.leaveType} for ${dateRange}.`;
-        await notifyTenantRoles({
-          tenantId: req.user.tenantId,
-          roles: ADMIN_NOTIFICATION_ROLES,
-          leave: newLeave,
-          triggeredById: req.user.userId,
-          type: NOTIFICATION_TYPES.SUBMITTED,
-          title: "New leave request submitted",
-          message: leaveMessage,
-          status: "PENDING",
-        });
+        if (newLeave.approverId) {
+          const approver = newLeave.approver;
+          const dateRange = formatLeaveDateRange(newLeave);
+          const leaveMessage = `${user.name} submitted ${newLeave.leaveType} for ${dateRange}.`;
+          const tenantInfo = await getTenantInfo(req.user.tenantId);
+          await notifyAssignedUser({
+            recipient: approver,
+            leave: newLeave,
+            triggeredById: req.user.userId,
+            type: NOTIFICATION_TYPES.SUBMITTED,
+            title: "New leave request submitted",
+            message: leaveMessage,
+            status: newLeave.status,
+            actionUrl: `${FRONTEND_BASE_URL}/dashboard/leave`,
+            actionLabel: "Review request",
+            tenantId: req.user.tenantId,
+          });
+        }
       } catch (notificationError) {
         console.error(
           "Failed to notify tenant admins about new leave",
@@ -684,6 +757,14 @@ router.get(
             department: true,
             position: true,
             avatar: true,
+            reportsToId: true,
+            reportsTo: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+              },
+            },
           },
         },
         actionedByUser: {
@@ -694,6 +775,13 @@ router.get(
             avatar: true,
             position: true,
             department: true,
+          },
+        },
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
         attachments: true,
@@ -747,6 +835,14 @@ router.get("/my", authenticateToken, tenantGuard, async (req, res) => {
     const leaves = await prisma.leave.findMany({
       where: whereClause,
       include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            reportsToId: true,
+          },
+        },
         attachments: true,
         actionedByUser: {
           select: {
@@ -756,6 +852,13 @@ router.get("/my", authenticateToken, tenantGuard, async (req, res) => {
             avatar: true,
             position: true,
             department: true,
+          },
+        },
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
       },
@@ -818,6 +921,13 @@ router.get("/:id", authenticateToken, async (req, res) => {
             name: true,
             email: true,
             tenantId: true,
+            reportsToId: true,
+            reportsTo: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         actionedByUser: {
@@ -828,6 +938,13 @@ router.get("/:id", authenticateToken, async (req, res) => {
             avatar: true,
             position: true,
             department: true,
+          },
+        },
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
         attachments: true,
@@ -1176,6 +1293,14 @@ router.put(
               position: true,
               department: true,
               tenantId: true,
+              reportsToId: true,
+            },
+          },
+          approver: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
             },
           },
           attachments: true,
@@ -1189,10 +1314,23 @@ router.put(
         return res.status(403).json({ message: "Unauthorized access" });
       }
 
+      if (leave.userId === req.user.userId) {
+        return res.status(403).json({
+          message: "You cannot approve or reject your own leave request.",
+        });
+      }
+
+      const expectedApproverId = leave.user?.reportsToId;
+      if (expectedApproverId !== req.user.userId) {
+        return res.status(403).json({
+          message: "You are not authorized to approve this leave request.",
+        });
+      }
+
       if (leave.status !== "PENDING") {
         return res
           .status(400)
-          .json({ message: "OnlyPENDING leaves can beAPPROVED" });
+          .json({ message: "Only PENDING leaves can be APPROVED" });
       }
 
       const currentBalance = getLeaveBalance(
@@ -1244,21 +1382,32 @@ router.put(
               department: true,
             },
           },
+          approver: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
           attachments: true,
         },
       });
 
+      const approvedRange = formatLeaveDateRange(updatedLeave);
+      const approvalMessage = `Your ${updatedLeave.leaveType} request for ${approvedRange} has been approved.`;
+
       try {
-        const approvedRange = formatLeaveDateRange(updatedLeave);
-        const approvalMessage = `Your ${updatedLeave.leaveType} request for ${approvedRange} has been approved.`;
-        await sendNotificationToUser({
-          recipientId: updatedLeave.user.id,
+        await notifyAssignedUser({
+          recipient: updatedLeave.user,
           leave: updatedLeave,
           triggeredById: req.user.userId,
           type: NOTIFICATION_TYPES.APPROVED,
           title: "Leave approved",
           message: approvalMessage,
           status: updatedLeave.status,
+          actionUrl: `${FRONTEND_BASE_URL}/dashboard/leave`,
+          actionLabel: "View leave request",
+          tenantId: req.user.tenantId,
         });
       } catch (notificationError) {
         console.error(
@@ -1348,12 +1497,20 @@ router.put(
       const leave = await prisma.leave.findUnique({
         where: { id: leaveId },
         include: {
-          user: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            tenantId: true,
+            reportsToId: true,
+          },
+        },
+          approver: {
             select: {
               id: true,
-              email: true,
               name: true,
-              tenantId: true,
+              email: true,
             },
           },
         },
@@ -1365,6 +1522,19 @@ router.put(
 
       if (leave.user?.tenantId !== req.user.tenantId) {
         return res.status(403).json({ message: "Unauthorized access" });
+      }
+
+      if (leave.userId === req.user.userId) {
+        return res.status(403).json({
+          message: "You cannot approve or reject your own leave request.",
+        });
+      }
+
+      const expectedApproverId = leave.user?.reportsToId;
+      if (expectedApproverId !== req.user.userId) {
+        return res.status(403).json({
+          message: "You are not authorized to approve this leave request.",
+        });
       }
 
       const updatedLeave = await prisma.leave.update({
@@ -1386,21 +1556,32 @@ router.put(
               department: true,
             },
           },
+          approver: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
           attachments: true,
         },
       });
 
+      const rejectionRange = formatLeaveDateRange(updatedLeave);
+      const rejectionMessage = `Your ${updatedLeave.leaveType} request for ${rejectionRange} was rejected. Reason: ${updatedLeave.rejectionReason}`;
+
       try {
-        const rejectionRange = formatLeaveDateRange(updatedLeave);
-        const rejectionMessage = `Your ${updatedLeave.leaveType} request for ${rejectionRange} was rejected. Reason: ${updatedLeave.rejectionReason}`;
-        await sendNotificationToUser({
-          recipientId: updatedLeave.user.id,
+        await notifyAssignedUser({
+          recipient: updatedLeave.user,
           leave: updatedLeave,
           triggeredById: req.user.userId,
           type: NOTIFICATION_TYPES.REJECTED,
           title: "Leave rejected",
           message: rejectionMessage,
           status: updatedLeave.status,
+          actionUrl: `${FRONTEND_BASE_URL}/dashboard/leave`,
+          actionLabel: "View leave request",
+          tenantId: req.user.tenantId,
         });
       } catch (notificationError) {
         console.error(

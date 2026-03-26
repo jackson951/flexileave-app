@@ -31,6 +31,7 @@ const LeaveWorkspace = () => {
   const [approvingId, setApprovingId] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [expandedLeaveId, setExpandedLeaveId] = useState(null);
 
   const fetchLeaves = async () => {
     setLoading(true);
@@ -333,54 +334,144 @@ const LeaveWorkspace = () => {
                   <th className="px-4 py-3">Dates</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">User</th>
+                  <th className="px-4 py-3">Details</th>
                   {showAdminView && <th className="px-4 py-3">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {leavesToShow.map((leave) => (
-                  <tr key={leave.id} className="border-t border-gray-100 dark:border-gray-800">
-                    <td className="px-4 py-3 uppercase">{leave.leaveType}</td>
-                    <td className="px-4 py-3">
-                      <div>{leave.startDate}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {leave.endDate}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-white">
-                        {leave.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {leave.user?.name || user.name}
-                    </td>
-                    {showAdminView && (
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                {leavesToShow.map((leave) => {
+                  const isOwnLeave = leave.userId === user.id;
+                  const isAssignedApprover = leave.user?.reportsToId === user.id;
+                  const isExpanded = expandedLeaveId === leave.id;
+                  const detailColSpan = showAdminView ? 6 : 5;
+                  return (
+                    <React.Fragment key={leave.id}>
+                      <tr
+                        className="border-t border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
+                      >
+                        <td className="px-4 py-3 uppercase">{leave.leaveType}</td>
+                        <td className="px-4 py-3">
+                          <div>{leave.startDate}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {leave.endDate}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-white">
+                            {leave.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {leave.user?.name || user.name}
+                        </td>
+                        <td className="px-4 py-3">
                           <button
-                            disabled={leave.status !== "PENDING" || approvingId === leave.id}
-                            onClick={() => handleApprove(leave.id)}
-                            className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setExpandedLeaveId((prev) =>
+                                prev === leave.id ? null : leave.id
+                              );
+                            }}
+                            className="text-xs font-semibold uppercase text-indigo-600 hover:text-indigo-800 dark:text-indigo-300"
                           >
-                            {approvingId === leave.id ? "Approving…" : "Approve"}
+                            {isExpanded ? "Hide details" : "Show details"}
                           </button>
-                          <button
-                            disabled={leave.status !== "PENDING" || rejectingId === leave.id}
-                            onClick={() => handleReject(leave.id)}
-                            className="rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
-                          >
-                            {rejectingId === leave.id ? "Rejecting…" : "Reject"}
-                          </button>
-                        </div>
-                        {leave.status === "REJECTED" && (
-                          <p className="mt-1 text-xs text-gray-500">
-                            {leave.rejectionReason}
-                          </p>
+                        </td>
+                        {showAdminView && (
+                          <td className="px-4 py-3">
+                            {leave.status === "PENDING" ? (
+                              isAssignedApprover && !isOwnLeave ? (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    disabled={approvingId === leave.id}
+                                    onClick={() => handleApprove(leave.id)}
+                                    className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                                  >
+                                    {approvingId === leave.id ? "Approving…" : "Approve"}
+                                  </button>
+                                  <button
+                                    disabled={rejectingId === leave.id}
+                                    onClick={() => handleReject(leave.id)}
+                                    className="rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                                  >
+                                    {rejectingId === leave.id ? "Rejecting…" : "Reject"}
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-500">
+                                  {isOwnLeave
+                                    ? "You cannot approve or reject your own leave request."
+                                    : `Only ${leave.approver?.name || "the assigned approver"} can act on this request.`}
+                                </p>
+                              )
+                            ) : null}
+
+                            {leave.status === "REJECTED" && (
+                              <p className="mt-1 text-xs text-gray-500">
+                                {leave.rejectionReason}
+                              </p>
+                            )}
+                          </td>
                         )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-gray-50 dark:bg-gray-900">
+                          <td colSpan={detailColSpan} className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                            <div className="flex flex-col gap-2">
+                              <p>
+                                <span className="font-semibold">Reason:</span>{" "}
+                                {leave.reason}
+                              </p>
+                              {leave.emergencyContact && (
+                                <p>
+                                  <span className="font-semibold">
+                                    Emergency contact:
+                                  </span>{" "}
+                                  {leave.emergencyContact}
+                                </p>
+                              )}
+                              {leave.emergencyPhone && (
+                                <p>
+                                  <span className="font-semibold">
+                                    Emergency phone:
+                                  </span>{" "}
+                                  {leave.emergencyPhone}
+                                </p>
+                              )}
+                              <p>
+                                <span className="font-semibold">
+                                  Submitted at:
+                                </span>{" "}
+                                {new Date(leave.submittedAt).toLocaleString()}
+                              </p>
+                              {leave.attachments?.length > 0 && (
+                                <div>
+                                  <span className="font-semibold">
+                                    Supporting documents:
+                                  </span>
+                                  <div className="mt-1 flex flex-wrap gap-2">
+                                    {leave.attachments.map((file) => (
+                                      <a
+                                        key={file.id}
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700/40 dark:bg-indigo-900/40 dark:text-indigo-100"
+                                      >
+                                        {file.name}
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
