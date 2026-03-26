@@ -23,6 +23,17 @@ const TenantRegister = () => {
     { value: "#f43f5e", label: "Rose", description: "Bold rose" },
     { value: "#6366f1", label: "Violet", description: "Soft violet" },
     { value: "#14b8a6", label: "Teal", description: "Cool teal" },
+    { value: "#ef4444", label: "Scarlet", description: "Confident red" },
+    { value: "#facc15", label: "Sunshine", description: "Bright yellow" },
+    { value: "#10b981", label: "Mint", description: "Refreshing mint" },
+    { value: "#0f172a", label: "Midnight", description: "Deep charcoal" },
+    { value: "#2563eb", label: "Royal Blue", description: "Trustworthy blue" },
+    { value: "#dc2626", label: "Crimson", description: "Strong alert red" },
+    { value: "#0b7285", label: "Marine", description: "Calm ocean blue" },
+    { value: "#4338ca", label: "Grape", description: "Rich purple" },
+    { value: "#ea580c", label: "Copper", description: "Autumn glow" },
+    { value: "#0f766e", label: "Deep Teal", description: "Grounded teal" },
+    { value: "#fb7185", label: "Blush", description: "Soft highlight" },
   ];
 
   const accentOptions = [
@@ -33,6 +44,15 @@ const TenantRegister = () => {
     { value: "#e11d48", label: "Crimson", description: "Bold crimson" },
     { value: "#8b5cf6", label: "Amethyst", description: "Violet sparkle" },
     { value: "#f59e0b", label: "Sunset", description: "Sunset amber" },
+    { value: "#22c55e", label: "Lime", description: "Bright lime" },
+    { value: "#0ea5e9", label: "Azure", description: "Vivid azure" },
+    { value: "#f97316", label: "Coral", description: "Warm coral" },
+    { value: "#c026d3", label: "Fuchsia", description: "High-contrast pop" },
+    { value: "#047857", label: "Moss", description: "Earthy balance" },
+    { value: "#db2777", label: "Magenta", description: "Bold highlight" },
+    { value: "#2563eb", label: "Twilight", description: "Calm dusk" },
+    { value: "#c2410c", label: "Burnt Orange", description: "Energetic accent" },
+    { value: "#16a34a", label: "Jade", description: "Refreshing accent" },
   ];
 
   const [formData, setFormData] = useState({
@@ -173,9 +193,9 @@ const TenantRegister = () => {
         <title>Register Your Organization | FlexiLeave</title>
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-900 dark:to-black">
         <div className="flex min-h-screen items-center justify-center p-4">
-          <div className="w-full max-w-4xl rounded-3xl border bg-white/90 p-8 shadow-xl">
+          <div className="w-full max-w-4xl rounded-3xl border border-gray-200 bg-white/90 p-8 shadow-xl dark:border-gray-800 dark:bg-gray-900/80">
             <div className="mb-6 text-center">
               <h1 className="text-3xl font-semibold text-gray-900">
                 Start your organization
@@ -261,6 +281,7 @@ const TenantRegister = () => {
                             type="button"
                             onClick={() => {
                               updateColor("primaryColor", option.value);
+                              setPrimarySearch(option.label);
                               setPrimaryDropdownOpen(false);
                             }}
                             className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 dark:text-gray-200 dark:hover:bg-indigo-600"
@@ -341,6 +362,7 @@ const TenantRegister = () => {
                             type="button"
                             onClick={() => {
                               updateColor("secondaryColor", option.value);
+                              setSecondarySearch(option.label);
                               setSecondaryDropdownOpen(false);
                             }}
                             className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 dark:text-gray-200 dark:hover:bg-indigo-600"

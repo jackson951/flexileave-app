@@ -12,6 +12,11 @@ const {
   tenantGuard,
   authorizeRoles,
 } = require("../middleware/auth");
+const {
+  sendEmail,
+  buildInvitationEmail,
+  FRONTEND_BASE_URL,
+} = require("../utils/emailer");
 
 const INVITE_EXPIRY_HOURS = parseInt(
   process.env.INVITE_EXPIRY_HOURS ?? "48",
@@ -22,8 +27,11 @@ const TENANT_ADMIN_ROLES = ["OWNER", "ADMIN", "MANAGER"];
 const INVITE_ROLES = ["ADMIN", "MANAGER", "EMPLOYEE"];
 const VALID_ROLES = [...INVITE_ROLES, "OWNER"];
 const VALID_STATUSES = ["ACTIVE", "INACTIVE"];
+const APPROVER_ROLES = ["OWNER", "ADMIN", "MANAGER"];
 
 const generateInviteToken = () => crypto.randomBytes(32).toString("hex");
+const DEFAULT_TENANT_NAME =
+  process.env.DEFAULT_TENANT_NAME || "FlexiLeave";
 
 // Validator for leaveBalances object
 const validateLeaveBalances = body("leaveBalances").custom((value) => {
@@ -192,6 +200,14 @@ router.get(
           role: true,
           avatar: true,
           createdAt: true,
+          reportsToId: true,
+          reportsTo: {
+            select: {
+              id: true,
+              name: true,
+              role: true,
+            },
+          },
         },
       });
 
@@ -211,22 +227,23 @@ router.post(
   tenantGuard,
   authorizeRoles(...TENANT_ADMIN_ROLES),
   async (req, res) => {
-    const {
-      email,
-      role,
-      name,
-      department,
-      position,
-      phone,
-      joinDate,
-      password,
-    } = req.body;
+  const {
+    email,
+    role,
+    name,
+    department,
+    position,
+    phone,
+    joinDate,
+    password,
+    approverId,
+  } = req.body;
 
-    if (!email || !role || !name) {
-      return res.status(400).json({
-        message: "Name, email, and role are required for invitations",
-      });
-    }
+  if (!email || !role || !name) {
+    return res.status(400).json({
+      message: "Name, email, and role are required for invitations",
+    });
+  }
 
     const trimmedName = name.toString().trim();
     if (!trimmedName) {
@@ -236,47 +253,47 @@ router.post(
     }
 
     const normalizedRole = role.toUpperCase();
-    if (!INVITE_ROLES.includes(normalizedRole)) {
-      return res.status(400).json({
-        message: `Role must be one of ${INVITE_ROLES.join(", ")}`,
-      });
-    }
+  if (!INVITE_ROLES.includes(normalizedRole)) {
+    return res.status(400).json({
+      message: `Role must be one of ${INVITE_ROLES.join(", ")}`,
+    });
+  }
 
-    if (password && password.length < 8) {
+  if (password && password.length < 8) {
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 8 characters" });
+  }
+
+  try {
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        tenantId: req.user.tenantId,
+        email: normalizedEmail,
+      },
+    });
+    if (existingUser) {
       return res
-        .status(400)
-        .json({ message: "Password must be at least 8 characters" });
+        .status(409)
+        .json({ message: "User already exists for this tenant" });
     }
 
-    try {
-      const normalizedEmail = email.toLowerCase().trim();
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          tenantId: req.user.tenantId,
-          email: normalizedEmail,
+    const existingInvite = await prisma.userInvitation.findFirst({
+      where: {
+        tenantId: req.user.tenantId,
+        email: normalizedEmail,
+        used: false,
+        expiresAt: {
+          gt: new Date(),
         },
+      },
+    });
+    if (existingInvite) {
+      return res.status(409).json({
+        message: "An active invitation already exists for this email",
       });
-      if (existingUser) {
-        return res
-          .status(409)
-          .json({ message: "User already exists for this tenant" });
-      }
-
-      const existingInvite = await prisma.userInvitation.findFirst({
-        where: {
-          tenantId: req.user.tenantId,
-          email: normalizedEmail,
-          used: false,
-          expiresAt: {
-            gt: new Date(),
-          },
-        },
-      });
-      if (existingInvite) {
-        return res.status(409).json({
-          message: "An active invitation already exists for this email",
-        });
-      }
+    }
 
       const resolvedJoinDate = joinDate ? new Date(joinDate) : null;
       const joinDateIso =
@@ -292,6 +309,47 @@ router.post(
         joinDate: joinDateIso,
       };
 
+      let finalApproverId = null;
+      if (normalizedRole !== "OWNER") {
+      if (approverId === undefined || approverId === null) {
+        return res.status(400).json({
+          message: "Reports To is required for non-owner invitations",
+        });
+      }
+      const parsedReportsToId = Number(approverId);
+      if (!Number.isInteger(parsedReportsToId)) {
+        return res
+          .status(400)
+          .json({ message: "Invalid Reports To selection" });
+      }
+      // if (parsedReportsToId === req.user.userId) {
+      //   return res
+      //     .status(400)
+      //       .json({ message: "User cannot report to themselves" });
+      //   }
+
+        const reportsToUser = await prisma.user.findUnique({
+          where: { id: parsedReportsToId },
+          select: {
+            id: true,
+            tenantId: true,
+            role: true,
+          },
+        });
+        if (
+          !reportsToUser ||
+          reportsToUser.tenantId !== req.user.tenantId ||
+          !APPROVER_ROLES.includes(reportsToUser.role)
+        ) {
+          return res.status(400).json({
+            message:
+              "Reports To must be an OWNER, ADMIN, or MANAGER within your organization",
+          });
+        }
+
+        finalApproverId = parsedReportsToId;
+      }
+
       const passwordHash = password
         ? await bcrypt.hash(password, 10)
         : null;
@@ -305,8 +363,31 @@ router.post(
           expiresAt: new Date(Date.now() + INVITE_EXPIRY_MS),
           metadata,
           passwordHash,
+          approverId: finalApproverId,
         },
       });
+
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: req.user.tenantId },
+      });
+      const tenantName = tenant?.name || DEFAULT_TENANT_NAME;
+      const inviteLink = `${FRONTEND_BASE_URL}/accept-invite?token=${invitation.token}`;
+
+      try {
+        const emailPayload = buildInvitationEmail({
+          inviteeName: trimmedName,
+          tenantName,
+          inviteLink,
+          expiresAt: invitation.expiresAt,
+          invitedByName: req.user.name,
+        });
+        await sendEmail({
+          to: normalizedEmail,
+          ...emailPayload,
+        });
+      } catch (emailError) {
+        console.error("Failed to send invitation email", emailError);
+      }
 
       res.status(201).json({
         message: "Invitation created",
@@ -316,6 +397,39 @@ router.post(
     } catch (error) {
       console.error("Invite creation error:", error);
       res.status(500).json({ message: "Failed to create invitation" });
+    }
+  }
+);
+
+router.get(
+  "/invitations",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
+    try {
+      const invitations = await prisma.userInvitation.findMany({
+        where: {
+          tenantId: req.user.tenantId,
+        },
+        include: {
+          approver: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      res.json(invitations);
+    } catch (error) {
+      console.error("Fetch invitations error:", error);
+      res
+        .status(500)
+        .json({ message: "Failed to load invitations", error: error.message });
     }
   }
 );
@@ -353,26 +467,34 @@ router.post(
  */
 router.get("/me", authenticateToken, tenantGuard, async (req, res) => {
   try {
-    const user = await prisma.user.findFirst({
-      where: {
-        id: req.user.userId,
-        tenantId: req.user.tenantId,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        department: true,
-        position: true,
-        joinDate: true,
-        leaveBalances: true,
-        role: true,
-        avatar: true,
-        createdAt: true,
-        tenant: {
-          select: {
-            id: true,
+      const user = await prisma.user.findFirst({
+        where: {
+          id: req.user.userId,
+          tenantId: req.user.tenantId,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          department: true,
+          position: true,
+          joinDate: true,
+          leaveBalances: true,
+          role: true,
+          avatar: true,
+          createdAt: true,
+          reportsToId: true,
+          reportsTo: {
+            select: {
+              id: true,
+              name: true,
+              role: true,
+            },
+          },
+          tenant: {
+            select: {
+              id: true,
             name: true,
             slug: true,
           },
@@ -446,22 +568,30 @@ router.get("/:id", authenticateToken, tenantGuard, async (req, res) => {
       return res.status(403).json({ message: "Unauthorized access" });
     }
 
-    const user = await prisma.user.findFirst({
-      where: { id: parseInt(id), tenantId: req.user.tenantId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        department: true,
-        position: true,
-        joinDate: true,
-        leaveBalances: true,
-        role: true,
-        avatar: true,
-        createdAt: true,
-      },
-    });
+      const user = await prisma.user.findFirst({
+        where: { id: parseInt(id), tenantId: req.user.tenantId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          department: true,
+          position: true,
+          joinDate: true,
+          leaveBalances: true,
+          role: true,
+          avatar: true,
+          createdAt: true,
+          reportsToId: true,
+          reportsTo: {
+            select: {
+              id: true,
+              name: true,
+              role: true,
+            },
+          },
+        },
+      });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -571,7 +701,7 @@ router.post(
     }
 
     try {
-      const { password, joinDate, email, ...rest } = req.body;
+      const { password, joinDate, email, reportsToId, ...rest } = req.body;
 
       // Hash the password
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -584,6 +714,22 @@ router.post(
       const normalizedEmail = email.toLowerCase().trim();
       const resolvedJoinDate = joinDate ? new Date(joinDate) : new Date();
 
+      let resolvedReportsToId = null;
+      if (reportsToId) {
+        const manager = await prisma.user.findFirst({
+          where: {
+            id: parseInt(reportsToId),
+            tenantId: req.user.tenantId,
+          },
+        });
+        if (!manager) {
+          return res
+            .status(400)
+            .json({ message: "Assigned approver not found" });
+        }
+        resolvedReportsToId = manager.id;
+      }
+
       const newUser = await prisma.user.create({
         data: {
           ...rest,
@@ -591,6 +737,7 @@ router.post(
           password: hashedPassword,
           tenantId: req.user.tenantId,
           joinDate: resolvedJoinDate,
+          reportsToId: resolvedReportsToId,
         },
         select: {
           id: true,
@@ -844,7 +991,7 @@ router.put(
         return res.status(404).json({ message: "User not found" });
       }
 
-      const { password, joinDate, email, ...updateData } = req.body;
+      const { password, joinDate, email, reportsToId, ...updateData } = req.body;
 
       if (password) {
         updateData.password = await bcrypt.hash(password, 10);
@@ -856,6 +1003,25 @@ router.put(
 
       if (email) {
         updateData.email = email.toLowerCase().trim();
+      }
+
+      if (reportsToId !== undefined) {
+        if (reportsToId === null) {
+          updateData.reportsToId = null;
+        } else {
+          const manager = await prisma.user.findFirst({
+            where: {
+              id: parseInt(reportsToId),
+              tenantId: req.user.tenantId,
+            },
+          });
+          if (!manager) {
+            return res
+              .status(400)
+              .json({ message: "Assigned approver not found" });
+          }
+          updateData.reportsToId = manager.id;
+        }
       }
 
       const updatedUser = await prisma.user.update({

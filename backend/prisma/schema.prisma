@@ -11,14 +11,14 @@ datasource db {
 // TENANT (COMPANY)
 ////////////////////////
 model Tenant {
-  id            Int             @id @default(autoincrement())
-  name          String
-  slug          String          @unique
-  isActive      Boolean         @default(true)
-  logoUrl       String?
-  primaryColor  String?
+  id             Int      @id @default(autoincrement())
+  name           String
+  slug           String   @unique
+  isActive       Boolean  @default(true)
+  logoUrl        String?
+  primaryColor   String?
   secondaryColor String?
-  createdAt     DateTime        @default(now())
+  createdAt      DateTime @default(now())
 
   users         User[]
   leaves        Leave[]
@@ -32,33 +32,39 @@ model Tenant {
 // USER
 ////////////////////////
 model User {
-  id                     Int             @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  tenantId               Int
-  tenant                 Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name                   String
-  email                  String
-  phone                  String?
-  department             String?
-  position               String?
-  joinDate               DateTime
-  leaveBalances          Json
-  role                   Role            @default(EMPLOYEE)
-  avatar                 String?
-  password               String
-  createdAt              DateTime        @default(now())
-  refreshToken           String?
-  status                 String          @default("ACTIVE")
+  name                String
+  email               String
+  phone               String?
+  department          String?
+  position            String?
+  joinDate            DateTime
+  reportsToId         Int?
+  reportsTo           User?            @relation("UserReportsTo", fields: [reportsToId], references: [id])
+  subordinates        User[]           @relation("UserReportsTo")
+  incomingInvitations UserInvitation[] @relation("InvitationApprover")
+  leaveBalances       Json
+  role                Role             @default(EMPLOYEE)
+  avatar              String?
+  password            String
+  createdAt           DateTime         @default(now())
+  refreshToken        String?
+  status              String           @default("ACTIVE")
 
-  leaves                 Leave[]
-  actionedLeaves         Leave[]         @relation("LeaveActionedBy")
+  leaves            Leave[]
+  actionedLeaves    Leave[] @relation("LeaveActionedBy")
+  assignedApprovals Leave[] @relation("LeaveApprover")
 
-  notificationsReceived  Notification[]  @relation("NotificationRecipient")
-  notificationsTriggered Notification[]  @relation("NotificationTriggeredBy")
+  notificationsReceived  Notification[] @relation("NotificationRecipient")
+  notificationsTriggered Notification[] @relation("NotificationTriggeredBy")
 
   @@unique([tenantId, email])
   @@index([tenantId])
+  @@index([reportsToId])
   @@map("users")
 }
 
@@ -66,33 +72,36 @@ model User {
 // LEAVE
 ////////////////////////
 model Leave {
-  id               Int             @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  tenantId         Int
-  tenant           Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   leaveType        String
   startDate        DateTime
   endDate          DateTime
   days             Int
   reason           String
-  status           LeaveStatus     @default(PENDING)
-  submittedAt      DateTime        @default(now())
+  status           LeaveStatus @default(PENDING)
+  submittedAt      DateTime    @default(now())
   rejectionReason  String?
   emergencyContact String?
   emergencyPhone   String?
 
-  userId           Int
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  actionedBy       Int?
-  actionedByUser   User?           @relation("LeaveActionedBy", fields: [actionedBy], references: [id])
+  actionedBy     Int?
+  actionedByUser User? @relation("LeaveActionedBy", fields: [actionedBy], references: [id])
+  approverId     Int?
+  approver       User? @relation("LeaveApprover", fields: [approverId], references: [id])
 
-  attachments      File[]
-  notifications    Notification[]
+  attachments   File[]
+  notifications Notification[]
 
   @@index([tenantId])
   @@index([userId])
+  @@index([approverId])
   @@map("leaves")
 }
 
@@ -100,23 +109,26 @@ model Leave {
 // USER INVITATIONS
 ////////////////////////
 model UserInvitation {
-  id           Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  email        String
-  token        String   @unique
-  role         Role
+  email String
+  token String @unique
+  role  Role
 
-  tenantId     Int
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId   Int
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  approverId Int?
+  approver   User?  @relation("InvitationApprover", fields: [approverId], references: [id])
 
   expiresAt    DateTime
   used         Boolean  @default(false)
   passwordHash String?
   metadata     Json?
   createdAt    DateTime @default(now())
-
-  @@index([tenantId, email])
   // ❌ REMOVED @@map("user_invitations")
+
+  @@index([tenantId, approverId])
+  @@index([tenantId, email])
 }
 
 ////////////////////////
@@ -130,8 +142,8 @@ model File {
   type       String
   uploadedAt DateTime @default(now())
 
-  leaveId    Int?
-  leave      Leave?   @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  leaveId Int?
+  leave   Leave? @relation(fields: [leaveId], references: [id], onDelete: Cascade)
 
   @@map("files")
 }
@@ -140,27 +152,27 @@ model File {
 // NOTIFICATIONS
 ////////////////////////
 model Notification {
-  id            Int              @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  tenantId      Int
-  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  type          NotificationType
-  title         String
-  message       String
-  isRead        Boolean          @default(false)
-  createdAt     DateTime         @default(now())
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
 
-  recipientId   Int
-  recipient     User             @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId Int
+  recipient   User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 
   triggeredById Int?
-  triggeredBy   User?            @relation("NotificationTriggeredBy", fields: [triggeredById], references: [id])
+  triggeredBy   User? @relation("NotificationTriggeredBy", fields: [triggeredById], references: [id])
 
-  leaveId       Int?
-  leave         Leave?           @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  leaveId Int?
+  leave   Leave? @relation(fields: [leaveId], references: [id], onDelete: Cascade)
 
-  metadata      Json?
+  metadata Json?
 
   @@index([tenantId, recipientId, isRead])
   @@index([tenantId, createdAt])

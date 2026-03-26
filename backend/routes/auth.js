@@ -98,6 +98,14 @@ router.post("/login", async (req, res) => {
             secondaryColor: true,
           },
         },
+        reportsTo: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
       },
     });
 
@@ -207,6 +215,81 @@ router.post("/refresh", async (req, res) => {
 
 /**
  * @swagger
+ * /api/auth/invite:
+ *   get:
+ *     summary: Get invitation preview for a token
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: query
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Invitation details
+ *       400:
+ *         description: Token required
+ *       404:
+ *         description: Invitation not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get("/invite", async (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    return res.status(400).json({ message: "Invitation token is required" });
+  }
+
+  try {
+    const invitation = await prisma.userInvitation.findUnique({
+      where: { token },
+      select: {
+        token: true,
+        email: true,
+        metadata: true,
+        expiresAt: true,
+        used: true,
+        approverId: true,
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (
+      !invitation ||
+      invitation.used ||
+      (invitation.expiresAt && new Date(invitation.expiresAt) < new Date())
+    ) {
+      return res
+        .status(404)
+        .json({ message: "This invitation was not found or has expired." });
+    }
+
+    return res.json({
+        invite: {
+          token: invitation.token,
+          email: invitation.email,
+          name: invitation.metadata?.name || "",
+          expiresAt: invitation.expiresAt,
+          approver: invitation.approver,
+          reportsTo: invitation.approver,
+        },
+      });
+  } catch (error) {
+    console.error("Invite lookup error:", error);
+    res.status(500).json({ message: "Failed to load invitation details" });
+  }
+});
+
+/**
+ * @swagger
  * /api/auth/accept-invite:
  *   post:
  *     summary: Accept a tenant invitation
@@ -245,6 +328,17 @@ router.post("/accept-invite", async (req, res) => {
   try {
     const invitation = await prisma.userInvitation.findUnique({
       where: { token },
+      select: {
+        id: true,
+        email: true,
+        tenantId: true,
+        role: true,
+        expiresAt: true,
+        used: true,
+        passwordHash: true,
+        metadata: true,
+        approverId: true,
+      },
     });
 
     if (
@@ -303,6 +397,7 @@ router.post("/accept-invite", async (req, res) => {
         department: invitation.metadata?.department || undefined,
         position: invitation.metadata?.position || undefined,
         phone: invitation.metadata?.phone || undefined,
+        reportsToId: invitation.approverId,
       },
       include: {
         tenant: {
@@ -320,7 +415,7 @@ router.post("/accept-invite", async (req, res) => {
 
     await prisma.userInvitation.update({
       where: { id: invitation.id },
-      data: { used: true, usedAt: new Date() },
+      data: { used: true },
     });
 
     const accessToken = generateAccessToken({
@@ -438,6 +533,14 @@ router.get("/verify", authenticateToken, async (req, res) => {
         role: true,
         avatar: true,
         createdAt: true,
+        reportsToId: true,
+        reportsTo: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
         tenant: {
           select: {
             id: true,

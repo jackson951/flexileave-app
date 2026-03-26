@@ -23,7 +23,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { useTenant } from "../contexts/TenantContext";
 import { ApiService, useApiInterceptors } from "../api/web-api-service";
 import { formatDistanceToNow } from "date-fns";
-import digititanLogo from "../assets/digititan-logo.jpg";
+const fallbackLogoUrl = new URL(
+  "../assets/digititan-logo.jpg",
+  import.meta.url
+).href;
 
 const DashboardLayout = () => {
   const { user: authUser, logout, logoutLoading } = useAuth();
@@ -261,7 +264,7 @@ const DashboardLayout = () => {
     setNotificationsOpen(false);
   };
 
-  const logoUrl = tenant?.logoUrl || digititanLogo;
+  const logoUrl = tenant?.logoUrl || fallbackLogoUrl;
   const companyName = tenant?.name || "FlexiLeave";
   const primaryColor = tenant?.primaryColor || "#4f46e5";
   const secondaryColor = tenant?.secondaryColor || "#7c3aed";
@@ -271,7 +274,7 @@ const DashboardLayout = () => {
 
   const handleLogoError = (event) => {
     event.currentTarget.onerror = null;
-    event.currentTarget.src = digititanLogo;
+    event.currentTarget.src = fallbackLogoUrl;
   };
 
   return (

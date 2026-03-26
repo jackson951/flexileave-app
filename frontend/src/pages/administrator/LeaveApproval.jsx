@@ -97,20 +97,6 @@ const LeaveApprovals = () => {
     }
   };
 
-  const createNotification = async (leaveId, userId, type, message, title) => {
-    try {
-      await ApiService.post("/notifications", {
-        userId,
-        type,
-        message,
-        title, // Add the title field
-        leaveId,
-      });
-    } catch (error) {
-      console.error("Error creating notification:", error);
-    }
-  };
-
   useEffect(() => {
     if (currentView === "approvals") {
       fetchLeaves();
@@ -173,20 +159,6 @@ const LeaveApprovals = () => {
         prev.map((leave) => (leave.id === id ? processedLeave : leave))
       );
 
-      // Create approval notification for the requester
-      const leave = leaves.find((l) => l.id === id);
-      if (leave) {
-        await createNotification(
-          id,
-          leave.userId,
-          "leave_approved",
-          `Your leave request for ${formatDate(
-            leave.startDate
-          )} to ${formatDate(leave.endDate)} has been approved`,
-          "Leave Request Approved" // Add title here
-        );
-      }
-
       alert("Leave request approved successfully!");
     } catch (err) {
       console.error("Error approving leave:", err);
@@ -221,22 +193,6 @@ const LeaveApprovals = () => {
       setLeaves((prev) =>
         prev.map((leave) => (leave.id === id ? processedLeave : leave))
       );
-
-      // Create rejection notification for the requester
-      const leave = leaves.find((l) => l.id === id);
-      if (leave) {
-        await createNotification(
-          id,
-          leave.userId,
-          "leave_rejected",
-          `Your leave request for ${formatDate(
-            leave.startDate
-          )} to ${formatDate(
-            leave.endDate
-          )} has been rejected. Reason: ${reason}`,
-          "Leave Request Rejected"
-        );
-      }
 
       alert("Leave request rejected successfully!");
     } catch (err) {
@@ -306,6 +262,10 @@ const LeaveApprovals = () => {
 
   const isOwnRequest = (leave) => {
     return leave.userId === user?.id;
+  };
+
+  const isAssignedApprover = (leave) => {
+    return leave.approverId === user?.id;
   };
 
   const renderActionedByInfo = (leave) => {
@@ -900,41 +860,50 @@ const LeaveApprovals = () => {
                             {renderActionedByInfo(leave)}
                           </div>
 
-                          {leave.status === "pending" &&
-                            !isOwnRequest(leave) && (
-                              <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-xs">
-                                <h4 className="text-sm font-medium text-gray-700 mb-3">
-                                  Actions
-                                </h4>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleApprove(leave.id)}
-                                    className="col-span-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200"
-                                  >
-                                    <CheckCircleIcon className="h-4 w-4 mr-1 sm:mr-2" />
-                                    Approve
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReject(leave.id)}
-                                    className="col-span-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
-                                  >
-                                    <XMarkIcon className="h-4 w-4 mr-1 sm:mr-2" />
-                                    Reject
-                                  </button>
+                          {leave.status === "pending" && (
+                            <>
+                              {isAssignedApprover(leave) ? (
+                                <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-xs">
+                                  <h4 className="text-sm font-medium text-gray-700 mb-3">
+                                    Actions
+                                  </h4>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleApprove(leave.id)}
+                                      className="col-span-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200"
+                                    >
+                                      <CheckCircleIcon className="h-4 w-4 mr-1 sm:mr-2" />
+                                      Approve
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleReject(leave.id)}
+                                      className="col-span-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
+                                    >
+                                      <XMarkIcon className="h-4 w-4 mr-1 sm:mr-2" />
+                                      Reject
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-
-                          {leave.status === "pending" &&
-                            isOwnRequest(leave) && (
-                              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                                <p className="text-sm text-gray-600 text-center">
-                                  You cannot approve or reject your own request.
-                                </p>
-                              </div>
-                            )}
+                              ) : (
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                  <p className="text-sm text-gray-600 text-center">
+                                    Only{" "}
+                                    {leave.approver?.name ||
+                                      "the assigned approver"}{" "}
+                                    may act on this leave request.
+                                  </p>
+                                  {isOwnRequest(leave) && (
+                                    <p className="text-xs text-red-600 text-center mt-2">
+                                      You cannot approve or reject your own
+                                      request.
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
