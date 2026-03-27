@@ -1590,7 +1590,7 @@ router.put(
 /**
  * @swagger
  * /api/leaves/{id}/cancel:
- *   put:
+ *   post:
  *     summary: Cancel a leave request
  *     tags: [Leaves]
  *     security:
@@ -1610,7 +1610,7 @@ router.put(
  *             schema:
  *               $ref: '#/components/schemas/Leave'
  *       400:
- *         description: Only PENDING leaves can be CANCELLED
+ *         description: Leave cannot be cancelled (not pending, already started, or unauthorized)
  *       401:
  *         description: Access token required
  *       403:
@@ -1620,7 +1620,7 @@ router.put(
  *       500:
  *         description: Internal server error
  */
-router.put("/:id/cancel", authenticateToken, async (req, res) => {
+router.post("/:id/cancel", authenticateToken, tenantGuard, async (req, res) => {
   try {
     const leaveId = parseInt(req.params.id);
     if (isNaN(leaveId)) {
@@ -1632,11 +1632,23 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
       include: {
         user: {
           select: {
+            id: true,
+            name: true,
+            email: true,
             tenantId: true,
+            reportsToId: true,
+          },
+        },
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
       },
     });
+
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
     }
@@ -1645,21 +1657,43 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
       return res.status(403).json({ message: "Unauthorized access" });
     }
 
-    if (leave.userId !== req.user.userId && req.user.role !== "admin") {
-      return res.status(403).json({ message: "Unauthorized access" });
+    if (leave.userId !== req.user.userId) {
+      return res.status(403).json({ 
+        message: "You can only cancel your own leave requests" 
+      });
     }
 
     if (leave.status !== "PENDING") {
-      return res
-        .status(400)
-        .json({ message: "OnlyPENDING leaves can beCANCELLED" });
+      return res.status(400).json({ 
+        message: `Leave cannot be cancelled. Current status is ${leave.status}.` 
+      });
     }
 
-    constCANCELLEDLeave = await prisma.leave.update({
+    // Allow cancellation even for future dates as requested
+    // const today = new Date();
+    // const leaveStartDate = new Date(leave.startDate);
+    // if (leaveStartDate < today) {
+    //   return res.status(400).json({ 
+    //     message: "Leave cannot be cancelled as the start date has already passed" 
+    //   });
+    // }
+
+    const cancelledLeave = await prisma.leave.update({
       where: { id: leaveId },
-      data: { status: "cancelled" },
+      data: { 
+        status: "CANCELLED",
+        actionedBy: req.user.userId,
+      },
       include: {
-        attachments: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            tenantId: true,
+            reportsToId: true,
+          },
+        },
         actionedByUser: {
           select: {
             id: true,
@@ -1670,8 +1704,61 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
             department: true,
           },
         },
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        attachments: true,
       },
     });
+
+    const cancelledRange = formatLeaveDateRange(cancelledLeave);
+    const cancellationMessage = `Your ${cancelledLeave.leaveType} request for ${cancelledRange} has been cancelled.`;
+
+    try {
+      await notifyAssignedUser({
+        recipient: cancelledLeave.user,
+        leave: cancelledLeave,
+        triggeredById: req.user.userId,
+        type: "leave_cancelled",
+        title: "Leave cancelled",
+        message: cancellationMessage,
+        status: cancelledLeave.status,
+        actionUrl: `${FRONTEND_BASE_URL}/dashboard/leave`,
+        actionLabel: "View leave request",
+        tenantId: req.user.tenantId,
+      });
+    } catch (notificationError) {
+      console.error(
+        "Failed to notify employee after leave cancellation",
+        notificationError
+      );
+    }
+
+    if (cancelledLeave.approver) {
+      try {
+        await notifyAssignedUser({
+          recipient: cancelledLeave.approver,
+          leave: cancelledLeave,
+          triggeredById: req.user.userId,
+          type: "leave_cancelled",
+          title: "Leave cancelled",
+          message: `${cancelledLeave.user.name}'s ${cancelledLeave.leaveType} request for ${cancelledRange} has been cancelled.`,
+          status: cancelledLeave.status,
+          actionUrl: `${FRONTEND_BASE_URL}/dashboard/leave`,
+          actionLabel: "View leave request",
+          tenantId: req.user.tenantId,
+        });
+      } catch (notificationError) {
+        console.error(
+          "Failed to notify approver after leave cancellation",
+          notificationError
+        );
+      }
+    }
 
     res.json(cancelledLeave);
   } catch (error) {

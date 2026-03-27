@@ -20,6 +20,9 @@ import {
   ChevronUpDownIcon,
   ChevronUpIcon,
   ChevronDownIcon,
+  ChartPieIcon,
+  TrendingUpIcon,
+  TrendingDownIcon,
 } from "@heroicons/react/24/outline";
 
 const Dashboard = () => {
@@ -673,6 +676,37 @@ const Dashboard = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Analytics Section */}
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl overflow-hidden shadow-lg">
+            <div className="px-6 py-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">
+                  Analytics & Insights
+                </h3>
+                <ChartPieIcon className="h-6 w-6 text-white opacity-80" />
+              </div>
+              <p className="text-blue-100 text-sm mb-4">
+                Get detailed insights into leave patterns, team statistics, and organizational trends.
+              </p>
+              <div className="space-y-3">
+                <button className="w-full flex items-center justify-center px-4 py-3 border-2 border-white/20 text-base font-medium rounded-lg text-white bg-white/10 hover:bg-white/20 transition-all duration-300 transform hover:scale-105">
+                  <TrendingUpIcon className="h-5 w-5 mr-2" />
+                  View Analytics Dashboard
+                </button>
+                <div className="grid grid-cols-2 gap-2 text-xs text-blue-100">
+                  <div className="bg-white/10 rounded p-2">
+                    <div className="font-medium">12</div>
+                    <div className="text-xs opacity-80">Pending Approvals</div>
+                  </div>
+                  <div className="bg-white/10 rounded p-2">
+                    <div className="font-medium">23</div>
+                    <div className="text-xs opacity-80">Leaves This Month</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
