@@ -203,6 +203,7 @@ router.get(
           avatar: true,
           createdAt: true,
           reportsToId: true,
+          status: true,
           reportsTo: {
             select: {
               id: true,
