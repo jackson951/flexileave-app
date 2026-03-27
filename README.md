@@ -5,7 +5,7 @@
 [![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue.svg)](https://www.postgresql.org/)
 
-A modern, feature-rich **Leave Management System** designed for organizations to streamline employee leave requests, approvals, and tracking. Built with a modern tech stack and intuitive user interface.
+A modern, enterprise-grade **Leave Management System** designed for organizations to streamline employee leave requests, approvals, and tracking. Built with cutting-edge technologies and featuring an intuitive, professional interface.
 
 ---
 
@@ -37,117 +37,213 @@ A modern, feature-rich **Leave Management System** designed for organizations to
 ## 🚀 Tech Stack
 
 ### Frontend
-- **React 18+** - Modern UI library
-- **Tailwind CSS** - Utility-first CSS framework
-- **React Router** - Client-side routing
-- **Axios** - HTTP client for API calls
-- **React Context** - State management
+- **React 18+** - Modern UI library with hooks and context
+- **Tailwind CSS** - Utility-first CSS framework for rapid UI development
+- **React Router** - Client-side routing for SPA navigation
+- **Axios** - HTTP client for API communication
+- **React Context** - State management without external libraries
+- **React Hook Form** - Form validation and handling
+- **React Calendar** - Date selection components
 
 ### Backend
-- **Node.js** - JavaScript runtime
+- **Node.js** - JavaScript runtime environment
 - **Express.js** - Web application framework
-- **Prisma ORM** - Database ORM and schema management
-- **PostgreSQL** - Relational database
-- **JWT** - JSON Web Token authentication
-- **Bcrypt** - Password hashing
+- **Prisma ORM** - Modern database toolkit and ORM
+- **PostgreSQL** - Enterprise-grade relational database
+- **JWT** - JSON Web Token for secure authentication
+- **Bcrypt** - Password hashing and security
+- **Multer** - File upload handling
+- **Nodemailer** - Email notifications
 
 ### Development Tools
-- **ESLint** - Code linting
-- **Prettier** - Code formatting
-- **Vite** - Fast build tool and dev server
-- **Git** - Version control
+- **ESLint** - Code linting and quality assurance
+- **Prettier** - Code formatting and consistency
+- **Vite** - Fast build tool and development server
+- **Git** - Version control and collaboration
+- **Docker** - Containerization for deployment
+- **Railway** - Cloud deployment platform
 
 ---
 
-## 📸 Screenshots
+## 📸 Application Screenshots
 
-### Authentication & Onboarding
-![Login Screen](frontend/public/ex-6.png)
-*Secure login with role-based access*
+### Dashboard & Overview
+![Dashboard Overview](frontend/src/assets/app-images/dashboard-1.png)
+*Main dashboard with system overview and quick actions*
 
-### Employee Dashboard
-![Employee Dashboard](frontend/public/ex-2.png)
-*Overview of leave balance and recent requests*
+![Detailed Dashboard](frontend/src/assets/app-images/dashboard-2.png)
+*Comprehensive dashboard with analytics and metrics*
 
-### Leave Request Form
-![Leave Request Form](frontend/public/ex-4.png)
-*Comprehensive form with date picker and reason input*
+### Employee Management
+![Employee Directory](frontend/src/assets/app-images/eemployee-management.png)
+*Complete employee directory with search and filtering capabilities*
 
-![Leave Request Details](frontend/public/ex-5.png)
-*Additional options and attachments*
+### Leave Management
+![Leave Requests Overview](frontend/src/assets/app-images/leaves-1.png)
+*Overview of all leave requests with status indicators and filtering*
 
-### Leave Tracking
-![Leave History](frontend/public/ex-7.png)
-*Detailed view of all leave requests and their status*
+![Leave Request Details](frontend/src/assets/app-images/leaves-2.png)
+*Detailed view of individual leave requests with approval workflow*
+
+### Team Calendar
+![Team Calendar Overview](frontend/src/assets/app-images/team-calendar-1.png)
+*Visual overview of team availability and scheduled leaves*
+
+![Calendar Details](frontend/src/assets/app-images/team-calendar-2.png)
+*Interactive calendar with detailed view and planning tools*
 
 ### Analytics & Reports
-![Analytics Dashboard](frontend/public/ex-3.png)
-*System-wide statistics and trends*
+![Reports Dashboard](frontend/src/assets/app-images/reports-page-1.png)
+*System-wide statistics and trend analysis with interactive charts*
 
-![Detailed Reports](frontend/public/ex-8.png)
-*Advanced reporting and filtering options*
+![Advanced Analytics](frontend/src/assets/app-images/reports-page-2.png)
+*Advanced reporting with customizable filters and export options*
 
-### Admin Management
-![Admin Dashboard](frontend/public/ex-1.png)
-*Overview of pending requests and system metrics*
+### User Profile & Settings
+![Profile Overview](frontend/src/assets/app-images/profile-page-1.png)
+*User profile with basic information and quick settings*
 
-![Approval Workflow](frontend/public/ex-9.png)
-*Streamlined approval and rejection process*
+![Profile Details](frontend/src/assets/app-images/profile-page-2.png)
+*Detailed user information and account preferences*
+
+![Profile Configuration](frontend/src/assets/app-images/profile-page-3.png)
+*Account management, notification preferences, and security settings*
+
+### Notifications & Alerts
+![Notifications Center](frontend/src/assets/app-images/notifications-page.png)
+*Real-time notifications and alerts with action buttons*
+
+### Company Administration
+![Company Settings](frontend/src/assets/app-images/company-settings.png)
+*Organization-wide settings, policies, and system configurations*
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture Overview
 
+### System Architecture
 ```
 flexileave-app/
 ├── backend/                    # Node.js + Express API server
 │   ├── prisma/                # Database schema and migrations
 │   ├── src/
-│   │   ├── controllers/       # Request handlers
-│   │   ├── middleware/        # Authentication and validation
-│   │   ├── routes/           # API route definitions
-│   │   ├── services/         # Business logic
-│   │   └── utils/            # Utility functions
+│   │   ├── controllers/       # Request handlers and business logic
+│   │   ├── middleware/        # Authentication, validation, and security
+│   │   ├── routes/           # API route definitions and endpoints
+│   │   ├── services/         # Business logic and data processing
+│   │   ├── utils/            # Utility functions and helpers
+│   │   └── models/           # Data models and validation schemas
+│   ├── config/               # Configuration files
+│   ├── scripts/              # Database scripts and utilities
 │   └── package.json
 ├── frontend/                   # React application
-│   ├── public/                # Static assets and images
+│   ├── public/                # Static assets and favicon
 │   ├── src/
 │   │   ├── components/        # Reusable UI components
-│   │   ├── pages/            # Page components
-│   │   ├── context/          # State management
+│   │   ├── pages/            # Page components and views
+│   │   ├── context/          # State management with React Context
 │   │   ├── hooks/            # Custom React hooks
-│   │   ├── utils/            # Frontend utilities
-│   │   └── styles/           # Global styles
+│   │   ├── utils/            # Frontend utilities and helpers
+│   │   ├── services/         # API service calls and data fetching
+│   │   ├── styles/           # Global styles and theme
+│   │   └── assets/           # Images, icons, and other assets
+│   ├── eslint.config.js      # ESLint configuration
+│   ├── vite.config.js        # Vite build configuration
 │   └── package.json
 ├── uploads/                   # File upload directory
-└── README.md                  # This file
+├── docker/                    # Docker configuration files
+├── docs/                      # Documentation and API specs
+└── README.md                  # This comprehensive documentation
 ```
+
+### Database Schema
+The application uses Prisma ORM with a PostgreSQL database featuring:
+- **Users**: Employee information, roles, and authentication
+- **Leaves**: Leave requests, status, and approval workflow
+- **Departments**: Organizational structure and team management
+- **Notifications**: Real-time alerts and system messages
+- **Audit Logs**: Security and compliance tracking
 
 ---
 
 ## 🛠️ Installation & Setup
 
 ### Prerequisites
-- Node.js 18 or higher
-- PostgreSQL 14 or higher
-- npm or yarn package manager
+- **Node.js** 18 or higher
+- **PostgreSQL** 14 or higher
+- **npm** or **yarn** package manager
+- **Git** for version control
 
-### 1. Clone the Repository
+### Quick Start
+
+#### 1. Clone the Repository
 ```bash
 git clone https://github.com/jackson951/flexileave-app.git
 cd flexileave-app
 ```
 
-### 2. Backend Setup
-
-#### Install Dependencies
+#### 2. Backend Setup
 ```bash
 cd backend
+
+# Install dependencies
 npm install
+
+# Set up environment variables
+cp .env.example .env
+
+# Configure your environment
+# Edit .env with your database credentials and JWT secret
 ```
 
-#### Environment Configuration
-Create a `.env` file in the `backend` directory:
+#### 3. Database Configuration
+```bash
+# Run database migrations
+npx prisma migrate dev
+
+# Generate Prisma client
+npx prisma generate
+
+# Seed initial data (optional)
+npx prisma db seed
+```
+
+#### 4. Frontend Setup
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+
+# Configure frontend environment
+# Edit .env with your API base URL
+```
+
+#### 5. Start Development Servers
+```bash
+# Start backend server
+cd backend
+npm run dev
+
+# Start frontend server (in a new terminal)
+cd frontend
+npm run dev
+```
+
+The application will be available at:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:5000
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables
+
+#### Backend (.env)
 ```env
 # Database Configuration
 DATABASE_URL="postgresql://username:password@localhost:5432/flexileave?schema=public"
@@ -166,108 +262,82 @@ SMTP_PORT=587
 SMTP_USER="your-email@gmail.com"
 SMTP_PASS="your-app-password"
 FROM_EMAIL="noreply@yourcompany.com"
+
+# File Upload
+MAX_FILE_SIZE=5000000
+UPLOAD_PATH="./uploads"
 ```
 
-#### Database Setup
-```bash
-# Run database migrations
-npx prisma migrate dev
-
-# Generate Prisma client
-npx prisma generate
-
-# Seed initial data (optional)
-npx prisma db seed
-```
-
-#### Start Backend Server
-```bash
-npm run dev
-```
-The API will be available at `http://localhost:5000`
-
-### 3. Frontend Setup
-
-#### Install Dependencies
-```bash
-cd frontend
-npm install
-```
-
-#### Environment Configuration
-Create a `.env` file in the `frontend` directory:
+#### Frontend (.env)
 ```env
 VITE_API_BASE_URL="http://localhost:5000/api"
 VITE_APP_NAME="FlexiLeave"
 VITE_APP_VERSION="1.0.0"
+VITE_APP_DESCRIPTION="Enterprise Leave Management System"
 ```
-
-#### Start Development Server
-```bash
-npm run dev
-```
-The application will be available at `http://localhost:3000`
-
----
-
-## 🔧 Configuration
-
-### Database Configuration
-The application uses Prisma ORM for database management. The database schema is defined in `backend/prisma/schema.prisma`.
-
-### Environment Variables
-Both frontend and backend require environment variables for proper configuration. Refer to the `.env.example` files in each directory for complete configuration options.
 
 ### CORS Configuration
-CORS is configured in the backend to allow requests from the frontend. Update the allowed origins in `backend/src/middleware/cors.js` for production use.
+Update allowed origins in `backend/src/middleware/cors.js` for production:
+```javascript
+const allowedOrigins = [
+  'https://your-frontend-domain.com',
+  'https://your-admin-domain.com'
+];
+```
 
 ---
 
 ## 📊 API Documentation
 
-The API follows RESTful conventions and includes comprehensive error handling.
-
 ### Authentication Endpoints
-- `POST /api/auth/login` - User authentication
+- `POST /api/auth/login` - User authentication with email and password
 - `POST /api/auth/register` - User registration (admin only)
-- `POST /api/auth/logout` - User logout
+- `POST /api/auth/logout` - User logout and token invalidation
+- `GET /api/auth/profile` - Get current user profile
+- `PUT /api/auth/profile` - Update user profile
 
 ### Leave Management Endpoints
 - `GET /api/leaves` - Get all leaves (admin) or user's leaves
 - `POST /api/leaves` - Create new leave request
+- `GET /api/leaves/:id` - Get specific leave request details
 - `PUT /api/leaves/:id` - Update leave status (admin)
 - `DELETE /api/leaves/:id` - Delete leave request
+- `GET /api/leaves/balance` - Get user's leave balance
 
 ### User Management Endpoints
 - `GET /api/users` - Get all users (admin)
 - `POST /api/users` - Create new user (admin)
+- `GET /api/users/:id` - Get specific user details
 - `PUT /api/users/:id` - Update user (admin)
 - `DELETE /api/users/:id` - Delete user (admin)
+- `GET /api/users/departments` - Get department list
 
-For detailed API documentation, refer to the OpenAPI specification in `backend/docs/api.yaml`.
+### Analytics & Reports Endpoints
+- `GET /api/analytics/overview` - System-wide overview statistics
+- `GET /api/analytics/leaves` - Leave analytics and trends
+- `GET /api/analytics/users` - User activity and engagement metrics
+- `GET /api/reports/leaves` - Generate leave reports
+- `GET /api/reports/users` - Generate user reports
+- `GET /api/reports/departments` - Generate department reports
 
----
+### Notifications Endpoints
+- `GET /api/notifications` - Get user notifications
+- `PUT /api/notifications/:id/read` - Mark notification as read
+- `DELETE /api/notifications/:id` - Delete notification
+- `GET /api/notifications/unread-count` - Get unread notification count
 
-## 🚀 Deployment
+### File Upload Endpoints
+- `POST /api/uploads` - Upload files (avatars, documents)
+- `GET /api/uploads/:filename` - Download files
+- `DELETE /api/uploads/:filename` - Delete uploaded files
 
-### Docker Deployment
-```bash
-# Build and run with Docker Compose
-docker-compose up -d
-```
+### Department Management Endpoints
+- `GET /api/departments` - Get all departments
+- `POST /api/departments` - Create new department
+- `PUT /api/departments/:id` - Update department
+- `DELETE /api/departments/:id` - Delete department
 
-### Railway Deployment
-The application includes a `railway.json` configuration file for easy deployment to Railway.
-
-### Vercel Deployment
-Frontend can be deployed to Vercel with the included `vercel.json` configuration.
-
-### Production Considerations
-- Use environment-specific configuration
-- Set up proper SSL/TLS certificates
-- Configure database backups
-- Set up monitoring and logging
-- Implement proper security headers
+For detailed API documentation with request/response examples, refer to the OpenAPI specification in `backend/docs/api.yaml`.
 
 ---
 
@@ -291,6 +361,12 @@ npm test
 npm run cypress:open
 ```
 
+### Performance Testing
+```bash
+# Load testing with Artillery
+npm run test:load
+```
+
 ---
 
 ## 🤝 Contributing
@@ -308,6 +384,7 @@ We welcome contributions! Please follow these steps:
 - Use meaningful variable and function names
 - Write clear, concise comments for complex logic
 - Maintain consistent formatting
+- Follow Git commit message conventions
 
 ---
 
