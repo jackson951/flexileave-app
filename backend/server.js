@@ -52,6 +52,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const tenantRoutes = require("./routes/tenantRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const startExpiredInvitationCleanup = require("./jobs/cleanupExpiredInvites");
+const jobScheduler = require("./jobs/jobScheduler");
 
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
@@ -105,7 +106,9 @@ const startServer = async () => {
     console.log(`✅ Server running on port ${PORT}`);
     console.log(`✅ Accepting requests from: ${allowedOrigins.join(", ")}`);
     console.log(`📄 Swagger UI available at http://localhost:${PORT}/api-docs`);
-    startExpiredInvitationCleanup();
+    
+    // Start job scheduler
+    jobScheduler.start();
   });
 };
 
