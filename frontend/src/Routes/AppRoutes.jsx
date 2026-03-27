@@ -33,6 +33,7 @@ const PricingPage = lazy(() => import("../pages/public/PricingPage"));
 const PrivacyPage = lazy(() => import("../pages/public/PrivacyPage"));
 const TermsPage = lazy(() => import("../pages/public/TermsPage"));
 const PublicLayout = lazy(() => import("../components/PublicLayout"));
+const AnalyticsDashboard = lazy(() => import("../pages/analytics/AnalyticsDashboard"));
 
 //Global Loading Spinner
 const LoadingSpinner = () => (
@@ -142,7 +143,7 @@ const AppRoutes = () => {
         >
           <Route path="stats" element={
               <ManagementRoute>
-                <TenantDashboardPage />
+                <AnalyticsDashboard />
               </ManagementRoute>
             } />
           <Route
@@ -187,6 +188,15 @@ const AppRoutes = () => {
               </AdminRoute>
             }
           />
+          {/* Analytics Dashboard */}
+          {/* <Route
+            path="analytics"
+            element={
+              <ManagementRoute>
+                <AnalyticsDashboard />
+              </ManagementRoute>
+            }
+          /> */}
           {/* Profile */}
           <Route path="profile" element={<ProfilePage user={user} />} />
 

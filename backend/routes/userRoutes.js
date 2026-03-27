@@ -324,11 +324,11 @@ router.post(
             .status(400)
             .json({ message: "Invalid Reports To selection" });
         }
-        if (parsedReportsToId === req.user.userId) {
-          return res
-            .status(400)
-            .json({ message: "User cannot report to themselves" });
-        }
+        // if (parsedReportsToId === req.user.userId) {
+        //   return res
+        //     .status(400)
+        //     .json({ message: "User cannot report to themselves" });
+        // }
 
         const reportsToUser = await prisma.user.findUnique({
           where: { id: parsedReportsToId },
@@ -431,6 +431,128 @@ router.get(
       res
         .status(500)
         .json({ message: "Failed to load invitations", error: error.message });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/users/invites/{inviteId}/resend:
+ *   post:
+ *     summary: Resend an expired invitation
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: inviteId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the invitation to resend
+ *     responses:
+ *       200:
+ *         description: Invitation resent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Invitation resent successfully"
+ *                 expiresAt:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2023-12-31T23:59:59.999Z"
+ *       400:
+ *         description: Invitation is not expired or invalid invite ID
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Unauthorized access
+ *       404:
+ *         description: Invitation not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post(
+  "/invites/:inviteId/resend",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
+    try {
+      const { inviteId } = req.params;
+      
+      const invitation = await prisma.userInvitation.findUnique({
+        where: { id: inviteId },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              primaryColor: true,
+              secondaryColor: true,
+              logoUrl: true,
+            },
+          },
+        },
+      });
+
+      if (!invitation) {
+        return res.status(404).json({ message: "Invitation not found" });
+      }
+
+      if (invitation.tenantId !== req.user.tenantId) {
+        return res.status(403).json({ message: "Unauthorized access" });
+      }
+
+      if (!invitation.used && invitation.expiresAt > new Date()) {
+        return res.status(400).json({ 
+          message: "Invitation is still active and does not need to be resent" 
+        });
+      }
+
+      const newExpiryDate = new Date(Date.now() + INVITE_EXPIRY_MS);
+      
+      const updatedInvitation = await prisma.userInvitation.update({
+        where: { id: inviteId },
+        data: {
+          expiresAt: newExpiryDate,
+          token: generateInviteToken(),
+        },
+      });
+
+      const inviteLink = `${FRONTEND_BASE_URL}/accept-invite?token=${updatedInvitation.token}`;
+
+      try {
+        const emailPayload = buildInvitationEmail({
+          inviteeName: invitation.metadata?.name || "User",
+          tenant: invitation.tenant,
+          inviteLink,
+          expiresAt: newExpiryDate,
+          invitedByName: req.user.name,
+        });
+        
+        await sendEmail({
+          to: invitation.email,
+          ...emailPayload,
+        });
+      } catch (emailError) {
+        console.error("Failed to send resend invitation email", emailError);
+        return res.status(500).json({ 
+          message: "Invitation updated but email failed to send" 
+        });
+      }
+
+      res.json({
+        message: "Invitation resent successfully",
+        expiresAt: newExpiryDate,
+      });
+    } catch (error) {
+      console.error("Resend invitation error:", error);
+      res.status(500).json({ message: "Failed to resend invitation" });
     }
   }
 );
@@ -1270,5 +1392,317 @@ router.get("/admins/list", authenticateToken, async (req, res) => {
       .json({ message: "Internal server error", error: error.message });
   }
 });
+
+/**
+ * @swagger
+ * /api/users/invites/{inviteId}/revoke:
+ *   delete:
+ *     summary: Revoke an invitation (even if used)
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: inviteId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the invitation to revoke
+ *     responses:
+ *       200:
+ *         description: Invitation revoked successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Invitation revoked successfully"
+ *       400:
+ *         description: Invalid invite ID or invitation not found
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token, or not authorized to revoke this invitation
+ *       404:
+ *         description: Invitation not found
+ *       500:
+ *         description: Internal server error
+ */
+router.delete(
+  "/invites/:inviteId/revoke",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
+    try {
+      const inviteId = parseInt(req.params.inviteId);
+      if (isNaN(inviteId)) {
+        return res.status(400).json({ message: "Invalid invite ID" });
+      }
+
+      const invitation = await prisma.userInvitation.findUnique({
+        where: { id: inviteId },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              primaryColor: true,
+              secondaryColor: true,
+              logoUrl: true,
+            },
+          },
+        },
+      });
+
+      if (!invitation) {
+        return res.status(404).json({ message: "Invitation not found" });
+      }
+
+      if (invitation.tenantId !== req.user.tenantId) {
+        return res.status(403).json({
+          message: "You are not authorized to revoke this invitation",
+        });
+      }
+
+      await prisma.userInvitation.delete({
+        where: { id: inviteId },
+      });
+
+      await createNotification({
+        recipientId: req.user.userId,
+        triggeredById: req.user.userId,
+        tenantId: req.user.tenantId,
+        type: "invitation_revoked",
+        title: "Invitation revoked",
+        message: `Invitation to ${invitation.email} has been revoked.`,
+        metadata: { invitationId: inviteId },
+      });
+
+      res.json({ message: "Invitation revoked successfully" });
+    } catch (error) {
+      console.error("Revoke invitation error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/users/{id}/deactivate:
+ *   put:
+ *     summary: Deactivate a user (revoke access)
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the user to deactivate
+ *     responses:
+ *       200:
+ *         description: User deactivated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "User access revoked successfully"
+ *       400:
+ *         description: Cannot deactivate own account or invalid user ID
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token, or not authorized to deactivate this user
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
+ */
+router.put(
+  "/:id/deactivate",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      if (userId === req.user.userId) {
+        return res.status(400).json({ 
+          message: "Cannot deactivate your own account" 
+        });
+      }
+
+      const targetUser = await prisma.user.findFirst({
+        where: { id: userId, tenantId: req.user.tenantId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+          role: true,
+        },
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (targetUser.status === "INACTIVE") {
+        return res.status(400).json({ 
+          message: "User is already deactivated" 
+        });
+      }
+
+      const deactivatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { status: "INACTIVE" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+        },
+      });
+
+      await createNotification({
+        recipientId: userId,
+        triggeredById: req.user.userId,
+        tenantId: req.user.tenantId,
+        type: "access_revoked",
+        title: "Access revoked",
+        message: `Your access has been revoked by ${req.user.name}.`,
+        metadata: { 
+          revokedBy: req.user.name,
+          revokedUserId: userId,
+        },
+      });
+
+      res.json({ 
+        message: "User access revoked successfully",
+        user: deactivatedUser
+      });
+    } catch (error) {
+      console.error("Deactivate user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/users/{id}/activate:
+ *   put:
+ *     summary: Activate a user (restore access)
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the user to activate
+ *     responses:
+ *       200:
+ *         description: User activated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "User access restored successfully"
+ *       400:
+ *         description: User is already active or invalid user ID
+ *       401:
+ *         description: Access token required
+ *       403:
+ *         description: Invalid or expired token, or not authorized to activate this user
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
+ */
+router.put(
+  "/:id/activate",
+  authenticateToken,
+  tenantGuard,
+  authorizeRoles(...TENANT_ADMIN_ROLES),
+  async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const targetUser = await prisma.user.findFirst({
+        where: { id: userId, tenantId: req.user.tenantId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+          role: true,
+        },
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (targetUser.status === "ACTIVE") {
+        return res.status(400).json({ 
+          message: "User is already active" 
+        });
+      }
+
+      const activatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { status: "ACTIVE" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+        },
+      });
+
+      await createNotification({
+        recipientId: userId,
+        triggeredById: req.user.userId,
+        tenantId: req.user.tenantId,
+        type: "access_restored",
+        title: "Access restored",
+        message: `Your access has been restored by ${req.user.name}.`,
+        metadata: { 
+          restoredBy: req.user.name,
+          restoredUserId: userId,
+        },
+      });
+
+      res.json({ 
+        message: "User access restored successfully",
+        user: activatedUser
+      });
+    } catch (error) {
+      console.error("Activate user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
 
 module.exports = router;

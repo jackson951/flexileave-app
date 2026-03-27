@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { toast } from "react-toastify";
 import ApiService from "../../api/web-api-service";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -141,6 +142,30 @@ const EmployeeManagement = () => {
       fetchUsers();
     } catch (err) {
       setError(err.response?.data?.message || "Unable to update status");
+    }
+  };
+
+  const handleDeactivateUser = async (userId, userName) => {
+    if (window.confirm(`Are you sure you want to revoke access for ${userName}? This will deactivate their account.`)) {
+      try {
+        await ApiService.put(`/users/${userId}/deactivate`);
+        toast.success(`Access revoked for ${userName}`);
+        fetchUsers();
+      } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to revoke access");
+      }
+    }
+  };
+
+  const handleActivateUser = async (userId, userName) => {
+    if (window.confirm(`Are you sure you want to restore access for ${userName}?`)) {
+      try {
+        await ApiService.put(`/users/${userId}/activate`);
+        toast.success(`Access restored for ${userName}`);
+        fetchUsers();
+      } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to restore access");
+      }
     }
   };
 
@@ -492,17 +517,21 @@ const EmployeeManagement = () => {
                       </select>
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() =>
-                          updateStatus(
-                            person.id,
-                            person.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
-                          )
-                        }
-                        className="text-xs text-indigo-600 hover:underline"
-                      >
-                        toggle status
-                      </button>
+                      {person.status === "ACTIVE" ? (
+                        <button
+                          onClick={() => handleDeactivateUser(person.id, person.name)}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          revoke access
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleActivateUser(person.id, person.name)}
+                          className="text-xs text-green-600 hover:underline"
+                        >
+                          restore access
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -539,48 +568,104 @@ const EmployeeManagement = () => {
                   <th className="px-4 py-3">Approver</th>
                   <th className="px-4 py-3">Expires</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {invites.map((invite) => (
-                  <tr
-                    key={invite.id}
-                    className="border-t border-gray-100 dark:border-gray-800"
-                  >
-                    <td className="px-4 py-3">{invite.email}</td>
-                    <td className="px-4 py-3">{invite.role?.toLowerCase()}</td>
-                    <td className="px-4 py-3">
-                      {invite.reportsTo?.name ? (
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {invite.reportsTo.name}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {invite.reportsTo.role.toLowerCase()}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-xs uppercase text-gray-400 dark:text-gray-500">
-                          unassigned
+                {invites.map((invite) => {
+                  const isExpired = new Date(invite.expiresAt) < new Date();
+                  const isUsed = invite.used;
+                  
+                  return (
+                    <tr
+                      key={invite.id}
+                      className="border-t border-gray-100 dark:border-gray-800"
+                    >
+                      <td className="px-4 py-3">{invite.email}</td>
+                      <td className="px-4 py-3">{invite.role?.toLowerCase()}</td>
+                      <td className="px-4 py-3">
+                        {invite.reportsTo?.name ? (
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {invite.reportsTo.name}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {invite.reportsTo.role.toLowerCase()}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs uppercase text-gray-400 dark:text-gray-500">
+                            unassigned
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {new Date(invite.expiresAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            isUsed
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200"
+                              : isExpired
+                              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-200"
+                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                          }`}
+                        >
+                          {isUsed ? "used" : isExpired ? "expired" : "pending"}
                         </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {new Date(invite.expiresAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          invite.used
-                            ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200"
-                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                        }`}
-                      >
-                        {invite.used ? "used" : "pending"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isExpired && !isUsed && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await ApiService.post(`/users/invites/${invite.id}/resend`);
+                                toast.success("Invitation resent successfully");
+                                fetchInvites();
+                              } catch (err) {
+                                toast.error(
+                                  err.response?.data?.message || "Failed to resend invitation"
+                                );
+                              }
+                            }}
+                            className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                          >
+                            Resend
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            if (window.confirm("Are you sure you want to revoke this invitation?")) {
+                              try {
+                                await ApiService.delete(`/users/invites/${invite.id}/revoke`);
+                                toast.success("Invitation revoked successfully");
+                                fetchInvites();
+                              } catch (err) {
+                                toast.error(
+                                  err.response?.data?.message || "Failed to revoke invitation"
+                                );
+                              }
+                            }
+                          }}
+                          className="ml-2 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-500"
+                        >
+                          Revoke
+                        </button>
+                        {isUsed && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Used
+                          </span>
+                        )}
+                        {!isExpired && !isUsed && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Active
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

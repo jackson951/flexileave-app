@@ -50,6 +50,7 @@ const authRoutes = require("./routes/auth");
 const leaveRoutes = require("./routes/leaveRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const tenantRoutes = require("./routes/tenantRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 const startExpiredInvitationCleanup = require("./jobs/cleanupExpiredInvites");
 
 app.use("/api/users", userRoutes);
@@ -57,6 +58,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/tenants", tenantRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // ------------------- Health Check -------------------
 app.get("/api/health", (req, res) => {

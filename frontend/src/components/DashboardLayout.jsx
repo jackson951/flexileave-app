@@ -18,6 +18,7 @@ import {
   CheckCircleIcon,
   ArrowPathIcon,
   UserCircleIcon,
+  ChartPieIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../contexts/AuthContext";
 import { useTenant } from "../contexts/TenantContext";
@@ -170,7 +171,7 @@ const DashboardLayout = () => {
   }, [authUser?.userId]);
 
   const normalizedRole = authUser?.role?.toLowerCase();
-    const navigation = [
+  const navigation = [
       {
         name: "Dashboard",
         href: "/dashboard/stats",
@@ -201,6 +202,7 @@ const DashboardLayout = () => {
       icon: CalendarDaysIcon,
       show: ["admin", "manager", "owner"].includes(normalizedRole),
     },
+      
         {
           name: "Reports",
           href: "/dashboard/reports",

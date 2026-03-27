@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import ApiService from "../../api/web-api-service";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -341,6 +342,15 @@ const LeaveWorkspace = () => {
               <tbody>
                 {leavesToShow.map((leave) => {
                   const isOwnLeave = leave.userId === user.id;
+                  console.log("Leave request:", leave);
+                  console.log("Current user:", user);
+                  console.log("Debug comparison:", {
+                    leaveUserId: leave.userId,
+                    currentUserId: user.id,
+                    isOwnLeave: isOwnLeave,
+                    leaveUserName: leave.user?.name,
+                    currentUserName: user.name
+                  });
                   const isAssignedApprover = leave.user?.reportsToId === user.id;
                   const isExpanded = expandedLeaveId === leave.id;
                   const detailColSpan = showAdminView ? 6 : 5;
@@ -463,6 +473,33 @@ const LeaveWorkspace = () => {
                                       </a>
                                     ))}
                                   </div>
+                                </div>
+                              )}
+                              {leave.status === "PENDING" && (
+                                <div className="mt-3 flex gap-2">
+                                  {console.log("Rendering cancel section:", { isOwnLeave, leaveId: leave.id })}
+                                  {isOwnLeave ? (
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          await ApiService.post(`/leaves/${leave.id}/cancel`);
+                                          toast.success("Leave cancelled successfully");
+                                          fetchLeaves();
+                                        } catch (err) {
+                                          toast.error(
+                                            err.response?.data?.message || "Failed to cancel leave"
+                                          );
+                                        }
+                                      }}
+                                      className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-red-500"
+                                    >
+                                      Cancel Leave
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      Only the leave requester can cancel this leave
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
