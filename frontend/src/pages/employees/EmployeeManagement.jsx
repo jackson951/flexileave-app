@@ -634,12 +634,13 @@ const EmployeeManagement = () => {
                             Resend
                           </button>
                         )}
-                        <button
-                          onClick={async () => {
-                            if (window.confirm("Are you sure you want to revoke this invitation?")) {
-                              try {
-                                await ApiService.delete(`/users/invites/${invite.id}/revoke`);
-                                toast.success("Invitation revoked successfully");
+                        {!isExpired && !isUsed && (
+                          <button
+                            onClick={async () => {
+                              if (window.confirm("Are you sure you want to revoke this invitation?")) {
+                                try {
+                                  await ApiService.delete(`/users/invites/${invite.id}/revoke`);
+                                  toast.success("Invitation revoked successfully");
                                 fetchInvites();
                               } catch (err) {
                                 toast.error(
@@ -652,6 +653,7 @@ const EmployeeManagement = () => {
                         >
                           Revoke
                         </button>
+                          )}
                         {isUsed && (
                           <span className="text-xs text-gray-500 dark:text-gray-400">
                             Used
