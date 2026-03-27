@@ -269,10 +269,25 @@ const AnalyticsDashboard = () => {
                   data={overview?.statusDistribution || []}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={true}
+                  label={({ name, percent, index }) => {
+                    const status = overview?.statusDistribution[index]?.status;
+                    const color = getStatusColor(status, tenantColors);
+                    return (
+                      <text 
+                        x={0} 
+                        y={0} 
+                        fill={color}
+                        fontSize={12}
+                        fontWeight="600"
+                        textAnchor="middle"
+                      >
+                        {name} ({(percent * 100).toFixed(0)}%)
+                      </text>
+                    );
+                  }}
                   outerRadius={80}
-                  fill="#8884d8"
+                  innerRadius={40}
                   dataKey="count"
                 >
                   {overview?.statusDistribution?.map((entry, index) => (
@@ -282,7 +297,30 @@ const AnalyticsDashboard = () => {
                     />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => `${value} requests`} />
+                <Tooltip 
+                  formatter={(value, name) => [`${value} requests`, name]}
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                  }}
+                  labelStyle={{ fontWeight: 'bold' }}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  formatter={(value, entry) => {
+                    const status = entry.payload.status;
+                    const color = getStatusColor(status, tenantColors);
+                    const count = entry.payload.count;
+                    return (
+                      <span style={{ color: color, fontWeight: '600' }}>
+                        {value} ({count})
+                      </span>
+                    );
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
