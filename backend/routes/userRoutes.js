@@ -19,6 +19,7 @@ const {
   FRONTEND_BASE_URL,
 } = require("../utils/emailer");
 const { createNotification } = require("../utils/notifications");
+const { stat } = require("fs");
 
 const INVITE_EXPIRY_HOURS = parseInt(
   process.env.INVITE_EXPIRY_HOURS ?? "48",
@@ -203,6 +204,7 @@ router.get(
           avatar: true,
           createdAt: true,
           reportsToId: true,
+          status: true,
           reportsTo: {
             select: {
               id: true,
