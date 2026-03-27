@@ -16,6 +16,7 @@ import {
   EyeIcon,
   ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
+import { useNavigate } from "react-router-dom";
 import {
   PieChart,
   Pie,
@@ -42,6 +43,7 @@ const AnalyticsDashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate(); 
 
   // State for analytics data
   const [overview, setOverview] = useState(null);
@@ -444,7 +446,9 @@ const AnalyticsDashboard = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Notifications</h3>
-            <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-medium">
+            <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-medium"
+             onClick={() => navigate("/dashboard/notifications")}
+              >
               View All
             </button>
           </div>
