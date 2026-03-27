@@ -17,867 +17,634 @@ import {
   ShieldCheckIcon,
   InformationCircleIcon,
   SparklesIcon,
+  CameraIcon,
+  BellAlertIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { ApiService, useApiInterceptors } from "../api/web-api-service";
 
+/* ─── Google Fonts injection ─── */
+const FontInjector = () => {
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.href =
+      "https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;1,300&family=DM+Sans:wght@300;400;500;600&display=swap";
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+    return () => document.head.removeChild(link);
+  }, []);
+  return null;
+};
+
+/* ─── Leave color palette ─── */
+const LEAVE_COLORS = [
+  { bar: "#c084fc", bg: "#faf5ff", text: "#7e22ce" },
+  { bar: "#34d399", bg: "#f0fdf4", text: "#065f46" },
+  { bar: "#fb923c", bg: "#fff7ed", text: "#9a3412" },
+  { bar: "#60a5fa", bg: "#eff6ff", text: "#1d4ed8" },
+  { bar: "#f472b6", bg: "#fdf2f8", text: "#9d174d" },
+];
+
+const TABS = ["Overview", "Security", "Leave Balance"];
+
 const ProfilePage = () => {
   const { user, updateUserProfile } = useAuth();
+  const [activeTab, setActiveTab] = useState("Overview");
   const [isEditing, setIsEditing] = useState(false);
   const [updatePassword, setUpdatePassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    department: "",
-    position: "",
-    joinDate: "",
-    avatar: "",
-    password: "",
-    confirmPassword: "",
+    name: "", phone: "", department: "", position: "",
+    joinDate: "", avatar: "", password: "", confirmPassword: "",
   });
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
-  const [requestType, setRequestType] = useState(""); // 'department' or 'position'
+  const [requestType, setRequestType] = useState("");
   const [requestDetails, setRequestDetails] = useState("");
   const navigate = useNavigate();
 
-  // Initialize interceptors
   useApiInterceptors();
 
-  // Initialize form data when user changes
   useEffect(() => {
     if (user) {
       setFormData({
-        name: user.name || "",
-        phone: user.phone || "",
-        department: user.department || "",
-        position: user.position || "",
-        joinDate: user.joinDate || "",
-        avatar: user.avatar || "",
-        password: "",
-        confirmPassword: "",
+        name: user.name || "", phone: user.phone || "",
+        department: user.department || "", position: user.position || "",
+        joinDate: user.joinDate || "", avatar: user.avatar || "",
+        password: "", confirmPassword: "",
       });
     }
   }, [user]);
 
-  // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-
-    // Clear errors when user types
-    if (errorMessage) {
-      setErrorMessage("");
-    }
+    setFormData({ ...formData, [name]: value });
+    if (errorMessage) setErrorMessage("");
   };
 
-  // Handle checkbox change for password update
   const handlePasswordCheckboxChange = (e) => {
     setUpdatePassword(e.target.checked);
-    if (!e.target.checked) {
-      setFormData({
-        ...formData,
-        password: "",
-        confirmPassword: "",
-      });
-    }
+    if (!e.target.checked) setFormData({ ...formData, password: "", confirmPassword: "" });
   };
 
-  // Validate password fields
   const validatePasswords = () => {
     if (updatePassword) {
-      if (!formData.password) {
-        setErrorMessage("Password is required when updating password");
-        return false;
-      }
-      if (formData.password.length < 8) {
-        setErrorMessage("Password must be at least 8 characters long");
-        return false;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        setErrorMessage("Passwords do not match");
-        return false;
-      }
+      if (!formData.password) { setErrorMessage("Password is required when updating password"); return false; }
+      if (formData.password.length < 8) { setErrorMessage("Password must be at least 8 characters long"); return false; }
+      if (formData.password !== formData.confirmPassword) { setErrorMessage("Passwords do not match"); return false; }
     }
     return true;
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setSuccessMessage("");
     setErrorMessage("");
-
-    // Validate passwords if updating
-    if (!validatePasswords()) {
-      setLoading(false);
-      return;
-    }
-
+    if (!validatePasswords()) { setLoading(false); return; }
     try {
-      // Prepare profile updates
       const profileUpdates = {
-        name: formData.name,
-        phone: formData.phone,
-        // DO NOT include department, position, or role - these are admin-only
-        joinDate: formData.joinDate,
-        avatar: formData.avatar,
+        name: formData.name, phone: formData.phone,
+        joinDate: formData.joinDate, avatar: formData.avatar,
       };
-
-      // Add password if updating
-      if (updatePassword && formData.password) {
-        profileUpdates.password = formData.password;
-      }
-
-      // Use ApiService for the PUT request
-      const response = await ApiService.put(
-        `/users/${user.id}`,
-        profileUpdates
-      );
-
-      // Update the auth context with new user data
+      if (updatePassword && formData.password) profileUpdates.password = formData.password;
+      const response = await ApiService.put(`/users/${user.id}`, profileUpdates);
       await updateUserProfile(user?.id, response.data);
-
-      setSuccessMessage(
-        updatePassword
-          ? "Your profile and password have been updated successfully!"
-          : "Your profile has been updated successfully!"
-      );
+      setSuccessMessage(updatePassword ? "Profile and password updated!" : "Profile updated successfully!");
       setIsEditing(false);
       setUpdatePassword(false);
-      setFormData({
-        ...formData,
-        password: "",
-        confirmPassword: "",
-      });
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccessMessage("");
-      }, 3000);
+      setFormData({ ...formData, password: "", confirmPassword: "" });
+      setTimeout(() => setSuccessMessage(""), 3500);
     } catch (error) {
-      console.error("Error updating profile:", error);
-      setErrorMessage(
-        error.response?.data?.message ||
-          "Failed to update profile. Please try again."
-      );
+      setErrorMessage(error.response?.data?.message || "Failed to update profile. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Reset form to current user data
   const handleReset = () => {
-    setFormData({
-      name: user.name || "",
-      phone: user.phone || "",
-      department: user.department || "",
-      position: user.position || "",
-      joinDate: user.joinDate || "",
-      avatar: user.avatar || "",
-      password: "",
-      confirmPassword: "",
-    });
+    setFormData({ name: user.name || "", phone: user.phone || "", department: user.department || "",
+      position: user.position || "", joinDate: user.joinDate || "", avatar: user.avatar || "",
+      password: "", confirmPassword: "" });
     setIsEditing(false);
     setUpdatePassword(false);
     setErrorMessage("");
     setSuccessMessage("");
   };
 
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return "Not specified";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+  const formatDate = (d) => {
+    if (!d) return "Not specified";
+    return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   };
 
-  // Calculate total leave balance
-  const calculateTotalLeaveBalance = (leaveBalances) => {
-    if (!leaveBalances) return 0;
-    return Object.values(leaveBalances).reduce(
-      (sum, balance) => sum + (balance || 0),
-      0
-    );
-  };
+  const calcTotalLeave = (lb) => lb ? Object.values(lb).reduce((s, v) => s + (v || 0), 0) : 0;
 
-  // Format leave type for display
-  const formatLeaveType = (leaveType) => {
-    return leaveType
-      .replace(/([A-Z])/g, " $1")
-      .trim()
-      .replace(/^./, (str) => str.toUpperCase());
-  };
+  const formatLeaveType = (lt) =>
+    lt.replace(/([A-Z])/g, " $1").trim().replace(/^./, s => s.toUpperCase());
 
-  // Handle request for department/position update
   const handleRequestUpdate = (type) => {
     setRequestType(type);
     setRequestDetails("");
     setShowRequestModal(true);
   };
 
-  // Submit request for update
   const submitUpdateRequest = async () => {
-    if (!requestDetails.trim()) {
-      alert("Please provide details for your request.");
-      return;
-    }
-
-    try {
-      // In a real app, you would send this to an API endpoint
-      // For now, we'll just simulate it
-      console.log(`Update Request: ${requestType}`, requestDetails);
-      alert(
-        `Your request to update your ${requestType} has been submitted to HR. They will review it and get back to you soon.`
-      );
-      setShowRequestModal(false);
-    } catch (error) {
-      console.error("Error submitting request:", error);
-      alert("Failed to submit request. Please try again later.");
-    }
+    if (!requestDetails.trim()) { alert("Please provide details for your request."); return; }
+    alert(`Your request to update your ${requestType} has been submitted to HR.`);
+    setShowRequestModal(false);
   };
 
   if (!user) return null;
 
-  const dashboardRoute =
-    user.role?.toUpperCase() === "EMPLOYEE"
-      ? "/dashboard/leave"
-      : "/dashboard/stats";
+  const dashboardRoute = user.role?.toUpperCase() === "EMPLOYEE" ? "/dashboard/leave" : "/dashboard/stats";
+  const totalLeave = calcTotalLeave(user.leaveBalances);
+  const initials = (formData.name || "U").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
-  const totalLeaveBalance = calculateTotalLeaveBalance(user.leaveBalances);
-  const leaveBalanceSummary =
-    totalLeaveBalance > 20
-      ? "Excellent balance!"
-      : totalLeaveBalance > 10
-      ? "Good balance"
-      : "Consider planning your time off";
+  const roleLabel = { admin: "Administrator", manager: "Manager", employee: "Employee" }[user?.role] || "User";
+
+  /* ─── inline styles as objects for custom font ─── */
+  const isDark = document.documentElement.classList.contains("dark");
+  const s = {
+    page: {
+      minHeight: "100vh",
+      background: isDark 
+        ? "linear-gradient(135deg, #111827 0%, #0b1220 100%)"
+        : "linear-gradient(135deg, #faf9f7 0%, #f0ede8 100%)",
+      fontFamily: "'DM Sans', sans-serif",
+      padding: "2rem 1.5rem",
+      color: isDark ? "#e5e7eb" : "#1a1612",
+    },
+    heading: { fontFamily: "'Fraunces', serif", fontWeight: 300 },
+    card: {
+      background: isDark ? "#1f2937" : "#ffffff",
+      borderRadius: "20px",
+      boxShadow: isDark 
+        ? "0 1px 3px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.4)"
+        : "0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06)",
+      overflow: "hidden",
+      border: isDark ? "1px solid #374151" : "none",
+    },
+    input: {
+      width: "100%",
+      padding: "0.625rem 0.875rem",
+      border: isDark 
+        ? "1.5px solid #374151"
+        : "1.5px solid #e5e0d8",
+      borderRadius: "10px",
+      background: isDark ? "#374151" : "#fdfcfb",
+      fontFamily: "'DM Sans', sans-serif",
+      fontSize: "0.9rem",
+      outline: "none",
+      transition: "border-color 0.2s",
+      color: isDark ? "#e5e7eb" : "#1a1612",
+    },
+    inputReadOnly: {
+      width: "100%",
+      padding: "0.625rem 0.875rem",
+      border: isDark 
+        ? "1.5px solid #4b5563"
+        : "1.5px solid #ede9e3",
+      borderRadius: "10px",
+      background: isDark ? "#374151" : "#f7f5f2",
+      color: isDark ? "#9ca3af" : "#9e9890",
+      fontFamily: "'DM Sans', sans-serif",
+      fontSize: "0.9rem",
+      cursor: "not-allowed",
+    },
+  };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Back Button */}
-      <div className="mb-6">
-          <button
-            type="button"
+    <>
+      <FontInjector />
+      <style>{`
+        .prof-tab { cursor:pointer; padding:0.5rem 1.25rem; border-radius:50px; font-size:0.85rem; font-weight:500; transition:all .2s; color:#8a8070; background:transparent; border:none; font-family:'DM Sans',sans-serif; }
+        .prof-tab.active { background:#1a1612; color:#fff; }
+        .prof-tab:hover:not(.active) { background:#f0ede8; color:#3d3525; }
+        .prof-input:focus { border-color:#c9a96e !important; box-shadow:0 0 0 3px rgba(201,169,110,0.12); }
+        .prof-btn-primary { background:#1a1612; color:#fff; border:none; padding:0.6rem 1.5rem; border-radius:50px; font-size:0.85rem; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background .2s; }
+        .prof-btn-primary:hover { background:#3d3525; }
+        .prof-btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+        .prof-btn-secondary { background:transparent; color:#5a5040; border:1.5px solid #d9d0c4; padding:0.6rem 1.5rem; border-radius:50px; font-size:0.85rem; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .2s; }
+        .prof-btn-secondary:hover { background:#f0ede8; }
+        .leave-bar { height:6px; border-radius:3px; background:#ede9e3; overflow:hidden; margin-top:6px; }
+        .leave-bar-fill { height:100%; border-radius:3px; transition:width 0.8s cubic-bezier(.4,0,.2,1); }
+        .avatar-ring { width:88px; height:88px; border-radius:50%; background:linear-gradient(135deg,#c9a96e,#e8c98a); display:flex; align-items:center; justify-content:center; font-family:'Fraunces',serif; font-size:2rem; color:#fff; font-weight:400; flex-shrink:0; box-shadow:0 4px 16px rgba(201,169,110,0.35); }
+        .field-label { font-size:0.75rem; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#9e9890; margin-bottom:0.35rem; }
+        .field-value { font-size:0.95rem; color:#1a1612; font-weight:400; }
+        .section-divider { height:1px; background:linear-gradient(90deg,transparent,#e8e2d9,transparent); margin:1.5rem 0; }
+        @keyframes slideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        .slide-in { animation:slideIn 0.3s ease; }
+        .toast-success { background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:12px; padding:0.875rem 1.25rem; display:flex; align-items:center; gap:0.75rem; }
+        .toast-error { background:#fef2f2; border:1.5px solid #fecaca; border-radius:12px; padding:0.875rem 1.25rem; display:flex; align-items:center; gap:0.75rem; }
+        .modal-overlay { position:fixed; inset:0; background:rgba(26,22,18,0.45); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:50; padding:1rem; }
+        .modal-box { background:#fff; border-radius:20px; padding:2rem; max-width:440px; width:100%; box-shadow:0 24px 80px rgba(0,0,0,0.18); animation:slideIn 0.25s ease; }
+        .badge { display:inline-flex; align-items:center; gap:0.35rem; padding:0.3rem 0.875rem; border-radius:50px; font-size:0.75rem; font-weight:600; }
+        
+        /* Dark mode styles */
+        .dark .prof-tab { color:#d1d5db; }
+        .dark .prof-tab:hover:not(.active) { background:#374151; color:#e5e7eb; }
+        .dark .prof-btn-secondary { color:#d1d5db; border-color:#4b5563; }
+        .dark .prof-btn-secondary:hover { background:#374151; }
+        .dark .prof-input:focus { border-color:#60a5fa !important; box-shadow:0 0 0 3px rgba(96,165,250,0.12); }
+        .dark .leave-bar { background:#374151; }
+        .dark .field-label { color:#9ca3af; }
+        .dark .field-value { color:#e5e7eb; }
+        .dark .section-divider { background:linear-gradient(90deg,transparent,#374151,transparent); }
+        .dark .toast-success { background:#064e3b; border-color:#10b981; }
+        .dark .toast-success span { color:#a7f3d0; }
+        .dark .toast-error { background:#7f1d1d; border-color:#ef4444; }
+        .dark .toast-error span { color:#fecaca; }
+        .dark .modal-overlay { background:rgba(17,24,39,0.6); }
+        .dark .modal-box { background:#1f2937; box-shadow:0 24px 80px rgba(0,0,0,0.5); }
+        .dark .badge { color:#e5e7eb; }
+      `}</style>
+
+      <div style={s.page}>
+        <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+
+          {/* ── Back nav ── */}
+                  <button
             onClick={() => navigate(dashboardRoute)}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-full bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition"
-        >
-          <ArrowLeftIcon className="h-4 w-4 text-gray-500" />
-          Back to Dashboard
-        </button>
-      </div>
+            style={{ display:"flex", alignItems:"center", gap:"0.4rem", background:"none", border:"none", color:isDark ? "#d1d5db" : "#8a8070", fontSize:"0.85rem", cursor:"pointer", marginBottom:"2rem", fontFamily:"'DM Sans',sans-serif", padding:0 }}
+          >
+            <ArrowLeftIcon style={{ width:14, height:14, color:isDark ? "#9ca3af" : "#9e9890" }} />
+            Back to Dashboard
+          </button>
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900">My Profile</h1>
-        <p className="mt-2 text-xl text-gray-600">
-          Manage your personal information and view your employment details
-        </p>
-      </div>
+          {/* ── Page title ── */}
+          <div style={{ marginBottom:"2rem" }}>
+            <h1 style={{ ...s.heading, fontSize:"2.75rem", color:isDark ? "#e5e7eb" : "#1a1612", margin:0, lineHeight:1.1 }}>
+              My Profile
+            </h1>
+            <p style={{ color:isDark ? "#9ca3af" : "#9e9890", marginTop:"0.4rem", fontSize:"0.95rem" }}>
+              Manage your personal information and employment details
+            </p>
+          </div>
 
-      {/* Profile Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column - Profile Section */}
-        <div className="lg:col-span-2">
-          <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-200">
-            {/* Profile Header */}
-            <div className="p-8 border-b border-gray-100 bg-gray-50">
-              <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-                <div className="relative">
+          {/* ── Main layout ── */}
+          <div style={{ display:"grid", gridTemplateColumns:"280px 1fr", gap:"1.5rem", alignItems:"start" }}>
+
+            {/* ─── LEFT SIDEBAR ─── */}
+            <div style={{ display:"flex", flexDirection:"column", gap:"1.25rem" }}>
+
+              {/* Identity card */}
+              <div style={{ ...s.card, padding:"1.75rem", textAlign:"center" }}>
+                <div style={{ display:"flex", justifyContent:"center", marginBottom:"1rem", position:"relative" }}>
                   {formData.avatar ? (
                     <img
                       src={formData.avatar}
                       alt={formData.name}
-                      className="h-32 w-32 rounded-full object-cover border-2 border-gray-200 shadow-sm transition-transform duration-300 hover:scale-105"
-                      onError={(e) => {
-                        e.target.src =
-                          "https://via.placeholder.com/150?text=User";
-                      }}
+                      style={{ width:88, height:88, borderRadius:"50%", objectFit:"cover", boxShadow:"0 4px 16px rgba(0,0,0,0.12)" }}
+                      onError={e => { e.target.style.display = "none"; }}
                     />
                   ) : (
-                    <div className="h-32 w-32 rounded-full bg-gray-100 flex items-center justify-center">
-                      <UserIcon className="h-16 w-16 text-gray-500" />
-                    </div>
-                  )}
-                  {isEditing && (
-                    <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg border border-gray-200">
-                      <PencilIcon className="h-5 w-5 text-gray-700" />
-                    </div>
+                    <div className="avatar-ring">{initials}</div>
                   )}
                 </div>
 
-                <div className="flex-1 space-y-2 text-center md:text-left">
-                  <h2 className="text-3xl font-bold text-gray-900">
-                    {formData.name || "User Name"}
-                  </h2>
-                  <p className="text-sm text-gray-600">
-                    {user?.email || "Email not available"}
-                  </p>
-                  {user?.role && (
-                    <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start text-sm text-gray-600">
-                      <span className="rounded-full border border-gray-300 px-4 py-1 text-xs font-semibold text-gray-700">
-                        {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                      </span>
-                      <span className="text-xs uppercase tracking-wide text-gray-400">
-                        • {formatDate(formData.joinDate)}
-                      </span>
-                    </div>
-                  )}
+                <h2 style={{ ...s.heading, fontSize:"1.35rem", color:isDark ? "#e5e7eb" : "#1a1612", margin:"0 0 0.25rem" }}>
+                  {formData.name || "Your Name"}
+                </h2>
+                <p style={{ color:isDark ? "#9ca3af" : "#9e9890", fontSize:"0.8rem", margin:"0 0 1rem" }}>
+                  {user?.email}
+                </p>
+
+                  <div style={{ display:"flex", flexDirection:"column", gap:"0.5rem", marginBottom:"1.25rem" }}>
+                  <span className="badge" style={{ background:isDark ? "#374151" : "#fef9f0", color:isDark ? "#fbbf24" : "#c9a96e", border:`1px solid ${isDark ? "#4b5563" : "#f0d9a8"}`, justifyContent:"center" }}>
+                    <SparklesIcon style={{ width:12, height:12 }} />
+                    {roleLabel}
+                  </span>
+                  <span className="badge" style={{ background:isDark ? "#064e3b" : "#f0fdf4", color:isDark ? "#a7f3d0" : "#16a34a", border:`1px solid ${isDark ? "#10b981" : "#bbf7d0"}`, justifyContent:"center" }}>
+                    <CheckCircleIcon style={{ width:12, height:12 }} />
+                    Active
+                  </span>
                 </div>
 
-                <div className="md:ml-auto">
-                  {!isEditing ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(true)}
-                      className="inline-flex items-center px-6 py-3 border border-gray-300 rounded-full bg-white text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition"
-                    >
-                      <PencilIcon className="h-5 w-5 mr-2 text-gray-500" />
-                      Edit Profile
+                <div className="section-divider" style={{ margin:"1rem 0" }} />
+
+                <div style={{ textAlign:"left", display:"flex", flexDirection:"column", gap:"0.75rem" }}>
+                  {[
+                    { icon: BuildingOfficeIcon, label: "Department", val: formData.department || "—" },
+                    { icon: BriefcaseIcon, label: "Position", val: formData.position || "—" },
+                    { icon: CalendarIcon, label: "Joined", val: formatDate(formData.joinDate) },
+                  ].map(({ icon: Icon, label, val }) => (
+                    <div key={label} style={{ display:"flex", alignItems:"flex-start", gap:"0.6rem" }}>
+                      <div style={{ width:28, height:28, borderRadius:8, background:isDark ? "#374151" : "#f5f2ee", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:1 }}>
+                        <Icon style={{ width:14, height:14, color:isDark ? "#9ca3af" : "#9e9890" }} />
+                      </div>
+                      <div>
+                        <div className="field-label" style={{ marginBottom:1 }}>{label}</div>
+                        <div style={{ fontSize:"0.82rem", color:isDark ? "#e5e7eb" : "#3d3525", fontWeight:500 }}>{val}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick stats */}
+              <div style={{ ...s.card, padding:"1.25rem" }}>
+                <p style={{ fontSize:"0.7rem", fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#c9a96e", margin:"0 0 1rem" }}>
+                  Leave at a glance
+                </p>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"0.75rem" }}>
+                  <span style={{ fontSize:"0.8rem", color:"#8a8070" }}>Total balance</span>
+                  <span style={{ ...s.heading, fontSize:"1.75rem", color:"#1a1612" }}>{totalLeave}</span>
+                </div>
+                <div className="leave-bar">
+                  <div className="leave-bar-fill" style={{ width:`${Math.min((totalLeave / 30) * 100, 100)}%`, background:"linear-gradient(90deg,#c9a96e,#e8c98a)" }} />
+                </div>
+                <p style={{ fontSize:"0.75rem", color:"#9e9890", marginTop:"0.4rem" }}>
+                  {totalLeave > 20 ? "Excellent balance!" : totalLeave > 10 ? "Good balance" : "Consider planning time off"}
+                </p>
+              </div>
+            </div>
+
+            {/* ─── RIGHT PANEL ─── */}
+            <div style={s.card}>
+              {/* Tab bar */}
+              <div style={{ display:"flex", alignItems:"center", gap:"0.25rem", padding:"1.25rem 1.75rem 0", borderBottom:"1.5px solid #f0ede8" }}>
+                <div style={{ display:"flex", gap:"0.25rem", flex:1 }}>
+                  {TABS.map(t => (
+                    <button key={t} className={`prof-tab${activeTab === t ? " active" : ""}`} onClick={() => setActiveTab(t)}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                {activeTab === "Overview" && (
+                  !isEditing ? (
+                    <button className="prof-btn-secondary" onClick={() => setIsEditing(true)} style={{ display:"flex", alignItems:"center", gap:"0.4rem" }}>
+                      <PencilIcon style={{ width:13, height:13 }} /> Edit
                     </button>
                   ) : (
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={handleReset}
-                        className="px-6 py-3 rounded-full border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition"
-                      >
-                        Cancel
+                    <div style={{ display:"flex", gap:"0.5rem" }}>
+                      <button className="prof-btn-secondary" onClick={handleReset}>Cancel</button>
+                      <button className="prof-btn-primary" onClick={handleSubmit} disabled={loading}>
+                        {loading ? "Saving…" : "Save changes"}
                       </button>
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="px-6 py-3 rounded-full border border-transparent bg-gray-900 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loading ? (
-                          <div className="flex items-center gap-2">
-                            <svg
-                              className="h-5 w-5 animate-spin text-white"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                            Saving...
-                          </div>
-                        ) : (
-                          "Save Changes"
-                        )}
-                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* ── OVERVIEW TAB ── */}
+              {activeTab === "Overview" && (
+                <form onSubmit={handleSubmit} style={{ padding:"2rem 1.75rem" }}>
+                  {/* Toast messages */}
+                  {successMessage && (
+                    <div className="toast-success slide-in" style={{ marginBottom:"1.5rem" }}>
+                      <CheckCircleIcon style={{ width:18, height:18, color:"#16a34a", flexShrink:0 }} />
+                      <span style={{ fontSize:"0.875rem", color:"#166534" }}>{successMessage}</span>
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-          {/* Profile Details */}
-            <div className="p-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Left Column - Personal Information */}
-                <div>
-                  <h3 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
-                    <UserIcon className="h-6 w-6 mr-3 text-gray-500" />
+                  {errorMessage && (
+                    <div className="toast-error slide-in" style={{ marginBottom:"1.5rem" }}>
+                      <XMarkIcon style={{ width:18, height:18, color:"#dc2626", flexShrink:0 }} />
+                      <span style={{ fontSize:"0.875rem", color:"#991b1b" }}>{errorMessage}</span>
+                    </div>
+                  )}
+
+                  {/* Personal section */}
+                  <p style={{ fontSize:"0.7rem", fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#c9a96e", margin:"0 0 1.25rem" }}>
                     Personal Information
-                  </h3>
-
-                  <div className="space-y-6">
-                    <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                      <UserIcon className="h-6 w-6 text-gray-500" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Full Name
-                        </label>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
-                            placeholder="Enter your full name"
-                            autoFocus
-                          />
-                        ) : (
-                          <p className="text-gray-900 text-lg font-medium">
-                            {formData.name || "Not provided"}
-                          </p>
-                        )}
-                      </div>
+                  </p>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1.25rem", marginBottom:"2rem" }}>
+                    {/* Full name */}
+                    <div>
+                      <p className="field-label">Full Name</p>
+                      {isEditing ? (
+                        <input className="prof-input" style={s.input} type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="Your full name" />
+                      ) : (
+                        <p className="field-value">{formData.name || "Not provided"}</p>
+                      )}
                     </div>
-
-                    <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                      <EnvelopeIcon className="h-6 w-6 text-gray-500" />
-                      </div>
-                      <div className="ml-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Email Address
-                        </label>
-                        <p className="text-gray-900 text-lg font-medium">
-                          {user?.email || "Email not available"}
+                    {/* Email */}
+                    <div>
+                      <p className="field-label">Email Address</p>
+                      <p className="field-value" style={{ color:isDark ? "#9ca3af" : "#9e9890" }}>{user?.email}</p>
+                      {isEditing && <p style={{ fontSize:"0.72rem", color:isDark ? "#9ca3af" : "#c0b8ae", marginTop:3 }}>Cannot be changed</p>}
+                    </div>
+                    {/* Phone */}
+                    <div>
+                      <p className="field-label">Phone Number</p>
+                      {isEditing ? (
+                        <input className="prof-input" style={s.input} type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="+1 234 567 8900" />
+                      ) : (
+                        <p className="field-value">{formData.phone || "Not provided"}</p>
+                      )}
+                    </div>
+                    {/* Join date */}
+                    <div>
+                      <p className="field-label">Join Date</p>
+                      {isEditing ? (
+                        <input className="prof-input" style={s.input} type="date" name="joinDate" value={formData.joinDate} onChange={handleInputChange} />
+                      ) : (
+                        <p className="field-value">{formatDate(formData.joinDate)}</p>
+                      )}
+                    </div>
+                    {/* Avatar URL */}
+                    <div style={{ gridColumn:"1/-1" }}>
+                      <p className="field-label">Avatar URL</p>
+                      {isEditing ? (
+                        <input className="prof-input" style={s.input} type="url" name="avatar" value={formData.avatar} onChange={handleInputChange} placeholder="https://example.com/photo.jpg" />
+                      ) : (
+                        <p className="field-value" style={{ color:isDark ? "#9ca3af" : "#9e9890", fontSize:"0.83rem", wordBreak:"break-all" }}>
+                          {formData.avatar || "No custom avatar set"}
                         </p>
-                        <p className="text-sm text-gray-500 mt-1 italic">
-                          This cannot be changed
-                        </p>
-                      </div>
+                      )}
                     </div>
-
-                    <div className="flex items-start group">
-                    <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                      <PhoneIcon className="h-6 w-6 text-gray-500" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Phone Number
-                        </label>
-                        {isEditing ? (
-                          <input
-                            type="tel"
-                            name="phone"
-                            value={formData.phone}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
-                            placeholder="Enter your phone number"
-                          />
-                        ) : (
-                          <p className="text-gray-900 text-lg font-medium">
-                            {formData.phone || "Not provided"}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Password Update Section */}
-                    {isEditing && (
-                      <div className="border-t border-gray-200 pt-6">
-                        <div className="flex items-center mb-4">
-                          <input
-                            type="checkbox"
-                            id="updatePassword"
-                            checked={updatePassword}
-                            onChange={handlePasswordCheckboxChange}
-                            className="h-5 w-5 text-gray-900 focus:ring-2 focus:ring-gray-200 border-gray-300 rounded"
-                          />
-                          <label
-                            htmlFor="updatePassword"
-                            className="ml-3 block text-lg font-medium text-gray-700"
-                          >
-                            Update Password
-                          </label>
-                        </div>
-
-                        {updatePassword && (
-                          <div className="space-y-4">
-                            <div className="flex items-start group">
-                              <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                                <LockClosedIcon className="h-6 w-6 text-gray-500" />
-                              </div>
-                              <div className="ml-4 flex-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  New Password
-                                </label>
-                                <div className="relative">
-                                  <input
-                                    type={showPassword ? "text" : "password"}
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
-                                    placeholder="Enter new password (min 8 characters)"
-                                  />
-                                  <button
-                                    type="button"
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
-                                    onClick={() =>
-                                      setShowPassword(!showPassword)
-                                    }
-                                  >
-                                    {showPassword ? (
-                                      <EyeSlashIcon className="h-5 w-5" />
-                                    ) : (
-                                      <EyeIcon className="h-5 w-5" />
-                                    )}
-                                  </button>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-2">
-                                  Password must be at least 8 characters long
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-start group">
-                              <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                                <LockClosedIcon className="h-6 w-6 text-gray-500" />
-                              </div>
-                              <div className="ml-4 flex-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Confirm New Password
-                                </label>
-                                <div className="relative">
-                                  <input
-                                    type={
-                                      showConfirmPassword ? "text" : "password"
-                                    }
-                                    name="confirmPassword"
-                                    value={formData.confirmPassword}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
-                                    placeholder="Confirm new password"
-                                  />
-                                  <button
-                                    type="button"
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
-                                    onClick={() =>
-                                      setShowConfirmPassword(
-                                        !showConfirmPassword
-                                      )
-                                    }
-                                  >
-                                    {showConfirmPassword ? (
-                                      <EyeSlashIcon className="h-5 w-5" />
-                                    ) : (
-                                      <EyeIcon className="h-5 w-5" />
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
-                </div>
 
-                {/* Right Column - Employment Details */}
-                <div>
-                  <h3 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center">
-                    <BuildingOfficeIcon className="h-6 w-6 mr-3 text-gray-500" />
+                  <div className="section-divider" />
+
+                  {/* Employment – read-only with request */}
+                  <p style={{ fontSize:"0.7rem", fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#c9a96e", margin:"0 0 1.25rem" }}>
                     Employment Details
-                  </h3>
-
-                  <div className="space-y-6">
-                    <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-gray-100 rounded-xl flex items-center justify-center group-hover:bg-gray-200 transition-colors duration-200">
-                        <CalendarIcon className="h-6 w-6 text-gray-600" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Join Date
-                        </label>
-                        {isEditing ? (
-                          <input
-                            type="date"
-                            name="joinDate"
-                            value={formData.joinDate}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
-                          />
-                        ) : (
-                          <p className="text-gray-900 text-lg font-medium">
-                            {formatDate(formData.joinDate)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                        <ShieldCheckIcon className="h-6 w-6 text-gray-500" />
-                      </div>
-                      <div className="ml-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Status
-                        </label>
-                        <span className="inline-flex items-center px-4 py-2 border border-gray-200 rounded-full text-sm font-medium text-gray-700">
-                          <CheckCircleIcon className="h-4 w-4 mr-2 text-gray-400" />
-                          Active
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                        <BuildingOfficeIcon className="h-6 w-6 text-gray-500" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                          Department
-                          <span className="ml-2">
-                            <LockClosedIcon className="h-4 w-4 text-gray-400" />
-                          </span>
-                        </label>
-                        {isEditing ? (
-                          <div className="relative">
-                            <input
-                              type="text"
-                              name="department"
-                              value={formData.department}
-                              readOnly
-                              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRequestUpdate("department")}
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-full hover:bg-gray-200 transition duration-200"
-                            >
-                              Request Update
-                            </button>
-                          </div>
-                        ) : (
-                        <div className="flex items-center">
-                          <span className="px-4 py-2 rounded-full text-sm font-medium border border-gray-200 text-gray-700">
-                            {formData.department || "Not specified"}
-                          </span>
+                  </p>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1.25rem" }}>
+                    {/* Department */}
+                    <div>
+                      <p className="field-label" style={{ display:"flex", alignItems:"center", gap:4 }}>
+                        Department <LockClosedIcon style={{ width:10, height:10, color:isDark ? "#9ca3af" : "#c0b8ae" }} />
+                      </p>
+                      {isEditing ? (
+                        <div style={{ position:"relative" }}>
+                          <input style={s.inputReadOnly} value={formData.department} readOnly />
+                          <button type="button" onClick={() => handleRequestUpdate("department")}
+                            style={{ position:"absolute", right:6, top:"50%", transform:"translateY(-50%)", background:isDark ? "#374151" : "#f5f2ee", border:`1px solid ${isDark ? "#4b5563" : "#e0d9cf"}`, borderRadius:50, padding:"2px 10px", fontSize:"0.7rem", fontWeight:600, color:isDark ? "#d1d5db" : "#8a8070", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                            Request
+                          </button>
                         </div>
-                        )}
-                        <p className="text-xs text-gray-500 mt-2 flex items-center">
-                          <InformationCircleIcon className="h-4 w-4 mr-1" />
-                          Contact HR to update your department
-                        </p>
-                      </div>
+                      ) : (
+                        <p className="field-value">{formData.department || "—"}</p>
+                      )}
                     </div>
-
-                    <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                        <BriefcaseIcon className="h-6 w-6 text-gray-500" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                          Position
-                          <span className="ml-2">
-                            <LockClosedIcon className="h-4 w-4 text-gray-400" />
-                          </span>
-                        </label>
-                        {isEditing ? (
-                          <div className="relative">
-                            <input
-                              type="text"
-                              name="position"
-                              value={formData.position}
-                              readOnly
-                              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRequestUpdate("position")}
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-full hover:bg-gray-200 transition duration-200"
-                            >
-                              Request Update
-                            </button>
-                          </div>
-                        ) : (
-                          <p className="text-gray-900 text-lg font-medium">
-                            {formData.position || "Not specified"}
-                          </p>
-                        )}
-                        <p className="text-xs text-gray-500 mt-2 flex items-center">
-                          <InformationCircleIcon className="h-4 w-4 mr-1" />
-                          Contact HR for position updates
-                        </p>
-                      </div>
+                    {/* Position */}
+                    <div>
+                      <p className="field-label" style={{ display:"flex", alignItems:"center", gap:4 }}>
+                        Position <LockClosedIcon style={{ width:10, height:10, color:isDark ? "#9ca3af" : "#c0b8ae" }} />
+                      </p>
+                      {isEditing ? (
+                        <div style={{ position:"relative" }}>
+                          <input style={s.inputReadOnly} value={formData.position} readOnly />
+                          <button type="button" onClick={() => handleRequestUpdate("position")}
+                            style={{ position:"absolute", right:6, top:"50%", transform:"translateY(-50%)", background:isDark ? "#374151" : "#f5f2ee", border:`1px solid ${isDark ? "#4b5563" : "#e0d9cf"}`, borderRadius:50, padding:"2px 10px", fontSize:"0.7rem", fontWeight:600, color:isDark ? "#d1d5db" : "#8a8070", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                            Request
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="field-value">{formData.position || "—"}</p>
+                      )}
                     </div>
-
-                    <div className="flex items-start group">
-                      <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                        <SparklesIcon className="h-6 w-6 text-gray-500" />
-                      </div>
-                      <div className="ml-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                          Role
-                          <span className="ml-2">
-                            <LockClosedIcon className="h-4 w-4 text-gray-400" />
-                          </span>
-                        </label>
-                        <p className="text-gray-900 text-lg font-medium">
-                          {user?.role === "admin"
-                            ? "Administrator"
-                            : user?.role === "manager"
-                            ? "Manager"
-                            : user?.role === "employee"
-                            ? "Employee"
-                            : "User"}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-2 flex items-center">
-                          <InformationCircleIcon className="h-4 w-4 mr-1" />
-                          Assigned by system administrator
-                        </p>
-                      </div>
+                    {/* Role */}
+                    <div>
+                      <p className="field-label" style={{ display:"flex", alignItems:"center", gap:4 }}>
+                        Role <LockClosedIcon style={{ width:10, height:10, color:isDark ? "#9ca3af" : "#c0b8ae" }} />
+                      </p>
+                      <p className="field-value">{roleLabel}</p>
+                      <p style={{ fontSize:"0.72rem", color:isDark ? "#9ca3af" : "#c0b8ae", marginTop:3 }}>Assigned by administrator</p>
                     </div>
-
-                    <div className="flex items-start group">
-                    <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
-                        <PencilIcon className="h-6 w-6 text-gray-500" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Avatar
-                        </label>
-                        {isEditing ? (
-                          <input
-                            type="url"
-                            name="avatar"
-                            value={formData.avatar}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
-                            placeholder="https://example.com/avatar.jpg"
-                          />
-                        ) : (
-                          <div className="flex items-center">
-                            {formData.avatar ? (
-                              <img
-                                src={formData.avatar}
-                                alt={formData.name}
-                                className="h-12 w-12 rounded-full object-cover mr-3 border-2 border-gray-200"
-                              />
-                            ) : (
-                              <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center mr-3 border-2 border-gray-200">
-                                <UserIcon className="h-6 w-6 text-gray-400" />
-                              </div>
-                            )}
-                            <div>
-                              <p className="text-gray-900 font-medium">
-                                {formData.avatar
-                                  ? "Custom avatar"
-                                  : "Default avatar"}
-                              </p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {isEditing
-                                  ? "Provide a URL to an image for your profile picture"
-                                  : "Upload a custom avatar in edit mode"}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Success/Error Messages */}
-            </div>
-
-            {successMessage && (
-              <div className="mt-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
-                <div className="flex items-center gap-3">
-                  <CheckCircleIcon className="h-6 w-6 text-gray-400" />
-                  <p className="text-gray-700 text-base font-medium">
-                    {successMessage}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {errorMessage && (
-              <div className="mt-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
-                <div className="flex items-center gap-3">
-                  <XMarkIcon className="h-6 w-6 text-gray-400" />
-                  <p className="text-gray-700 text-base font-medium">
-                    {errorMessage}
-                  </p>
-                </div>
-              </div>
-            )}
-        </div>
-        </div>
-
-        {/* Right Column - Leave Balance Section */}
-        <div className="space-y-6">
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
-            <div className="p-6 border-b border-gray-100 bg-gray-50">
-              <div className="flex items-center gap-3">
-                <ChartBarIcon className="h-7 w-7 text-gray-500" />
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Leave Balances</p>
-                  <h3 className="text-2xl font-semibold text-gray-900">Available days</h3>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 space-y-5">
-              {user?.leaveBalances ? (
-                <>
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 space-y-2">
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <span>Total Available Days</span>
-                      <span className="text-2xl font-semibold text-gray-900">
-                        {totalLeaveBalance}
+                    {/* Status */}
+                    <div>
+                      <p className="field-label">Account Status</p>
+                      <span className="badge" style={{ background:isDark ? "#064e3b" : "#f0fdf4", color:isDark ? "#a7f3d0" : "#16a34a", border:`1px solid ${isDark ? "#10b981" : "#bbf7d0"}` }}>
+                        <CheckCircleIcon style={{ width:11, height:11 }} /> Active
                       </span>
                     </div>
-                    <div className="h-2.5 rounded-full bg-gray-200">
-                      <div
-                        className="h-full rounded-full bg-gray-500 transition-all duration-500"
-                        style={{
-                          width: `${Math.min((totalLeaveBalance / 30) * 100, 100)}%`,
-                        }}
-                      />
+                  </div>
+                </form>
+              )}
+
+              {/* ── SECURITY TAB ── */}
+              {activeTab === "Security" && (
+                <div style={{ padding:"2rem 1.75rem" }}>
+                  <p style={{ fontSize:"0.7rem", fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#c9a96e", margin:"0 0 1.5rem" }}>
+                    Password & Security
+                  </p>
+
+                  <div style={{ ...s.card, padding:"1.5rem", background:"#fdfcfb", border:"1.5px solid #f0ede8", boxShadow:"none", marginBottom:"1.5rem" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"1rem" }}>
+                      <div style={{ width:44, height:44, borderRadius:12, background:"#fef9f0", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                        <LockClosedIcon style={{ width:20, height:20, color:"#c9a96e" }} />
+                      </div>
+                      <div>
+                        <p style={{ fontWeight:600, color:"#1a1612", fontSize:"0.95rem", margin:0 }}>Change your password</p>
+                        <p style={{ fontSize:"0.82rem", color:"#9e9890", margin:"2px 0 0" }}>Use at least 8 characters with a mix of letters and numbers</p>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      {leaveBalanceSummary}
-                    </p>
                   </div>
 
-                  <div className="space-y-4">
-                    {Object.entries(user.leaveBalances).map(([leaveType, balance]) => (
-                      <div
-                        key={leaveType}
-                        className="rounded-xl border border-gray-200 p-4"
-                      >
-                        <div className="flex items-center justify-between text-sm text-gray-500">
-                          <p className="font-medium text-gray-900">
-                            {formatLeaveType(leaveType)}
-                          </p>
-                          <p className="font-semibold text-gray-900">
-                            {balance} day{balance !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                        <div className="mt-2 h-2 rounded-full bg-gray-200">
-                          <div
-                            className="h-full rounded-full bg-gray-500 transition-all duration-500"
-                            style={{
-                              width: `${Math.min((balance / 15) * 100, 100)}%`,
-                            }}
-                          />
-                        </div>
-                        {balance === 0 && (
-                          <p className="mt-2 text-xs italic text-gray-500">
-                            Contact HR to request additional {formatLeaveType(leaveType)} days.
-                          </p>
-                        )}
+                  <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:"1.25rem", maxWidth:440 }}>
+                    {successMessage && (
+                      <div className="toast-success slide-in">
+                        <CheckCircleIcon style={{ width:18, height:18, color:"#16a34a", flexShrink:0 }} />
+                        <span style={{ fontSize:"0.875rem", color:"#166534" }}>{successMessage}</span>
                       </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-2 py-10 text-center text-sm text-gray-500">
-                  <ChartBarIcon className="mx-auto h-12 w-12 text-gray-300" />
-                  <p>No leave balance information available</p>
-                  <p className="text-xs text-gray-400">Contact HR for assistance</p>
+                    )}
+                    {errorMessage && (
+                      <div className="toast-error slide-in">
+                        <XMarkIcon style={{ width:18, height:18, color:"#dc2626", flexShrink:0 }} />
+                        <span style={{ fontSize:"0.875rem", color:"#991b1b" }}>{errorMessage}</span>
+                      </div>
+                    )}
+
+                    {/* New password */}
+                    <div>
+                      <p className="field-label">New Password</p>
+                      <div style={{ position:"relative" }}>
+                        <input
+                          className="prof-input"
+                          style={s.input}
+                          type={showPassword ? "text" : "password"}
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          placeholder="Min. 8 characters"
+                        />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)}
+                          style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"#9e9890", display:"flex" }}>
+                          {showPassword ? <EyeSlashIcon style={{ width:16, height:16 }} /> : <EyeIcon style={{ width:16, height:16 }} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Confirm */}
+                    <div>
+                      <p className="field-label">Confirm Password</p>
+                      <div style={{ position:"relative" }}>
+                        <input
+                          className="prof-input"
+                          style={s.input}
+                          type={showConfirmPassword ? "text" : "password"}
+                          name="confirmPassword"
+                          value={formData.confirmPassword}
+                          onChange={handleInputChange}
+                          placeholder="Re-enter your new password"
+                        />
+                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"#9e9890", display:"flex" }}>
+                          {showConfirmPassword ? <EyeSlashIcon style={{ width:16, height:16 }} /> : <EyeIcon style={{ width:16, height:16 }} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <button
+                        type="submit"
+                        className="prof-btn-primary"
+                        disabled={loading || !formData.password}
+                        onClick={() => setUpdatePassword(true)}
+                      >
+                        {loading ? "Updating…" : "Update Password"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* ── LEAVE BALANCE TAB ── */}
+              {activeTab === "Leave Balance" && (
+                <div style={{ padding:"2rem 1.75rem" }}>
+                  <p style={{ fontSize:"0.7rem", fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#c9a96e", margin:"0 0 1.5rem" }}>
+                    Leave Entitlements
+                  </p>
+
+                  {user?.leaveBalances ? (
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:"1rem" }}>
+                      {Object.entries(user.leaveBalances).map(([leaveType, balance], idx) => {
+                        const palette = LEAVE_COLORS[idx % LEAVE_COLORS.length];
+                        const pct = Math.min((balance / 15) * 100, 100);
+                        return (
+                          <div key={leaveType} style={{ background:palette.bg, border:`1.5px solid ${palette.bar}22`, borderRadius:16, padding:"1.25rem" }}>
+                            <p style={{ fontSize:"0.75rem", fontWeight:600, color:palette.text, margin:"0 0 0.5rem", textTransform:"uppercase", letterSpacing:"0.05em" }}>
+                              {formatLeaveType(leaveType)}
+                            </p>
+                            <p style={{ fontFamily:"'Fraunces',serif", fontSize:"2.25rem", color:"#1a1612", margin:"0 0 0.5rem", fontWeight:300, lineHeight:1 }}>
+                              {balance}
+                              <span style={{ fontSize:"0.9rem", color:"#9e9890", fontFamily:"'DM Sans',sans-serif", marginLeft:4 }}>days</span>
+                            </p>
+                            <div className="leave-bar" style={{ background:`${palette.bar}25` }}>
+                              <div className="leave-bar-fill" style={{ width:`${pct}%`, background:palette.bar }} />
+                            </div>
+                            {balance === 0 && (
+                              <p style={{ fontSize:"0.72rem", color:palette.text, marginTop:6, opacity:0.8 }}>
+                                Contact HR to request more days
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign:"center", padding:"3rem 0", color:"#9e9890" }}>
+                      <ChartBarIcon style={{ width:40, height:40, margin:"0 auto 0.75rem", color:"#d4cec6" }} />
+                      <p style={{ fontWeight:500 }}>No leave balance data</p>
+                      <p style={{ fontSize:"0.82rem" }}>Contact HR for assistance</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -885,61 +652,42 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      {/* Request Update Modal */}
+      {/* ── REQUEST MODAL ── */}
       {showRequestModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900">
-                  Request{" "}
-                  {requestType === "department" ? "Department" : "Position"}{" "}
-                  Update
+        <div className="modal-overlay" onClick={() => setShowRequestModal(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"1.25rem" }}>
+              <div>
+                <h3 style={{ ...s.heading, fontSize:"1.4rem", color:"#1a1612", margin:0 }}>
+                  Request {requestType === "department" ? "Department" : "Position"} Update
                 </h3>
-                <button
-                  onClick={() => setShowRequestModal(false)}
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
+                <p style={{ fontSize:"0.82rem", color:"#9e9890", marginTop:4 }}>HR will review within 3–5 business days</p>
               </div>
+              <button onClick={() => setShowRequestModal(false)} style={{ background:"none", border:"none", cursor:"pointer", color:"#9e9890", padding:0 }}>
+                <XMarkIcon style={{ width:20, height:20 }} />
+              </button>
+            </div>
 
-              <div className="mb-6">
-                <p className="text-gray-600 mb-4">
-                  Please provide details about your request to update your{" "}
-                  {requestType}. Our HR team will review your request and get
-                  back to you within 3-5 business days.
-                </p>
-                <textarea
-                  value={requestDetails}
-                  onChange={(e) => setRequestDetails(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all duration-200 shadow-sm"
-                  rows="4"
-                  placeholder={`Why do you want to change your ${requestType}? Please provide details...`}
-                />
-              </div>
+            <div style={{ marginBottom:"1.25rem" }}>
+              <p className="field-label">Reason for change</p>
+              <textarea
+                value={requestDetails}
+                onChange={e => setRequestDetails(e.target.value)}
+                className="prof-input"
+                style={{ ...s.input, resize:"vertical", minHeight:100 }}
+                placeholder={`Describe why you need a ${requestType} update…`}
+              />
+            </div>
 
-              <div className="flex justify-end space-x-4">
-                <button
-                  onClick={() => setShowRequestModal(false)}
-                className="px-6 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-colors duration-150"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitUpdateRequest}
-                className="px-6 py-3 border border-transparent rounded-lg text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-150"
-                >
-                  Submit Request
-                </button>
-              </div>
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:"0.75rem" }}>
+              <button className="prof-btn-secondary" onClick={() => setShowRequestModal(false)}>Cancel</button>
+              <button className="prof-btn-primary" onClick={submitUpdateRequest}>Submit Request</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
 export default ProfilePage;
-
