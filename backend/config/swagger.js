@@ -44,9 +44,39 @@ const options = {
             name: { type: "string", example: "FlexiLeave" },
             slug: { type: "string", example: "flexileave" },
             createdAt: { type: "string", format: "date-time" },
+            authMode: { type: "string", enum: ["PASSWORD", "SSO", "PASSWORD_AND_SSO"] },
+            allowedEmailDomains: {
+              type: "array",
+              items: { type: "string" },
+              example: ["example.com"],
+            },
           },
         },
-        User: {
+        TenantIdentityProvider: {
+          type: "object",
+          properties: {
+            id: { type: "integer", example: 1 },
+            provider: { type: "string", enum: ["MICROSOFT_ENTRA_ID"] },
+            clientId: { type: "string", example: "00000000-0000-0000-0000-000000000000" },
+            azureTenantId: { type: "string", nullable: true, example: "common" },
+            issuer: { type: "string", nullable: true },
+            authorizationUrl: { type: "string", nullable: true },
+            tokenUrl: { type: "string", nullable: true },
+            enabled: { type: "boolean", example: true },
+            autoProvisionUsers: { type: "boolean", example: false },
+            defaultRole: { type: "string", enum: ["ADMIN", "MANAGER", "EMPLOYEE"] },
+          },
+        },
+        SsoDiscovery: {
+          type: "object",
+          properties: {
+            tenant: { $ref: "#/components/schemas/Tenant" },
+            providers: {
+              type: "array",
+              items: { $ref: "#/components/schemas/TenantIdentityProvider" },
+            },
+          },
+        },        User: {
           type: "object",
           properties: {
             id: { type: "integer", example: 1 },
@@ -69,6 +99,12 @@ const options = {
             tenantId: { type: "integer" },
             tenant: { $ref: "#/components/schemas/Tenant" },
             createdAt: { type: "string", format: "date-time" },
+            authMode: { type: "string", enum: ["PASSWORD", "SSO", "PASSWORD_AND_SSO"] },
+            allowedEmailDomains: {
+              type: "array",
+              items: { type: "string" },
+              example: ["example.com"],
+            },
             refreshToken: { type: "string", nullable: true },
           },
         },
@@ -82,6 +118,12 @@ const options = {
             tenantId: { type: "integer" },
             expiresAt: { type: "string", format: "date-time" },
             createdAt: { type: "string", format: "date-time" },
+            authMode: { type: "string", enum: ["PASSWORD", "SSO", "PASSWORD_AND_SSO"] },
+            allowedEmailDomains: {
+              type: "array",
+              items: { type: "string" },
+              example: ["example.com"],
+            },
           },
         },
         Leave: {
@@ -136,6 +178,12 @@ const options = {
             message: { type: "string" },
             isRead: { type: "boolean" },
             createdAt: { type: "string", format: "date-time" },
+            authMode: { type: "string", enum: ["PASSWORD", "SSO", "PASSWORD_AND_SSO"] },
+            allowedEmailDomains: {
+              type: "array",
+              items: { type: "string" },
+              example: ["example.com"],
+            },
             recipientId: { type: "integer" },
             triggeredById: { type: "integer", nullable: true },
             leaveId: { type: "integer", nullable: true },
@@ -271,3 +319,4 @@ const swaggerUiOptions = {
 };
 
 module.exports = { swaggerUi, specs, swaggerUiOptions };
+

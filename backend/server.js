@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("dotenv").config({ path: process.env.DOTENV_CONFIG_PATH || ".env.development" });
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -51,11 +51,13 @@ const leaveRoutes = require("./routes/leaveRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const tenantRoutes = require("./routes/tenantRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
+const ssoRoutes = require("./routes/ssoRoutes");
 const startExpiredInvitationCleanup = require("./jobs/cleanupExpiredInvites");
 const jobScheduler = require("./jobs/jobScheduler");
 
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/auth/sso", ssoRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/tenants", tenantRoutes);
@@ -113,3 +115,5 @@ const startServer = async () => {
 };
 
 startServer();
+
+

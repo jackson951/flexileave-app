@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
 }
 
 ////////////////////////
@@ -15,6 +16,8 @@ model Tenant {
   name           String
   slug           String   @unique
   isActive       Boolean  @default(true)
+  authMode       AuthMode @default(PASSWORD)
+  allowedEmailDomains String[] @default([])
   logoUrl        String?
   primaryColor   String?
   secondaryColor String?
@@ -24,10 +27,62 @@ model Tenant {
   leaves        Leave[]
   notifications Notification[]
   invitations   UserInvitation[]
-
+  identityProviders TenantIdentityProvider[]
+  externalIdentities ExternalIdentity[]
   @@map("tenants")
 }
 
+////////////////////////
+// TENANT SSO CONFIG
+////////////////////////
+model TenantIdentityProvider {
+  id Int @id @default(autoincrement())
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  provider            SsoProvider
+  clientId            String
+  azureTenantId       String?
+  issuer              String?
+  jwksUri             String?
+  authorizationUrl    String?
+  tokenUrl            String?
+  enabled             Boolean @default(true)
+  autoProvisionUsers  Boolean @default(false)
+  defaultRole         Role    @default(EMPLOYEE)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([tenantId, provider])
+  @@index([provider, issuer])
+  @@map("tenant_identity_providers")
+}
+
+////////////////////////
+// EXTERNAL IDENTITIES
+////////////////////////
+model ExternalIdentity {
+  id Int @id @default(autoincrement())
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider         SsoProvider
+  providerTenantId String?
+  subject          String
+  email            String
+  createdAt        DateTime @default(now())
+  lastLoginAt      DateTime?
+
+  @@unique([provider, subject, providerTenantId])
+  @@index([tenantId, email])
+  @@index([userId])
+  @@map("external_identities")
+}
 ////////////////////////
 // USER
 ////////////////////////
@@ -61,6 +116,7 @@ model User {
 
   notificationsReceived  Notification[] @relation("NotificationRecipient")
   notificationsTriggered Notification[] @relation("NotificationTriggeredBy")
+  externalIdentities     ExternalIdentity[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -202,4 +258,14 @@ enum LeaveStatus {
   APPROVED
   REJECTED
   CANCELLED
+}
+
+enum AuthMode {
+  PASSWORD
+  SSO
+  PASSWORD_AND_SSO
+}
+
+enum SsoProvider {
+  MICROSOFT_ENTRA_ID
 }

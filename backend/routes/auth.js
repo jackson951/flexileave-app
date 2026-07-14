@@ -84,6 +84,12 @@ router.post("/login", async (req, res) => {
         .json({ message: "Tenant not found. Check tenantSlug." });
     }
 
+    if (tenant.authMode === "SSO") {
+      return res.status(403).json({
+        message: "Password login is disabled for this tenant. Use SSO instead.",
+      });
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
 
     const user = await prisma.user.findUnique({
@@ -658,3 +664,5 @@ router.get("/health", (req, res) => {
 });
 
 module.exports = router;
+
+
