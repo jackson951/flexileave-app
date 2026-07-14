@@ -479,10 +479,11 @@ router.post("/token-login", async (req, res) => {
 
     const existingIdentity = await prisma.externalIdentity.findUnique({
       where: {
-        provider_subject_providerTenantId: {
+        tenantId_provider_subject_providerTenantId: {
+          tenantId: tenant.id,
           provider,
           subject: identity.subject,
-          providerTenantId: identity.providerTenantId,
+          providerTenantId: identity.providerTenantId || "",
         },
       },
       include: {
@@ -553,7 +554,7 @@ router.post("/token-login", async (req, res) => {
           tenantId: tenant.id,
           userId: user.id,
           provider,
-          providerTenantId: identity.providerTenantId,
+          providerTenantId: identity.providerTenantId || "",
           subject: identity.subject,
           email: identity.email,
           lastLoginAt: new Date(),
@@ -589,6 +590,4 @@ router.post("/token-login", async (req, res) => {
 });
 
 module.exports = router;
-
-
 

@@ -1,2 +1,2 @@
--- AlterTable
-ALTER TABLE "tenant_identity_providers" ALTER COLUMN "updatedAt" DROP DEFAULT;
+-- Superseded by 20260714104500_add_optional_tenant_sso.
+-- Kept as a no-op so clean databases can run migrations in timestamp order.

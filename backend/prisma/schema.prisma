@@ -69,18 +69,18 @@ model ExternalIdentity {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Cascade)
 
   provider         SsoProvider
-  providerTenantId String?
+  providerTenantId String @default("")
   subject          String
   email            String
   createdAt        DateTime @default(now())
   lastLoginAt      DateTime?
 
-  @@unique([provider, subject, providerTenantId])
+  @@unique([tenantId, provider, subject, providerTenantId])
   @@index([tenantId, email])
-  @@index([userId])
+  @@index([tenantId, userId])
   @@map("external_identities")
 }
 ////////////////////////
@@ -99,7 +99,7 @@ model User {
   position            String?
   joinDate            DateTime
   reportsToId         Int?
-  reportsTo           User?            @relation("UserReportsTo", fields: [reportsToId], references: [id])
+  reportsTo           User?            @relation("UserReportsTo", fields: [reportsToId, tenantId], references: [id, tenantId], onDelete: NoAction)
   subordinates        User[]           @relation("UserReportsTo")
   invitedUsers        UserInvitation[] @relation("InvitationReportsTo")
   leaveBalances       Json
@@ -120,7 +120,8 @@ model User {
 
   @@unique([tenantId, email])
   @@index([tenantId])
-  @@index([reportsToId])
+  @@unique([id, tenantId])
+  @@index([tenantId, reportsToId])
   @@map("users")
 }
 
@@ -145,19 +146,21 @@ model Leave {
   emergencyPhone   String?
 
   userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Cascade)
 
   actionedBy     Int?
-  actionedByUser User? @relation("LeaveActionedBy", fields: [actionedBy], references: [id])
+  actionedByUser User? @relation("LeaveActionedBy", fields: [actionedBy, tenantId], references: [id, tenantId], onDelete: NoAction)
   approverId     Int?
-  approver       User? @relation("LeaveApprover", fields: [approverId], references: [id])
+  approver       User? @relation("LeaveApprover", fields: [approverId, tenantId], references: [id, tenantId], onDelete: NoAction)
 
   attachments   File[]
   notifications Notification[]
 
   @@index([tenantId])
-  @@index([userId])
-  @@index([approverId])
+  @@unique([id, tenantId])
+  @@index([tenantId, userId])
+  @@index([tenantId, approverId])
+  @@index([tenantId, actionedBy])
   @@map("leaves")
 }
 
@@ -174,7 +177,7 @@ model UserInvitation {
   tenantId   Int
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   reportsToId Int?
-  reportsTo   User?  @relation("InvitationReportsTo", fields: [reportsToId], references: [id])
+  reportsTo   User?  @relation("InvitationReportsTo", fields: [reportsToId, tenantId], references: [id, tenantId], onDelete: NoAction)
 
   expiresAt    DateTime
   used         Boolean  @default(false)
@@ -220,17 +223,19 @@ model Notification {
   createdAt DateTime         @default(now())
 
   recipientId Int
-  recipient   User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipient   User @relation("NotificationRecipient", fields: [recipientId, tenantId], references: [id, tenantId], onDelete: Cascade)
 
   triggeredById Int?
-  triggeredBy   User? @relation("NotificationTriggeredBy", fields: [triggeredById], references: [id])
+  triggeredBy   User? @relation("NotificationTriggeredBy", fields: [triggeredById, tenantId], references: [id, tenantId], onDelete: NoAction)
 
   leaveId Int?
-  leave   Leave? @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  leave   Leave? @relation(fields: [leaveId, tenantId], references: [id, tenantId], onDelete: Cascade)
 
   metadata Json?
 
   @@index([tenantId, recipientId, isRead])
+  @@index([tenantId, triggeredById])
+  @@index([tenantId, leaveId])
   @@index([tenantId, createdAt])
   @@map("notifications")
 }

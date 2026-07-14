@@ -112,7 +112,7 @@ const verifyMicrosoftEntraIdToken = async (idToken, identityProvider) => {
 
   return {
     provider: "MICROSOFT_ENTRA_ID",
-    providerTenantId: claims.tid || null,
+    providerTenantId: claims.tid || "",
     subject: claims.oid || claims.sub,
     email,
     name: claims.name || email,
